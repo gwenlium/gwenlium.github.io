@@ -1,0 +1,36 @@
+<div class="background-vfx" data-background-vfx aria-hidden="true">
+  <canvas data-background-canvas></canvas>
+</div>
+
+<script>
+  import '../scripts/background';
+</script>
+
+<style>
+  .background-vfx {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--page-bg);
+  }
+
+  .background-vfx::before {
+    content: '';
+    position: absolute;
+    inset: -64px;
+    transform: translateY(calc(var(--background-parallax-y, 0px) * .3));
+    background:
+      radial-gradient(ellipse at 68% 36%, color-mix(in srgb, var(--surface-raised) 72%, transparent), transparent 57%),
+      radial-gradient(ellipse at 95% 8%, color-mix(in srgb, var(--pink) 80%, transparent), transparent 65%),
+      radial-gradient(ellipse at 15% 94%, color-mix(in srgb, var(--lavender) 78%, transparent), transparent 60%),
+      var(--page-bg);
+  }
+
+  canvas { position: relative; display: block; width: 100%; height: 100%; opacity: .72; }
+
+  :global([data-background-active='off']) .background-vfx { display: none; }
+  @media (forced-colors: active) { .background-vfx { display: none; } }
+  @media print { .background-vfx { display: none; } }
+</style>

@@ -1,0 +1,65 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import Window from '../components/Window.astro';
+import Media from '../components/Media.astro';
+import Icon from '../components/Icon.astro';
+import { gallery } from '../lib/settings';
+const images = gallery.filter((item) => item.type === 'image').length;
+const videos = gallery.filter((item) => item.type === 'video').length;
+---
+
+<SiteLayout title="Gallery">
+  <header class="page-heading">
+    <span class="eyebrow">Images & videos</span>
+    <h1>Gallery</h1>
+  </header>
+  {gallery.length ? (
+    <section data-gallery aria-label="Gallery">
+      <div class="gallery-toolbar">
+        <div class="gallery-filters" role="group" aria-label="Filter gallery">
+          <button type="button" class="button-secondary" data-gallery-filter="all" aria-pressed="true">All <span>{gallery.length}</span></button>
+          <button type="button" class="button-secondary" data-gallery-filter="image" aria-pressed="false">Images <span>{images}</span></button>
+          <button type="button" class="button-secondary" data-gallery-filter="video" aria-pressed="false">Video <span>{videos}</span></button>
+        </div>
+        <p data-gallery-status role="status" aria-live="polite">{gallery.length} {gallery.length === 1 ? 'item' : 'items'} shown</p>
+      </div>
+      <div class="gallery-grid">
+        {gallery.map((item) => (
+          <article class="gallery-item" data-gallery-type={item.type} id={`work-${item.id}`}>
+            <div class="gallery-item-heading"><span aria-hidden="true"><Icon name={item.type === 'video' ? 'play' : 'image'} size={13} /></span><h2>{item.title}</h2></div>
+            <div class="gallery-item-body">
+              <Media src={item.src} alt={item.alt} caption={item.caption} type={item.type} poster={item.poster} sizes="(max-width: 640px) calc(100vw - 3rem), (max-width: 1100px) 40vw, 30vw" />
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  ) : (
+    <Window title="Gallery" tone="pink">
+      <div class="empty-state">
+        <Icon name="image" size={36} />
+        <h2>No work published yet</h2>
+        <p>Images and videos will appear here when added to the gallery.</p>
+      </div>
+    </Window>
+  )}
+</SiteLayout>
+
+<style>
+  .gallery-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding-bottom: 1.2rem; margin-bottom: 1.7rem; border-bottom: 1px solid var(--line); }
+  .gallery-filters { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .gallery-filters button { font: inherit; font-size: .7rem; cursor: pointer; }
+  .gallery-filters button[aria-pressed='true'] { background: var(--ink); color: var(--surface); }
+  .gallery-filters span { font-size: .6rem; opacity: .75; }
+  .gallery-toolbar p { font-size: .65rem; color: var(--muted); margin: 0; }
+  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 265px), 1fr)); gap: 1.5rem; align-items: start; }
+  .gallery-item { min-width: 0; border: 1px solid var(--line); border-top-color: var(--surface-raised); border-left-color: var(--surface-raised); background: var(--surface); box-shadow: var(--shadow); }
+  .gallery-item[hidden] { display: none; }
+  .gallery-item-heading { display: flex; align-items: center; gap: .55rem; padding: .55rem .7rem; background: var(--sage); border-bottom: 1px solid var(--line); }
+  .gallery-item:nth-child(3n + 2) .gallery-item-heading { background: var(--pink); }
+  .gallery-item:nth-child(3n) .gallery-item-heading { background: var(--lavender); }
+  .gallery-item h2 { margin: 0; font-size: .7rem; font-weight: 400; overflow-wrap: anywhere; }
+  .gallery-item-body { padding: .65rem; }
+  .gallery-item :global(img) { max-height: 470px; object-fit: contain; }
+  .empty-state :global(svg) { margin-inline: auto; }
+</style>

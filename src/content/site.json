@@ -1,0 +1,24 @@
+{
+  "name": "Gwenlium",
+  "description": "",
+  "intro": "",
+  "status": "",
+  "githubUrl": "https://github.com/gwenlium",
+  "featuredPost": "",
+  "newsletterUrl": "",
+  "game": {
+    "title": "",
+    "description": "",
+    "status": "",
+    "cover": "",
+    "coverAlt": "",
+    "trailerUrl": "",
+    "links": []
+  },
+  "about": {
+    "body": "",
+    "avatar": "",
+    "avatarAlt": "",
+    "links": []
+  }
+}

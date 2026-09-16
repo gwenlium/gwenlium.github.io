@@ -1,0 +1,217 @@
+---
+import { ClientRouter } from 'astro:transitions';
+import Icon from '../components/Icon.astro';
+import BackgroundVfx from '../components/BackgroundVfx.astro';
+import Player from '../components/Player.astro';
+import Window from '../components/Window.astro';
+import StartMenu from '../components/StartMenu.astro';
+import { site } from '../lib/settings';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  imageAlt?: string;
+  article?: boolean;
+  noindex?: boolean;
+}
+
+const { title, description = site.description, image, imageAlt, article = false, noindex = false } = Astro.props;
+const pageTitle = title ? `${title} · ${site.name}` : site.name;
+const siteUrl = Astro.site ?? new URL('https://gwenlium.dev');
+const canonical = new URL(Astro.url.pathname, siteUrl).href;
+const socialImage = new URL(image || '/social-card.png', siteUrl).href;
+const path = Astro.url.pathname;
+const navigation = [
+  { href: '/', label: 'Home', icon: 'home' },
+  { href: '/devlog/', label: 'Devlog', icon: 'book' },
+  { href: '/game/', label: 'Game', icon: 'game' },
+  { href: '/gallery/', label: 'Gallery', icon: 'image' },
+  { href: '/music/', label: 'Music', icon: 'music' },
+  { href: '/about/', label: 'About', icon: 'user' },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <script is:inline>
+      (() => {
+        let saved = {};
+        try {
+          const value = JSON.parse(localStorage.getItem('gwenlium:preferences') || '{}');
+          if (value && typeof value === 'object') saved = value;
+        } catch {}
+        const theme = ['light', 'dark', 'system'].includes(saved.theme) ? saved.theme : 'system';
+        const motion = ['full', 'reduced', 'system'].includes(saved.motion) ? saved.motion : 'system';
+        const reading = saved.reading === 'pixel' ? 'pixel' : 'readable';
+        const root = document.documentElement;
+        const backgrounds = { auto: true, dots: true, polygons: true, circuits: true, checker: true, wave: true, off: true };
+        const background = typeof saved.background === 'string' && Object.hasOwn(backgrounds, saved.background) ? saved.background : 'auto';
+        if (!root.dataset.backgroundAuto) {
+          const presets = ['dots', 'polygons', 'circuits', 'checker', 'wave'];
+          let previous = -1;
+          try { previous = presets.indexOf(localStorage.getItem('gwenlium:background:last-auto')); } catch {}
+          const choice = previous < 0 ? Math.floor(Math.random() * presets.length) : (previous + 1 + Math.floor(Math.random() * (presets.length - 1))) % presets.length;
+          root.dataset.backgroundAuto = presets[choice];
+          if (background === 'auto') {
+            try { localStorage.setItem('gwenlium:background:last-auto', root.dataset.backgroundAuto); } catch {}
+          }
+        }
+        root.dataset.background = background;
+        root.dataset.backgroundActive = background === 'auto' ? root.dataset.backgroundAuto : background;
+        root.dataset.themePreference = theme;
+        root.dataset.motionPreference = motion;
+        root.dataset.theme = theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme;
+        root.dataset.motion = motion === 'system' ? (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'full') : motion;
+        root.dataset.reading = reading;
+        root.style.colorScheme = root.dataset.theme;
+      })();
+    </script>
+    <title>{pageTitle}</title>
+    {description && <meta name="description" content={description} />}
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    {!noindex && <link rel="canonical" href={canonical} />}
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="alternate" type="application/rss+xml" title={`${site.name} · Devlog`} href="/rss.xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="preload" href="/fonts/DepartureMono-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:type" content={article ? 'article' : 'website'} />
+    <meta property="og:title" content={pageTitle} />
+    {description && <meta property="og:description" content={description} />}
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={socialImage} />
+    <meta property="og:image:alt" content={imageAlt || site.name} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    {description && <meta name="twitter:description" content={description} />}
+    <meta name="twitter:image" content={socialImage} />
+    <meta name="twitter:image:alt" content={imageAlt || site.name} />
+    <ClientRouter />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <div transition:persist="site-background"><BackgroundVfx /></div>
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="site-brand" href="/" aria-label={`${site.name} home`}>
+          <span class="brand-icon"><img class="brand-avatar" src="/avatar.webp" alt="" width="43" height="43" /></span>
+          <span>{site.name}<span class="brand-caret" aria-hidden="true">_</span></span>
+        </a>
+        <div class="header-links">
+          {site.status && <span class="site-status"><i aria-hidden="true"></i>{site.status}</span>}
+          <a href={site.githubUrl} class="header-link">GitHub <Icon name="external" size={14} /></a>
+          <a href="/rss.xml" class="header-link"><Icon name="rss" size={15} /><span>RSS</span></a>
+        </div>
+      </header>
+
+      <div class="desktop-grid">
+        <aside class="site-rail">
+          <Window title="Navigation" class="navigation-window">
+            <nav aria-label="Main navigation" class="navigation">
+              {navigation.map((item) => (
+                <a class="nav-link" href={item.href} aria-current={(item.href === '/' ? path === '/' : path.startsWith(item.href)) ? 'page' : undefined}>
+                  <span class="nav-cursor" aria-hidden="true">▸</span>
+                  <Icon name={item.icon} size={18} />
+                  <span>{item.label}</span>
+                </a>
+              ))}
+              <span class="nav-divider" aria-hidden="true"></span>
+              <a class="nav-link nav-link--small" href="/subscribe/" aria-current={path.startsWith('/subscribe/') ? 'page' : undefined}>
+                <span class="nav-cursor" aria-hidden="true">▸</span><Icon name="mail" size={18} /><span>Subscribe</span>
+              </a>
+              <a class="nav-link nav-link--small" href="/rss.xml">
+                <span class="nav-cursor" aria-hidden="true">▸</span><Icon name="rss" size={18} /><span>RSS feed</span>
+              </a>
+            </nav>
+          </Window>
+          <div class="rail-decoration" aria-hidden="true">
+            <div class="rail-flower"><span></span><i></i></div>
+            <span>✧ &nbsp; · &nbsp; ✧</span>
+          </div>
+        </aside>
+
+        <main id="main-content" class="page-content" tabindex="-1" transition:name="page-content">
+          <slot />
+        </main>
+      </div>
+
+      <footer class="site-footer">
+        <div class="taskbar">
+          <Player />
+        </div>
+        <nav class="footer-links" aria-label="Footer navigation">
+          <div><h2>Explore</h2><div class="footer-link-group">{navigation.map((item) => <a href={item.href}>{item.label}</a>)}</div></div>
+          <div><h2>Follow</h2><div class="footer-link-group"><a href="/subscribe/">Updates</a><a href="/rss.xml" data-astro-reload>RSS feed</a><a href={site.githubUrl}>GitHub<Icon name="external" size={13} /></a></div></div>
+        </nav>
+        <div class="footer-meta">
+          <span>© {new Date().getUTCFullYear()} {site.name}</span>
+          <a href="/admin/"><Icon name="settings" size={12} />Content editor</a>
+        </div>
+      </footer>
+    </div>
+
+    <StartMenu />
+    <dialog id="site-settings" class="settings-dialog" aria-labelledby="settings-title">
+      <div class="window-titlebar">
+        <Icon name="settings" size={16} />
+        <h2 id="settings-title" class="window-titlebar__title">Preferences</h2>
+        <button type="button" class="window-close" data-close-settings aria-label="Close preferences"><Icon name="close" size={16} /></button>
+      </div>
+      <div class="settings-content">
+        <p class="settings-note">Display and reading settings.</p>
+        <fieldset class="preference-group">
+          <legend>Theme</legend>
+          <div class="preference-options">
+            <label><input type="radio" name="theme" value="light" data-preference="theme" /><Icon name="sun" size={17} />Light</label>
+            <label><input type="radio" name="theme" value="dark" data-preference="theme" /><Icon name="moon" size={17} />Dark</label>
+            <label><input type="radio" name="theme" value="system" data-preference="theme" checked />System</label>
+          </div>
+        </fieldset>
+        <fieldset class="preference-group">
+          <legend>Motion</legend>
+          <div class="preference-options">
+            <label><input type="radio" name="motion" value="full" data-preference="motion" />Full</label>
+            <label><input type="radio" name="motion" value="reduced" data-preference="motion" />Reduced</label>
+            <label><input type="radio" name="motion" value="system" data-preference="motion" checked />System</label>
+          </div>
+          <p>System follows your device’s accessibility preference.</p>
+        </fieldset>
+        <fieldset class="preference-group" aria-describedby="background-preference-help">
+          <legend>Background</legend>
+          <div class="preference-options">
+            <label><input type="radio" name="background" value="auto" data-preference="background" checked />Auto</label>
+            <label><input type="radio" name="background" value="dots" data-preference="background" />Dots</label>
+            <label><input type="radio" name="background" value="polygons" data-preference="background" />Polygons</label>
+            <label><input type="radio" name="background" value="circuits" data-preference="background" />Circuits</label>
+            <label><input type="radio" name="background" value="checker" data-preference="background" />Checker</label>
+            <label><input type="radio" name="background" value="wave" data-preference="background" />Wave mesh</label>
+            <label><input type="radio" name="background" value="off" data-preference="background" />Off</label>
+          </div>
+          <p id="background-preference-help">Auto changes the pattern on each new visit. Reduced motion keeps it still.</p>
+        </fieldset>
+        <fieldset class="preference-group">
+          <legend>Reading font</legend>
+          <div class="preference-options preference-options--font">
+            <label class="font-option-readable"><input type="radio" name="reading" value="readable" data-preference="reading" checked />Readable</label>
+            <label><input type="radio" name="reading" value="pixel" data-preference="reading" />Pixel</label>
+          </div>
+          <p>Changes the font used for posts and longer text.</p>
+        </fieldset>
+        <div class="settings-bottom">
+          <p data-preferences-status role="status" aria-live="polite">Saved on this device when browser storage is available.</p>
+          <button type="button" class="button" data-close-settings>Done<Icon name="arrow" size={16} /></button>
+        </div>
+      </div>
+    </dialog>
+    <script>
+      import '../scripts/preferences';
+      import '../scripts/media';
+    </script>
+  </body>
+</html>

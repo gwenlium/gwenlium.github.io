@@ -1,0 +1,71 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import Window from '../components/Window.astro';
+import Media from '../components/Media.astro';
+import Icon from '../components/Icon.astro';
+import { tracks } from '../lib/settings';
+---
+
+<SiteLayout title="Music">
+  <header class="page-heading">
+    <span class="eyebrow">Tracks</span>
+    <h1>Music</h1>
+    {tracks.length > 0 && <p>Press play to listen. Music keeps playing as you explore the site; pause or adjust it in the player below.</p>}
+  </header>
+  <Window title="Track list" tone="lavender">
+    {tracks.length ? (
+      <ol class="track-list">
+        {tracks.map((track, index) => (
+          <li class="track" id={`track-${track.id}`} data-track-row>
+            <span class="track-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+            <div class:list={['track-cover', { 'track-cover--empty': !track.cover }]}>
+              {track.cover ? <Media src={track.cover} alt={track.coverAlt} sizes="68px" /> : <Icon name="music" size={24} />}
+            </div>
+            <div class="track-meta"><h2>{track.title}</h2><p data-track-state>{track.src ? 'Ready' : 'Audio unavailable'}</p></div>
+            <button type="button" class="button track-play" data-play-track={track.id} aria-label={`Play ${track.title}`} aria-pressed="false" disabled={!track.src}>
+              <span data-track-button-label>Play</span>
+            </button>
+            {track.src && <a class="track-file" href={track.src} aria-label={`Open audio file: ${track.title}`}><Icon name="external" size={16} /><span class="sr-only">Open audio file</span></a>}
+          </li>
+        ))}
+      </ol>
+    ) : (
+      <div class="empty-state">
+        <Icon name="music" size={36} />
+        <h2>No tracks published yet</h2>
+        <p>Published tracks will be listed here. Audio does not autoplay.</p>
+      </div>
+    )}
+  </Window>
+</SiteLayout>
+
+<style>
+  .page-heading p { max-width: 43rem; color: var(--muted); font-family: var(--font-reading); line-height: 1.7; }
+  .track-list { list-style: none; margin: 0; padding: 0; }
+  .track { display: grid; grid-template-columns: 2ch 68px minmax(0, 1fr) auto 32px; align-items: center; gap: 1rem; padding: 1.2rem .6rem; border-bottom: 1px solid var(--line); }
+  .track:first-child { padding-top: .35rem; }
+  .track:last-child { border-bottom: 0; padding-bottom: .35rem; }
+  .track:has([aria-current='true']) { background: color-mix(in srgb, var(--sage) 30%, var(--surface)); box-shadow: inset 3px 0 var(--line); }
+  .track-number { color: var(--muted); font-size: .7rem; flex-shrink: 0; }
+  .track-cover { width: 68px; padding: .2rem; background: var(--surface-raised); border: 1px solid var(--line); }
+  .track-cover--empty { display: grid; place-items: center; aspect-ratio: 1; color: var(--muted); background: linear-gradient(140deg, var(--sage), var(--lavender)); }
+  .track-cover :global(img) { aspect-ratio: 1; object-fit: cover; }
+  .track-meta { flex: 1; min-width: 0; }
+  .track-meta h2 { font-size: .9rem; font-weight: 400; margin: 0; overflow-wrap: anywhere; }
+  .track-meta p { margin: .5rem 0 0; font-size: .65rem; color: var(--muted); }
+  .track-play { min-width: 5rem; min-height: 44px; font: inherit; font-size: .7rem; cursor: pointer; }
+  .track-play[aria-pressed='true'] { background: var(--ink); color: var(--surface); }
+  .track-play:disabled { opacity: .45; cursor: default; }
+  .track-file { display: grid; place-items: center; width: 32px; min-height: 44px; color: var(--muted); }
+  .track-file:hover { color: var(--ink); }
+  .empty-state :global(svg) { margin-inline: auto; }
+  @media (max-width: 560px) {
+    .track { grid-template-columns: 48px minmax(0, 1fr) auto; gap: .75rem; padding: 1rem .5rem; }
+    .track-cover { width: 48px; }
+    .track-number { display: none; }
+    .track-meta h2 { font-size: .8rem; }
+    .track-play { min-width: 3.5rem; padding-inline: .6rem; }
+    .track-file { grid-column: 3; justify-self: center; }
+    .track:has(.track-file) .track-meta { grid-row: span 2; }
+  }
+</style>

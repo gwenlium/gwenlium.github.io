@@ -1,0 +1,65 @@
+---
+interface Props {
+  title: string;
+  id?: string;
+  class?: string;
+  tone?: 'sage' | 'pink' | 'lavender';
+}
+
+const { title, id, class: className, tone = 'sage' } = Astro.props;
+---
+
+<section id={id} class:list={['window', `window--${tone}`, className]} aria-label={title} data-desktop-window data-window-title={title} data-window-state="normal" tabindex="-1">
+  <div class="window-titlebar">
+    <span class="window-titlebar__mark" aria-hidden="true"></span>
+    <span class="window-titlebar__title" title={title}>{title}</span>
+    <div class="window-controls" data-window-controls hidden>
+      <button type="button" class="window-control" data-window-action="minimize" aria-label={`Minimize ${title}`} title={`Minimize ${title}`}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12h10" /></svg>
+      </button>
+      <button type="button" class="window-control" data-window-action="maximize" data-window-maximize aria-label={`Maximize ${title}`} title={`Maximize ${title}`}>
+        <svg class="window-control__maximize" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 3h10v10H3zM3 5.5h10" /></svg>
+        <svg class="window-control__restore" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 5V2h9v9h-3M2 5h9v9H2zM2 7.5h9M5 4.5h9" /></svg>
+      </button>
+      <button type="button" class="window-control window-control--close" data-window-action="close" aria-label={`Close ${title}`} title={`Close ${title}`}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8" /></svg>
+      </button>
+    </div>
+  </div>
+  <div class="window-body"><slot /></div>
+</section>
+
+<script>
+  import '../scripts/windows';
+</script>
+
+<style>
+  .window[hidden], .window-controls[hidden] { display: none; }
+  .window-controls { display: flex; flex-shrink: 0; align-items: center; gap: 3px; margin-left: auto; }
+  .window-control { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; padding: 0; border: 1px solid var(--line); border-radius: 0; color: var(--ink); background: linear-gradient(var(--surface-raised), var(--surface)); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
+  .window-control:hover { background: var(--sage); }
+  .window-control:active { box-shadow: inset 1px 1px var(--bevel-dark), inset -1px -1px var(--bevel-light); }
+  .window-control:focus-visible { position: relative; z-index: 1; outline-offset: 2px; }
+  .window-control--close { background: color-mix(in srgb, var(--pink) 75%, var(--surface)); }
+  .window-control--close:hover { background: var(--pink); }
+  .window-control__restore { display: none; }
+  .window[data-window-state='maximized'] { position: fixed; z-index: 40; inset: .75rem .75rem calc(var(--dock-space) + .75rem); display: flex; flex-direction: column; width: auto; height: auto; min-height: 0; max-width: none; max-height: none; margin: 0; overflow: hidden; }
+  .window[data-window-state='maximized'] > .window-titlebar { flex-shrink: 0; }
+  .window[data-window-state='maximized'] > .window-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scroll-padding-block: 1rem; }
+  .window[data-window-state='maximized'] .window-control__maximize { display: none; }
+  .window[data-window-state='maximized'] .window-control__restore { display: block; }
+  .window[data-window-state='maximized']::backdrop { display: none; }
+  :global(.window-recovery-toast) { position: fixed; z-index: 41; right: .75rem; bottom: calc(var(--dock-space) + 1rem); width: min(28rem, calc(100% - 1.5rem)); padding: .85rem; border: 1px solid var(--line); background: var(--surface-raised); color: var(--ink); font-family: var(--font-ui); font-size: .75rem; box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark), var(--shadow); }
+  :global(.window-recovery-toast[hidden]) { display: none; }
+  :global(.window-recovery-toast p) { margin: 0 0 .7rem; }
+  :global(.window-recovery-toast__actions) { display: flex; flex-wrap: wrap; gap: .6rem; }
+  :global(.window-recovery-toast button) { min-height: 32px; padding: .35rem .65rem; border: 1px solid var(--line); background: var(--surface); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
+  :global(.window-recovery-toast button:hover) { background: var(--sage); }
+  @media (pointer: coarse) { .window-control { width: 28px; height: 28px; } }
+  @media (forced-colors: active) { .window-control, :global(.window-recovery-toast), :global(.window-recovery-toast button) { border-color: ButtonText; box-shadow: none; } }
+  @media print {
+    .window-controls, :global(.window-recovery-toast), :global([data-window-placeholder]) { display: none !important; }
+    .window[data-window-state='maximized'] { position: static; display: block; overflow: visible; }
+    .window[data-window-state='maximized'] > .window-body { overflow: visible; }
+  }
+</style>

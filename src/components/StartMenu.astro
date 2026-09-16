@@ -1,0 +1,170 @@
+---
+import Icon from './Icon.astro';
+import { site } from '../lib/settings';
+
+const navigation = [
+  { title: 'Home', href: '/', icon: 'home' },
+  { title: 'Devlog', href: '/devlog/', icon: 'book' },
+  { title: 'Game', href: '/game/', icon: 'game' },
+  { title: 'Gallery', href: '/gallery/', icon: 'image' },
+  { title: 'Music', href: '/music/', icon: 'music' },
+  { title: 'About', href: '/about/', icon: 'user' },
+  { title: 'Updates', href: '/subscribe/', icon: 'rss' },
+];
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+---
+
+<dialog id="start-menu" class="start-menu" aria-labelledby="start-menu-title">
+  <header class="start-titlebar">
+    <img class="start-avatar" src="/avatar.webp" width="32" height="32" alt="" />
+    <div class="start-heading"><h2 id="start-menu-title">Start</h2><span>{site.name}</span></div>
+    <button class="start-close" type="button" data-close-start aria-label="Close Start menu"><Icon name="close" size={16} /></button>
+  </header>
+  <div class="start-content">
+    <form class="start-search" role="search" aria-label="Site" data-start-search>
+      <label for="start-query">Search this site</label>
+      <div class="start-search-field">
+        <Icon name="search" size={18} />
+        <input id="start-query" name="q" type="search" placeholder="Pages and posts" autocomplete="off" spellcheck="false" aria-controls="start-search-results" aria-describedby="start-search-status" autofocus />
+      </div>
+      <p class="start-status" id="start-search-status" role="status" aria-live="polite" aria-atomic="true">Search pages and published posts.</p>
+    </form>
+    <ul class="start-results" id="start-search-results" aria-label="Search results" data-start-results hidden></ul>
+    <div class="start-sections">
+      <nav class="start-pages" aria-labelledby="start-pages-title">
+        <h3 id="start-pages-title">Pages</h3>
+        <ul>
+          {navigation.map((item) => (
+            <li><a href={item.href} aria-current={path === (item.href.replace(/\/$/, '') || '/') || (item.href === '/devlog/' && path.startsWith('/devlog/')) ? 'page' : undefined}>
+              <Icon name={item.icon} size={17} /><span>{item.title}</span><Icon name="chevron" size={12} />
+            </a></li>
+          ))}
+        </ul>
+      </nav>
+      <section class="start-windows" aria-labelledby="start-windows-title">
+        <div class="start-section-heading"><h3 id="start-windows-title">Windows</h3><span class="start-window-count" data-start-window-count>0</span></div>
+        <p class="start-empty" data-start-windows-empty>All windows are open.</p>
+        <ul class="start-window-list" aria-label="Hidden windows" data-start-windows></ul>
+        <button class="start-restore-all" type="button" data-restore-all-windows disabled>Restore all</button>
+      </section>
+    </div>
+    <details class="start-shortcuts" id="start-keyboard-shortcuts" data-start-shortcuts>
+      <summary>Keyboard shortcuts</summary>
+      <dl>
+        <dt><kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>K</kbd>, <kbd>/</kbd></dt><dd>Search this site</dd>
+        <dt><kbd>?</kbd></dt><dd>Keyboard shortcuts</dd>
+        <dt><kbd>G</kbd> then <kbd>H</kbd></dt><dd>Home</dd>
+        <dt><kbd>G</kbd> then <kbd>D</kbd></dt><dd>Devlog</dd>
+        <dt><kbd>G</kbd> then <kbd>P</kbd></dt><dd>Game</dd>
+        <dt><kbd>G</kbd> then <kbd>I</kbd></dt><dd>Gallery</dd>
+        <dt><kbd>G</kbd> then <kbd>M</kbd></dt><dd>Music</dd>
+        <dt><kbd>G</kbd> then <kbd>A</kbd></dt><dd>About</dd>
+        <dt><kbd>P</kbd></dt><dd>Play / pause music</dd>
+        <dt><kbd>,</kbd></dt><dd>Preferences</dd>
+        <dt><kbd>Esc</kbd></dt><dd>Close dialog / restore maximized window</dd>
+      </dl>
+      <p>Press a second navigation key within one second. Shortcuts do not run while typing; page and player shortcuts pause while a dialog is open.</p>
+    </details>
+  </div>
+  <footer class="start-footer"><span><kbd>Esc</kbd> Close</span><button type="button" data-open-shortcuts aria-controls="start-keyboard-shortcuts"><kbd>?</kbd> Shortcuts</button></footer>
+</dialog>
+
+<script>
+  import '../scripts/start-menu';
+</script>
+
+<style>
+  .start-menu {
+    position: fixed;
+    inset: auto auto var(--start-bottom, var(--dock-space)) var(--start-left, max(.75rem, calc((100vw - 1440px) / 2)));
+    width: min(36rem, var(--start-available-width, calc(100% - 1.5rem)));
+    max-width: none;
+    max-height: var(--start-max-height, calc(100dvh - var(--dock-space) - .75rem));
+    margin: 0;
+    padding: 3px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: inset 1px 1px rgb(255 255 255 / .65), inset -1px -1px rgb(22 45 30 / .2), 5px 7px 0 rgb(20 42 29 / .16), 0 18px 60px rgb(16 39 28 / .3);
+    font-family: var(--font-ui);
+  }
+  .start-menu[open] { display: flex; flex-direction: column; }
+  .start-menu::backdrop { background: rgb(17 39 28 / .2); }
+  .start-titlebar { display: flex; flex: 0 0 auto; align-items: center; gap: .7rem; min-width: 0; padding: .55rem .65rem; border: 1px solid var(--line); border-radius: 2px; background: linear-gradient(180deg, color-mix(in srgb, var(--sage) 65%, var(--surface-raised)), var(--sage)); }
+  .start-avatar { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 3px; object-fit: cover; }
+  .start-heading { min-width: 0; }
+  .start-heading h2 { margin: 0; font: inherit; font-size: .85rem; }
+  .start-heading > span { display: block; margin-top: .2rem; color: var(--muted); font-size: .65rem; overflow-wrap: anywhere; }
+  .start-close { display: grid; place-items: center; flex-shrink: 0; min-width: 36px; min-height: 36px; margin-left: auto; padding: .35rem; border: 1px solid var(--line); border-radius: 2px; background: var(--pink); color: var(--ink); box-shadow: inset 1px 1px rgb(255 255 255 / .5), inset -1px -1px rgb(22 45 30 / .2); }
+  .start-close:hover { background: color-mix(in srgb, var(--pink) 65%, var(--surface-raised)); }
+  .start-content { min-height: 0; padding: 1rem; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  .start-search label { display: block; margin-bottom: .6rem; font-size: .7rem; }
+  .start-search-field { display: flex; align-items: center; gap: .65rem; min-width: 0; padding-left: .7rem; border: 1px solid var(--line); border-radius: 2px; background: var(--surface-raised); box-shadow: inset 1px 1px 2px rgb(22 45 30 / .16); }
+  .start-search-field :global(svg) { flex-shrink: 0; }
+  .start-search-field input { width: 100%; min-width: 0; padding: .75rem .6rem .75rem 0; border: 0; border-radius: 0; outline: none; background: transparent; color: var(--ink); font-family: var(--font-reading); font-size: 1rem; }
+  .start-search-field:focus-within { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .start-status { margin: .7rem 0 0; color: var(--muted); font-family: var(--font-reading); font-size: .8rem; line-height: 1.5; }
+  .start-results, .start-pages ul, .start-window-list { list-style: none; margin: 0; padding: 0; }
+  .start-results { margin-top: .8rem; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: var(--surface-raised); }
+  .start-results[hidden] { display: none; }
+  .start-results :global(li + li) { border-top: 1px solid color-mix(in srgb, var(--line) 35%, transparent); }
+  .start-results :global(a) { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; padding: .7rem; color: var(--ink); font-family: var(--font-reading); font-size: .9rem; text-decoration: none; }
+  .start-results :global(a > span:first-child) { min-width: 0; overflow-wrap: anywhere; }
+  .start-results :global(small) { flex-shrink: 0; padding: .15rem .3rem; border: 1px solid var(--line); border-radius: 2px; color: var(--muted); font-family: var(--font-ui); font-size: .6rem; }
+  .start-results :global(a:hover), .start-results :global(a:focus-visible) { background: var(--sage); }
+  .start-results :global(a:focus-visible) { outline-offset: -3px; }
+  .start-sections { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.1rem; margin-top: 1.15rem; }
+  .start-sections h3 { margin: 0 0 .6rem; color: var(--muted); font: inherit; font-size: .65rem; }
+  .start-pages a { display: flex; align-items: center; gap: .6rem; min-height: 42px; padding: .55rem .5rem; border: 1px solid transparent; border-radius: 2px; color: var(--ink); font-size: .72rem; text-decoration: none; }
+  .start-pages a > span { flex: 1; min-width: 0; }
+  .start-pages a :global(svg) { flex-shrink: 0; }
+  .start-pages a:hover, .start-pages a:focus-visible, .start-pages a[aria-current='page'] { border-color: var(--line); background: var(--sage); }
+  .start-windows { min-width: 0; padding-left: 1.1rem; border-left: 1px solid var(--line); }
+  .start-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+  .start-window-count { color: var(--muted); font-size: .65rem; }
+  .start-empty { margin: .5rem 0 1rem; color: var(--muted); font-family: var(--font-reading); font-size: .8rem; line-height: 1.5; }
+  .start-window-list { display: grid; gap: .45rem; }
+  .start-window-list :global(button) { display: flex; align-items: center; justify-content: space-between; gap: .7rem; width: 100%; min-height: 44px; padding: .6rem; border: 1px solid var(--line); border-radius: 2px; background: var(--surface-raised); color: var(--ink); text-align: left; }
+  .start-window-list :global(button:hover), .start-window-list :global(button:focus-visible) { background: var(--lavender); }
+  .start-window-list :global(button > span:first-child) { display: grid; min-width: 0; gap: .3rem; font-family: var(--font-reading); font-size: .85rem; overflow-wrap: anywhere; }
+  .start-window-list :global(small) { color: var(--muted); font-family: var(--font-ui); font-size: .55rem; }
+  .start-window-list :global(button > span:last-child) { flex-shrink: 0; font-family: var(--font-ui); font-size: .6rem; }
+  .start-restore-all { width: 100%; min-height: 40px; margin-top: .7rem; padding: .55rem; border: 1px solid var(--line); border-radius: 2px; background: var(--sage); color: var(--ink); font-family: var(--font-ui); font-size: .65rem; box-shadow: inset 1px 1px rgb(255 255 255 / .4), inset -1px -1px rgb(22 45 30 / .15); }
+  .start-restore-all:enabled:hover { background: var(--surface-raised); }
+  .start-shortcuts { margin-top: 1rem; border-top: 1px solid var(--line); }
+  .start-shortcuts summary { min-height: 40px; padding: .8rem .1rem; cursor: pointer; font-size: .7rem; }
+  .start-shortcuts dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: .7rem 1rem; margin: .4rem 0 .8rem; }
+  .start-shortcuts dt { font-size: .65rem; line-height: 1.6; }
+  .start-shortcuts kbd { font: inherit; }
+  .start-shortcuts dd { margin: 0; font-family: var(--font-reading); font-size: .85rem; line-height: 1.5; }
+  .start-shortcuts p { margin: .8rem 0 0; color: var(--muted); font-family: var(--font-reading); font-size: .8rem; line-height: 1.5; }
+  .start-footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .8rem; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--sage) 30%, var(--surface)); color: var(--muted); font-size: .6rem; }
+  .start-footer kbd { font: inherit; color: var(--ink); }
+  .start-footer button { min-height: 32px; margin: -.4rem -.3rem; padding: .4rem .3rem; border: 0; border-radius: 2px; background: transparent; color: var(--ink); font: inherit; }
+  .start-footer button:hover { background: var(--sage); }
+  @supports (backdrop-filter: blur(1px)) {
+    .start-menu { background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(20px) saturate(115%); }
+  }
+  @media (max-width: 420px) {
+    .start-content { padding: .8rem; }
+    .start-sections { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .start-pages ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .2rem; }
+    .start-windows { padding: .9rem 0 0; border-top: 1px solid var(--line); border-left: 0; }
+  }
+  @media (max-height: 420px) {
+    .start-titlebar { padding: .3rem .5rem; }
+    .start-avatar { width: 24px; height: 24px; }
+    .start-heading > span, .start-footer { display: none; }
+    .start-content { padding: .7rem; }
+  }
+  @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+    .start-menu { background: var(--surface); backdrop-filter: none; }
+  }
+  @media (forced-colors: active) {
+    .start-menu { border-color: CanvasText; box-shadow: none; }
+    .start-pages a[aria-current='page'] { outline: 1px solid Highlight; outline-offset: -2px; }
+  }
+  @media print { .start-menu { display: none !important; } }
+</style>

@@ -1,0 +1,96 @@
+---
+import manifest from '../generated/media.json';
+
+interface Props {
+  src: string;
+  alt?: string;
+  caption?: string;
+  type?: 'image' | 'video' | 'audio';
+  poster?: string;
+  eager?: boolean;
+  sizes?: string;
+  loop?: boolean;
+  muted?: boolean;
+}
+
+interface ImageVariant { src: string; width: number }
+interface ImageRecord {
+  width: number;
+  height: number;
+  src: string;
+  sources: { avif: ImageVariant[]; webp: ImageVariant[] };
+}
+
+const { src, alt = '', caption = '', type = 'image', poster = '', eager = false, loop = false, muted = false } = Astro.props;
+let sourceKey = src;
+try { sourceKey = decodeURIComponent(new URL(src, Astro.site || 'https://gwenlium.dev').pathname); }
+catch { /* Keep malformed escape sequences as authored. */ }
+const images = manifest as Record<string, ImageRecord>;
+const image = images[src] || (src.startsWith('/media/') ? images[sourceKey] : undefined);
+const srcset = (variants: ImageVariant[]) => variants.map((variant) => `${variant.src} ${variant.width}w`).join(', ');
+const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px) 85vw, 1200px';
+---
+
+{src && (
+  <figure class:list={['media', `media--${type}`]}>
+    {type === 'image' ? (
+      <picture>
+        {image?.sources.avif.length ? <source type="image/avif" srcset={srcset(image.sources.avif)} sizes={sizes} /> : null}
+        {image?.sources.webp.length ? <source type="image/webp" srcset={srcset(image.sources.webp)} sizes={sizes} /> : null}
+        <img
+          src={image?.src || src}
+          alt={alt}
+          width={image?.width}
+          height={image?.height}
+          loading={eager ? 'eager' : 'lazy'}
+          fetchpriority={eager ? 'high' : 'auto'}
+          decoding="async"
+          data-zoom
+          data-full-src={image?.src || src}
+          data-zoom-caption={caption}
+        />
+      </picture>
+    ) : type === 'video' ? (
+      <div class="media-video">
+        <video
+          src={src}
+          poster={poster || undefined}
+          controls
+          playsinline
+          preload="none"
+          loop={loop}
+          muted={muted}
+          aria-label={alt || caption || 'Video'}
+          data-media-video
+        >
+          Your browser does not support this video. <a href={src}>Download the video</a>.
+        </video>
+        <button
+          type="button"
+          class="media-expand button-secondary"
+          data-zoom-video={src}
+          data-zoom-caption={caption}
+          data-zoom-alt={alt}
+          data-zoom-poster={poster}
+          aria-haspopup="dialog"
+          aria-label={`Expand video${alt ? `: ${alt}` : ''}`}
+        >Expand video</button>
+      </div>
+    ) : (
+      <audio src={src} controls preload="none" aria-label={alt || caption || 'Audio'}>
+        Your browser does not support audio. <a href={src}>Download the audio</a>.
+      </audio>
+    )}
+    {caption && <figcaption>{caption}</figcaption>}
+  </figure>
+)}
+
+<style>
+  .media { margin: 0; min-width: 0; }
+  .media :global(picture), .media :global(img), .media video { display: block; width: 100%; }
+  .media :global(img), .media video { height: auto; border-radius: 2px; }
+  .media audio { display: block; width: 100%; }
+  .media-video { position: relative; }
+  .media-expand { margin-top: .6rem; font: inherit; font-size: .7rem; cursor: pointer; }
+  figcaption { margin-top: .65rem; color: var(--muted); font-family: var(--font-reading); font-size: .88rem; line-height: 1.6; overflow-wrap: anywhere; }
+</style>

@@ -1,0 +1,513 @@
+---
+import { tracks } from '../lib/settings';
+import manifest from '../generated/media.json';
+import Icon from './Icon.astro';
+
+interface ImageVariant { src: string; width: number }
+interface ImageRecord { sources: { avif: ImageVariant[]; webp: ImageVariant[] } }
+const images = manifest as Record<string, ImageRecord>;
+const thumbnail = (src: string) => {
+  let sourceKey = src;
+  try { sourceKey = decodeURIComponent(new URL(src, Astro.site || 'https://gwenlium.dev').pathname); }
+  catch { /* Keep malformed escape sequences as authored. */ }
+  const image = images[src] || (src.startsWith('/media/') ? images[sourceKey] : undefined);
+  const variants = image?.sources.webp.length ? image.sources.webp : image?.sources.avif;
+  if (!variants?.length) return src;
+  const suitable = variants.filter((variant) => variant.width >= 112);
+  return (suitable.length ? suitable : variants).reduce((smallest, variant) => variant.width < smallest.width ? variant : smallest).src;
+};
+const queueTracks = tracks.map((track) => ({ ...track, cover: thumbnail(track.cover) }));
+const availableTracks = queueTracks.filter((track) => track.src);
+const firstTrack = availableTracks[0];
+const emptyMessage = tracks.length ? 'No playable tracks' : 'No tracks published';
+---
+
+<gwenlium-player transition:persist="site-player" data-tracks={JSON.stringify(availableTracks)}>
+  <audio preload="none" aria-label="Music player" data-player-audio></audio>
+  <div class="player-content">
+    <div class="player-left">
+      <div class="player-shortcuts">
+          <button type="button" class="button start-trigger" data-open-start aria-haspopup="dialog" aria-controls="start-menu"><img src="/avatar.webp" alt="" width="23" height="23" /><span>Start</span></button>
+          <button type="button" class="button settings-trigger" data-open-settings aria-haspopup="dialog" aria-controls="site-settings">
+            <Icon name="settings" size={18} /><span class="sr-only">Settings</span>
+          </button>
+      </div>
+    <div class="player-track">
+      <div class="player-cover" aria-hidden="true">
+        <img data-player-cover src={firstTrack?.cover || undefined} alt="" width="56" height="56" decoding="async" hidden={!firstTrack?.cover} />
+        <span data-player-cover-fallback hidden={Boolean(firstTrack?.cover)}><Icon name="music" size={24} /></span>
+      </div>
+      <div class="player-meta">
+        <span class="player-caption">Music</span>
+        <a href={firstTrack ? `/music/#track-${firstTrack.id}` : '/music/'} class="player-title" data-player-title title={firstTrack?.title}>{firstTrack?.title || 'Music library'}</a>
+        <span data-player-status class="player-status" role="status" aria-live="polite">{firstTrack ? 'Not playing' : emptyMessage}</span>
+      </div>
+    </div>
+    </div>
+    <div class="player-transport" role="group" aria-label="Playback controls">
+      <button type="button" class="player-button player-skip" data-player-previous aria-label="Previous track" disabled={availableTracks.length < 2}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 4v16M19 4 7 12l12 8Z" /></svg>
+      </button>
+      <button type="button" data-player-toggle aria-label={firstTrack ? `Play ${firstTrack.title}` : 'Play music'} class="player-button player-toggle" disabled={!firstTrack}>
+        <span data-player-play><Icon name="play" size={20} /></span>
+        <span data-player-pause hidden><Icon name="pause" size={20} /></span>
+      </button>
+      <button type="button" class="player-button player-skip" data-player-next aria-label="Next track" disabled={availableTracks.length < 2}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M19 4v16M5 4l12 8-12 8Z" /></svg>
+      </button>
+    </div>
+    <div class="player-seek">
+      <label for="player-progress" class="sr-only">Track position</label>
+      <input id="player-progress" data-player-seek type="range" min="0" max="0" step="0.1" value="0" disabled />
+      <span class="player-time" data-player-time aria-hidden="true">0:00 / 0:00</span>
+    </div>
+    <div class="player-tools">
+      <div class="player-volume player-volume--dock">
+        <label for="player-volume">Vol</label>
+        <input id="player-volume" data-player-volume type="range" min="0" max="1" step="0.05" value="0.65" aria-label="Music volume" disabled={!firstTrack} />
+      </div>
+      <button type="button" class="player-button player-queue-toggle" data-player-queue-toggle aria-label="Open queue" aria-controls="player-queue" aria-expanded="false">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 5h18M3 10h18M3 15h9M3 20h9m5-6 5 3-5 3Z" /></svg>
+        <span class="player-queue-label">Queue</span>
+      </button>
+          <a class="taskbar-rss" href="/rss.xml" aria-label="Read the RSS feed"><Icon name="rss" size={18} /></a>
+    </div>
+  </div>
+  <section id="player-queue" class="player-queue" data-player-queue aria-labelledby="player-queue-title" hidden>
+    <header class="player-queue-header">
+      <div><h2 id="player-queue-title">Queue</h2><span>{tracks.length} {tracks.length === 1 ? 'track' : 'tracks'}</span></div>
+      <a href="/music/" class="player-library-link">Music library</a>
+      <button type="button" class="player-button player-queue-close" data-player-queue-close aria-label="Close queue"><Icon name="close" size={16} /></button>
+    </header>
+    {queueTracks.length ? (
+      <ol class="player-queue-list">
+        {queueTracks.map((track, index) => (
+          <li>
+            <button type="button" class="player-queue-track" data-play-track={track.id} aria-label={`Play ${track.title}`} aria-pressed="false" disabled={!track.src}>
+              <span class="player-queue-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+              <span class="player-queue-cover" aria-hidden="true">
+                {track.cover ? <img src={track.cover} alt="" width="42" height="42" loading="lazy" decoding="async" /> : <Icon name="music" size={20} />}
+              </span>
+              <span class="player-queue-meta"><span class="player-queue-title">{track.title}</span><span class="player-track-state" data-track-state>{track.src ? 'Ready' : 'Audio unavailable'}</span></span>
+              {track.src && <span class="player-queue-action" data-track-button-label>Play</span>}
+            </button>
+          </li>
+        ))}
+      </ol>
+    ) : <p class="player-queue-empty">No tracks published yet.</p>}
+    <div class="player-queue-footer">
+      <label class="player-autoplay"><input type="checkbox" data-player-autoplay />Autoplay next track</label>
+      <span class="player-autoplay-status" data-autoplay-status role="status"></span>
+      <div class="player-volume">
+        <label for="player-queue-volume">Volume</label>
+        <input id="player-queue-volume" data-player-volume type="range" min="0" max="1" step="0.05" value="0.65" aria-label="Music volume" disabled={!firstTrack} />
+        <output data-player-volume-value for="player-queue-volume">65%</output>
+      </div>
+    </div>
+  </section>
+</gwenlium-player>
+
+<script>
+  interface PlayerTrack { id: string; title: string; src: string; cover: string; coverAlt: string }
+
+  class GwenliumPlayer extends HTMLElement {
+    private initialized = false;
+    private tracks: PlayerTrack[] = [];
+    private index = 0;
+    private request = 0;
+    private userInitiated = false;
+    private autoplayNext = false;
+    private actuallyPlaying = false;
+    private audio!: HTMLAudioElement;
+    private toggle!: HTMLButtonElement;
+    private seek!: HTMLInputElement;
+    private volumes!: NodeListOf<HTMLInputElement>;
+    private status!: HTMLElement;
+    private titleLink!: HTMLAnchorElement;
+    private cover!: HTMLImageElement;
+    private coverFallback!: HTMLElement;
+    private time!: HTMLElement;
+    private queue!: HTMLElement;
+    private queueToggle!: HTMLButtonElement;
+    private pageEvents?: AbortController;
+    private dockObserver?: ResizeObserver;
+    private measureFrame = 0;
+
+    connectedCallback() {
+      if (!this.initialized) this.initialize();
+      this.pageEvents?.abort();
+      this.pageEvents = new AbortController();
+      const { signal } = this.pageEvents;
+      document.addEventListener('gwenlium:play', ((event: CustomEvent<{ id: string }>) => {
+        const index = this.tracks.findIndex((track) => track.id === event.detail?.id);
+        if (index >= 0) void this.playTrack(index);
+      }) as EventListener, { signal });
+      document.addEventListener('click', (event) => {
+        if (!(event.target instanceof Element)) return;
+        const button = event.target.closest<HTMLButtonElement>('[data-play-track]');
+        if (!button?.dataset.playTrack || button.disabled) return;
+        if (button.dataset.playTrack === this.tracks[this.index]?.id && !this.audio.paused) this.pause();
+        else document.dispatchEvent(new CustomEvent('gwenlium:play', { detail: { id: button.dataset.playTrack } }));
+      }, { signal });
+      document.addEventListener('pointerdown', (event) => {
+        if (!this.queue.hidden && event.target instanceof Node && !this.queue.contains(event.target) && !this.queueToggle.contains(event.target)) this.setQueueOpen(false);
+      }, { signal });
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || this.queue.hidden) return;
+        event.preventDefault();
+        this.setQueueOpen(false, true);
+      }, { signal });
+      document.addEventListener('astro:before-swap', () => this.setQueueOpen(false), { signal });
+      document.addEventListener('astro:page-load', () => {
+        this.updateTrackButtons();
+        this.observeDock();
+      }, { signal });
+      this.updateTrackButtons();
+      this.observeDock();
+    }
+
+    disconnectedCallback() {
+      this.pageEvents?.abort();
+      this.dockObserver?.disconnect();
+      cancelAnimationFrame(this.measureFrame);
+      // ClientRouter moves this persisted element; never reset or pause its audio here.
+    }
+
+    private initialize() {
+      this.initialized = true;
+      this.tracks = JSON.parse(this.dataset.tracks || '[]') as PlayerTrack[];
+      this.audio = this.querySelector('[data-player-audio]')!;
+      this.toggle = this.querySelector('[data-player-toggle]')!;
+      this.seek = this.querySelector('[data-player-seek]')!;
+      this.volumes = this.querySelectorAll('[data-player-volume]');
+      this.status = this.querySelector('[data-player-status]')!;
+      this.titleLink = this.querySelector('[data-player-title]')!;
+      this.cover = this.querySelector('[data-player-cover]')!;
+      this.coverFallback = this.querySelector('[data-player-cover-fallback]')!;
+      this.time = this.querySelector('[data-player-time]')!;
+      this.queue = this.querySelector('[data-player-queue]')!;
+      this.queueToggle = this.querySelector('[data-player-queue-toggle]')!;
+      this.audio.volume = Number(this.volumes[0].value);
+      const autoplay = this.querySelector<HTMLInputElement>('[data-player-autoplay]')!;
+      try { this.autoplayNext = localStorage.getItem('gwenlium:autoplay-next') === 'true'; } catch { /* Off by default when storage is unavailable. */ }
+      autoplay.checked = this.autoplayNext;
+      autoplay.addEventListener('change', () => {
+        this.autoplayNext = autoplay.checked;
+        const status = this.querySelector<HTMLElement>('[data-autoplay-status]')!;
+        try {
+          localStorage.setItem('gwenlium:autoplay-next', String(this.autoplayNext));
+          status.textContent = 'Saved on this device.';
+        } catch { status.textContent = 'Applies to this visit; browser storage is unavailable.'; }
+      });
+
+      this.queueToggle.addEventListener('click', () => this.setQueueOpen(this.queue.hidden, true));
+      this.querySelector('[data-player-queue-close]')!.addEventListener('click', () => this.setQueueOpen(false, true));
+      this.toggle.addEventListener('click', () => {
+        if (this.audio.paused) void this.playTrack(this.index);
+        else this.pause();
+      });
+      this.querySelector('[data-player-previous]')!.addEventListener('click', () => {
+        if (!this.tracks.length) return;
+        if (this.audio.currentTime > 3) { this.audio.currentTime = 0; this.updateProgress(); return; }
+        this.changeTrack((this.index - 1 + this.tracks.length) % this.tracks.length);
+      });
+      this.querySelector('[data-player-next]')!.addEventListener('click', () => {
+        if (this.tracks.length) this.changeTrack((this.index + 1) % this.tracks.length);
+      });
+      this.seek.addEventListener('input', () => {
+        if (Number.isFinite(this.audio.duration)) {
+          this.audio.currentTime = Number(this.seek.value);
+          this.updateProgress();
+        }
+      });
+      this.volumes.forEach((volume) => volume.addEventListener('input', () => {
+        this.audio.volume = Number(volume.value);
+        this.audio.muted = false;
+        this.updateVolume();
+      }));
+      this.audio.addEventListener('volumechange', () => this.updateVolume());
+      this.audio.addEventListener('playing', () => {
+        if (!this.userInitiated) { this.audio.pause(); return; }
+        this.actuallyPlaying = true;
+        this.feedback('Playing');
+        this.updateControls();
+      });
+      this.audio.addEventListener('play', () => this.updateControls());
+      this.audio.addEventListener('pause', () => {
+        if (!this.audio.paused) return;
+        this.actuallyPlaying = false;
+        if (!this.audio.error && !this.audio.ended) this.feedback('Paused');
+        this.updateControls();
+      });
+      this.audio.addEventListener('waiting', () => {
+        if (this.audio.paused || !this.userInitiated) return;
+        this.actuallyPlaying = false;
+        this.feedback('Buffering…');
+        this.updateControls();
+      });
+      this.audio.addEventListener('error', () => {
+        this.request++;
+        this.userInitiated = false;
+        this.actuallyPlaying = false;
+        this.audio.pause();
+        this.feedback('Unable to load this track. Try again or choose another.', true);
+        this.updateControls();
+      });
+      this.audio.addEventListener('ended', () => {
+        this.actuallyPlaying = false;
+        if (this.userInitiated && this.autoplayNext && this.index < this.tracks.length - 1) void this.playTrack(this.index + 1);
+        else {
+          this.userInitiated = false;
+          this.feedback('Playback finished');
+          this.updateControls();
+        }
+      });
+      this.audio.addEventListener('timeupdate', () => this.updateProgress());
+      this.audio.addEventListener('durationchange', () => this.updateProgress());
+      this.audio.addEventListener('loadedmetadata', () => this.updateProgress());
+      this.audio.addEventListener('emptied', () => this.updateProgress());
+      this.updateControls();
+      this.updateVolume();
+    }
+
+    private observeDock() {
+      this.dockObserver?.disconnect();
+      cancelAnimationFrame(this.measureFrame);
+      const dock = this.closest<HTMLElement>('.taskbar');
+      if (!dock) return;
+      const measure = () => {
+        cancelAnimationFrame(this.measureFrame);
+        this.measureFrame = requestAnimationFrame(() => {
+          if (this.isConnected) document.documentElement.style.setProperty('--dock-space', `${Math.ceil(dock.getBoundingClientRect().height) + 24}px`);
+        });
+      };
+      this.dockObserver = new ResizeObserver(measure);
+      this.dockObserver.observe(dock);
+      measure();
+    }
+
+    private setQueueOpen(open: boolean, focus = false) {
+      this.queue.hidden = !open;
+      this.queueToggle.setAttribute('aria-expanded', String(open));
+      this.queueToggle.setAttribute('aria-label', open ? 'Close queue' : 'Open queue');
+      if (!focus) return;
+      if (open) {
+        const target = this.queue.querySelector<HTMLButtonElement>('[data-play-track][aria-current="true"]')
+          || this.queue.querySelector<HTMLButtonElement>('[data-play-track]:not(:disabled)')
+          || this.queue.querySelector<HTMLButtonElement>('[data-player-queue-close]');
+        target?.focus({ preventScroll: true });
+        if (target?.matches('[data-play-track]')) target.scrollIntoView({ block: 'nearest' });
+      } else this.queueToggle.focus({ preventScroll: true });
+    }
+
+    private feedback(message: string, error = false) {
+      if (this.status.textContent !== message) this.status.textContent = message;
+      this.status.classList.toggle('player-status--error', error);
+    }
+
+    private pause() {
+      this.request++;
+      this.userInitiated = false;
+      this.actuallyPlaying = false;
+      this.audio.pause();
+      this.feedback('Paused');
+      this.updateControls();
+    }
+
+    private selectTrack(index: number) {
+      const track = this.tracks[index];
+      if (this.index === index && this.audio.dataset.track === track.id && !this.audio.error) return;
+      this.audio.pause();
+      this.index = index;
+      this.actuallyPlaying = false;
+      this.audio.src = track.src;
+      this.audio.dataset.track = track.id;
+      this.audio.setAttribute('aria-label', track.title);
+      this.titleLink.textContent = track.title;
+      this.titleLink.title = track.title;
+      this.titleLink.href = `/music/#track-${track.id}`;
+      this.cover.hidden = !track.cover;
+      this.coverFallback.hidden = Boolean(track.cover);
+      if (track.cover) this.cover.src = track.cover;
+      else this.cover.removeAttribute('src');
+      this.updateProgress();
+      this.updateControls();
+    }
+
+    private changeTrack(index: number) {
+      const continuePlaying = !this.audio.paused && this.userInitiated;
+      this.request++;
+      this.userInitiated = false;
+      this.selectTrack(index);
+      if (continuePlaying) void this.playTrack(index);
+      else this.feedback('Paused');
+    }
+
+    private async playTrack(index: number) {
+      if (!this.tracks[index]) return;
+      this.userInitiated = true;
+      if (index === this.index && !this.audio.paused && this.actuallyPlaying) {
+        this.feedback('Playing');
+        return;
+      }
+      this.selectTrack(index);
+      const request = ++this.request;
+      this.feedback('Loading…');
+      try {
+        await this.audio.play();
+      } catch (error) {
+        if (request !== this.request) return;
+        this.userInitiated = false;
+        this.actuallyPlaying = false;
+        this.feedback(error instanceof DOMException && error.name === 'NotAllowedError'
+          ? 'Playback was blocked. Press play to try again.'
+          : 'Unable to play this track. Try again or choose another.', true);
+        this.updateControls();
+      }
+    }
+
+    private updateControls() {
+      const track = this.tracks[this.index];
+      const active = !this.audio.paused && !this.audio.ended;
+      if (track) this.toggle.setAttribute('aria-label', `${active ? 'Pause' : 'Play'} ${track.title}`);
+      this.querySelector<HTMLElement>('[data-player-play]')!.hidden = active;
+      this.querySelector<HTMLElement>('[data-player-pause]')!.hidden = !active;
+      this.classList.toggle('is-playing', this.actuallyPlaying);
+      this.updateTrackButtons();
+    }
+
+    private updateTrackButtons() {
+      document.querySelectorAll<HTMLButtonElement>('[data-play-track]').forEach((button) => {
+        const track = this.tracks.find((entry) => entry.id === button.dataset.playTrack);
+        if (!track) return;
+        const selected = track.id === this.tracks[this.index]?.id;
+        const active = selected && !this.audio.paused && !this.audio.ended;
+        button.setAttribute('aria-pressed', String(active));
+        button.setAttribute('aria-label', `${active ? 'Pause' : 'Play'} ${track.title}`);
+        if (selected) button.setAttribute('aria-current', 'true');
+        else button.removeAttribute('aria-current');
+        const label = button.querySelector('[data-track-button-label]');
+        if (label) label.textContent = active ? 'Pause' : 'Play';
+        const state = button.querySelector('[data-track-state]') || button.closest('[data-track-row]')?.querySelector('[data-track-state]');
+        if (state) state.textContent = selected ? (this.actuallyPlaying ? 'Playing' : active ? 'Loading…' : 'Selected') : 'Ready';
+      });
+    }
+
+    private updateVolume() {
+      const value = this.audio.muted ? 0 : this.audio.volume;
+      const percent = Math.round(value * 100);
+      this.volumes.forEach((volume) => {
+        volume.value = String(value);
+        volume.setAttribute('aria-valuetext', `${percent} percent`);
+      });
+      this.querySelector('[data-player-volume-value]')!.textContent = `${percent}%`;
+    }
+
+    private updateProgress() {
+      const duration = Number.isFinite(this.audio.duration) ? this.audio.duration : 0;
+      const position = Number.isFinite(this.audio.currentTime) ? this.audio.currentTime : 0;
+      this.seek.disabled = duration <= 0;
+      this.seek.max = String(duration);
+      this.seek.value = String(position);
+      this.time.textContent = `${this.formatTime(position)} / ${this.formatTime(duration)}`;
+      this.seek.setAttribute('aria-valuetext', `${this.formatTime(position)} of ${this.formatTime(duration)}`);
+    }
+
+    private formatTime(seconds: number) {
+      const whole = Math.floor(seconds);
+      return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+    }
+  }
+
+  if (!customElements.get('gwenlium-player')) customElements.define('gwenlium-player', GwenliumPlayer);
+</script>
+
+<style>
+  gwenlium-player { display: block; position: relative; flex: 1; min-width: 0; width: 100%; color: var(--ink); font-family: var(--font-ui); container-type: inline-size; }
+  [hidden] { display: none !important; }
+  .player-content { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: 'track transport tools' 'track seek tools'; align-items: center; gap: .1rem .85rem; }
+  .player-left { grid-area: track; display: flex; align-items: center; gap: 1rem; min-width: 0; }
+  .player-shortcuts { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
+  .player-track { grid-area: track; display: flex; align-items: center; gap: .7rem; min-width: 0; }
+  .player-cover { display: grid; place-items: center; width: 56px; height: 56px; flex-shrink: 0; padding: 2px; border: 1px solid var(--line); background: linear-gradient(140deg, var(--sage), var(--lavender)); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
+  .player-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .player-cover > span { display: grid; place-items: center; }
+  .player-meta { min-width: 0; display: grid; gap: .2rem; }
+  .player-caption { color: var(--muted); font-size: 9px; line-height: 1.1; }
+  .player-title { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ink); font-size: 11px; line-height: 1.4; text-decoration: none; }
+  .player-title:hover { text-decoration: underline; }
+  .player-status { font-size: 9px; line-height: 1.4; color: var(--muted); overflow-wrap: anywhere; }
+  .player-status--error { color: var(--ink); background: var(--pink); padding: .2rem .3rem; }
+  .player-transport { grid-area: transport; display: flex; justify-content: center; align-items: center; gap: .45rem; }
+  .player-button { display: inline-grid; place-items: center; flex-shrink: 0; min-height: 34px; min-width: 34px; padding: .35rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); font: inherit; cursor: pointer; }
+  .player-button:hover:not(:disabled) { background: var(--sage); }
+  .player-button:active:not(:disabled), .player-button[aria-expanded='true'] { box-shadow: inset 1px 1px var(--bevel-dark), inset -1px -1px var(--bevel-light); background: var(--sage); }
+  .player-button:disabled { opacity: .4; cursor: default; }
+  .player-button:focus-visible, input:focus-visible, .player-queue-track:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .player-toggle { min-width: 42px; min-height: 38px; background: linear-gradient(180deg, var(--surface-raised), var(--sage)); }
+  .player-toggle > span { display: grid; place-items: center; }
+  .player-seek { grid-area: seek; display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: .1rem; min-width: 0; }
+  input[type='range'] { min-width: 0; accent-color: var(--accent-ink); height: 22px; margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; }
+  .player-seek input { flex: 1; width: 100%; }
+  .player-time { text-align: center; white-space: nowrap; color: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+  .player-tools { grid-area: tools; display: flex; justify-content: flex-end; align-items: center; gap: .65rem; }
+  .player-volume { display: flex; align-items: center; gap: .45rem; min-width: 0; font-size: 10px; color: var(--muted); }
+  .player-volume input { width: 4rem; }
+  .player-queue-toggle { gap: .1rem; min-width: 44px; min-height: 48px; }
+  .player-queue-label { font-size: 8px; }
+  .player-queue { position: absolute; z-index: 1; right: 0; bottom: calc(100% + 1rem); display: flex; flex-direction: column; width: min(28rem, calc(100vw - 3.5rem)); max-height: min(30rem, calc(100dvh - var(--dock-space, 8rem) - 1.5rem)); border: 1px solid var(--line); background: var(--surface); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark), var(--shadow); }
+  .player-queue-header { display: flex; flex-shrink: 0; align-items: center; gap: .75rem; padding: .7rem; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, var(--surface-raised), var(--lavender)); }
+  .player-queue-header > div { min-width: 0; }
+  .player-queue-header h2 { margin: 0 0 .2rem; font-size: 12px; font-weight: 400; }
+  .player-queue-header > div > span { color: var(--muted); font-size: 9px; }
+  .player-library-link { margin-left: auto; font-size: 10px; }
+  .player-queue-close { min-width: 30px; min-height: 30px; background: var(--pink); }
+  .player-queue-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; margin: 0; padding: .35rem; }
+  .player-queue-track { display: flex; align-items: center; gap: .65rem; width: 100%; min-width: 0; padding: .65rem .45rem; border: 1px solid transparent; background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+  .player-queue-track:hover:not(:disabled) { background: color-mix(in srgb, var(--sage) 50%, var(--surface)); }
+  .player-queue-track[aria-current='true'] { border-color: var(--line); background: color-mix(in srgb, var(--sage) 65%, var(--surface)); box-shadow: inset 1px 1px var(--bevel-light); }
+  .player-queue-track:disabled { opacity: .6; cursor: default; }
+  .player-queue-number { flex-shrink: 0; color: var(--muted); font-size: 9px; }
+  .player-queue-cover { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border: 1px solid var(--line); background: var(--surface-raised); }
+  .player-queue-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .player-queue-meta { display: grid; gap: .35rem; min-width: 0; flex: 1; }
+  .player-queue-title { overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; }
+  .player-track-state { font-size: 9px; color: var(--muted); }
+  .player-queue-track[aria-current='true'] .player-queue-number, .player-queue-track[aria-current='true'] .player-track-state { color: var(--ink); }
+  .player-queue-action { flex-shrink: 0; font-size: 10px; }
+  .player-queue-empty { padding: 2rem .8rem; margin: 0; color: var(--muted); font-size: 11px; text-align: center; }
+  .player-queue-footer { flex-shrink: 0; padding: .75rem; border-top: 1px solid var(--line); }
+  .player-queue-footer .player-volume input { flex: 1; width: auto; }
+  .player-queue-footer output { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .player-autoplay { display: flex; align-items: center; gap: .6rem; font-size: 11px; margin-bottom: .75rem; }
+  .player-autoplay input { accent-color: var(--accent-ink); }
+  .player-autoplay-status { display: block; font-size: 10px; color: var(--muted); margin-bottom: .5rem; }
+  .player-autoplay-status:empty { display: none; }
+  @container (max-width: 900px) {
+    .player-content { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: 'shortcuts track track' 'transport transport tools' 'seek seek seek'; gap: .3rem .65rem; }
+    .player-left { display: contents; }
+    .player-shortcuts { grid-area: shortcuts; gap: .35rem; }
+    .player-shortcuts :global(.start-trigger) { padding: .35rem; gap: .25rem; font-size: 9px; }
+    .player-shortcuts :global(.start-trigger img) { width: 18px; height: 18px; }
+    .player-shortcuts :global(.settings-trigger) { padding: .35rem; }
+    .player-transport { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
+    .player-tools { grid-column: 3; grid-row: 2; justify-self: end; }
+    .player-volume--dock { display: none; }
+    :global(.taskbar-rss) { display: none; }
+    .player-cover { width: 46px; height: 46px; }
+    .player-caption { display: none; }
+    .player-toggle { min-width: 44px; min-height: 44px; }
+    .player-queue-toggle { min-height: 44px; }
+    .player-seek { gap: .1rem; }
+    .player-track { gap: .55rem; }
+  }
+  @container (max-width: 330px) {
+    .player-content { grid-template-columns: minmax(0, 1.2fr) minmax(0, .9fr) minmax(0, .9fr); gap: .2rem .35rem; }
+    .player-cover { width: 38px; height: 38px; }
+    .player-title { font-size: 10px; }
+  }
+  @media (forced-colors: active) {
+    .player-cover, .player-button, .player-queue, .player-queue-track[aria-current='true'] { box-shadow: none; border-color: CanvasText; }
+    .player-queue-track[aria-current='true'] { outline: 1px solid Highlight; outline-offset: -3px; }
+  }
+</style>

@@ -1,0 +1,55 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import Window from '../components/Window.astro';
+import Media from '../components/Media.astro';
+import Icon from '../components/Icon.astro';
+import { site } from '../lib/settings';
+const about = site.about;
+const links = about.links.filter((link) => link.label && /^(https?:\/\/|mailto:|\/(?!\/))/.test(link.url));
+const paragraphs = about.body.trim() ? about.body.trim().split(/\n\s*\n/) : [];
+---
+
+<SiteLayout title="About" image={about.avatar || undefined} imageAlt={about.avatarAlt || undefined}>
+  <header class="page-heading">
+    <span class="eyebrow">Profile</span>
+    <h1>About {site.name}</h1>
+  </header>
+  <div class:list={['about-grid', { 'about-grid--with-avatar': about.avatar }]}>
+    {about.avatar && <aside class="about-avatar"><Window title={site.name} tone="pink"><Media src={about.avatar} alt={about.avatarAlt} eager sizes="(max-width: 800px) 300px, 25vw" /></Window></aside>}
+    <div class="about-main">
+      <Window title="About" tone="sage">
+        {paragraphs.length ? (
+          <div class="prose about-body">{paragraphs.map((paragraph) => <p>{paragraph}</p>)}</div>
+        ) : (
+          <div class="empty-state">
+            <Icon name="user" size={36} />
+            <h2>No bio published yet</h2>
+            <p>About information will appear here when added.</p>
+          </div>
+        )}
+      </Window>
+      <Window title="Links" tone="lavender">
+        <nav class="about-links" aria-label="Profile links">
+          {site.githubUrl && <a class="button-secondary" href={site.githubUrl}>GitHub<Icon name="external" size={14} /></a>}
+          {links.map((link) => <a class="button-secondary" href={link.url}>{link.label}<Icon name="external" size={14} /></a>)}
+          <a class="button-secondary" href="/subscribe/">Follow updates<Icon name="rss" size={14} /></a>
+        </nav>
+      </Window>
+    </div>
+  </div>
+</SiteLayout>
+
+<style>
+  .about-grid { display: grid; gap: 1.8rem; align-items: start; }
+  .about-grid--with-avatar { grid-template-columns: minmax(180px, 1fr) minmax(0, 2.1fr); }
+  .about-main { display: grid; gap: 1.8rem; min-width: 0; }
+  .about-avatar { min-width: 0; }
+  .about-avatar :global(img) { max-height: 410px; object-fit: contain; }
+  .about-body p { white-space: pre-line; overflow-wrap: anywhere; }
+  .about-body p:first-child { margin-top: 0; }
+  .about-body p:last-child { margin-bottom: 0; }
+  .about-links { display: flex; flex-wrap: wrap; gap: .8rem; }
+  .about-links a { display: inline-flex; align-items: center; gap: .6rem; }
+  .empty-state :global(svg) { margin-inline: auto; }
+  @media (max-width: 800px) { .about-grid--with-avatar { grid-template-columns: 1fr; } .about-avatar { max-width: 350px; } }
+</style>

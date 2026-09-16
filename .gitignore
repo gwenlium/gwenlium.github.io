@@ -1,7 +1,12 @@
 node_modules/
 dist/
-.angular/
+.astro/
 .env
 .env.*
 .DS_Store
 Thumbs.db
+src/generated/media.json
+public/_generated/
+.verification/
+.vscode/
+*.log
