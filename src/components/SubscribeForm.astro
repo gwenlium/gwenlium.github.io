@@ -1,0 +1,31 @@
+---
+import { site } from '../lib/settings';
+
+let action = '';
+if (site.newsletterFormAction) {
+  const endpoint = new URL(site.newsletterFormAction);
+  if (endpoint.protocol !== 'https:' || endpoint.hostname !== 'api.follow.it' || !endpoint.pathname.startsWith('/subscription-form/') || endpoint.username || endpoint.password) {
+    throw new Error('The newsletter form must use the HTTPS subscription-form endpoint supplied by follow.it.');
+  }
+  action = endpoint.href;
+}
+---
+
+{action ? (
+  <form class="newsletter-form" action={action} method="post" data-followit-form>
+    {site.newsletterHeading && <h2>{site.newsletterHeading}</h2>}
+    <label for="followit-email">Email address</label>
+    <input id="followit-email" type="email" name="email" required placeholder="Enter your email" autocomplete="email" spellcheck="false" />
+    <button class="button" type="submit">{site.newsletterButtonLabel}</button>
+    <p>Your email is submitted directly to follow.it. Confirm your subscription using the email they send.</p>
+  </form>
+) : <p>Email signup is currently unavailable.</p>}
+
+<style>
+  .newsletter-form { display: grid; gap: .8rem; }
+  h2 { margin: 0 0 .5rem; font-size: clamp(1.05rem, 2.5vw, 1.4rem); line-height: 1.5; }
+  label { font-size: .75rem; }
+  input { width: 100%; min-height: 44px; font-family: var(--font-reading); font-size: 1rem; }
+  button { width: 100%; min-height: 44px; }
+  p { margin: .3rem 0 0; color: var(--muted); font-family: var(--font-reading); font-size: .8rem; line-height: 1.65; }
+</style>

@@ -76,10 +76,10 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 <style>
   .start-menu {
     position: fixed;
-    inset: auto auto var(--start-bottom, var(--dock-space)) var(--start-left, max(.75rem, calc((100vw - 1440px) / 2)));
+    inset: auto auto var(--start-bottom, var(--chrome-bottom)) var(--start-left, var(--app-inset, .75rem));
     width: min(36rem, var(--start-available-width, calc(100% - 1.5rem)));
     max-width: none;
-    max-height: var(--start-max-height, calc(100dvh - var(--dock-space) - .75rem));
+    max-height: var(--start-max-height, calc(100dvh - var(--chrome-bottom) - var(--app-inset, .75rem)));
     margin: 0;
     padding: 3px;
     overflow: hidden;

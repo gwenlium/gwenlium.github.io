@@ -55,7 +55,6 @@ if (game.trailerUrl) {
           <div class="trailer-frame"><iframe src={embed} title={`${game.title || 'Game'} trailer`} loading="lazy" allow="fullscreen; picture-in-picture; encrypted-media" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
         ) : <a class="button" href={trailer}>Watch trailer<Icon name="external" size={14} /></a>}
       </Window>}
-      <a class="game-devlog button-secondary" href="/devlog/">Read the devlog<Icon name="arrow" size={16} /></a>
     </div>
   ) : (
     <Window title="Game" tone="sage">
@@ -63,7 +62,6 @@ if (game.trailerUrl) {
         <Icon name="game" size={36} />
         <h2>No game details published yet</h2>
         <p>Project information and development updates will appear here when published.</p>
-        <a class="button-secondary" href="/devlog/">Browse the devlog<Icon name="arrow" size={15} /></a>
       </div>
     </Window>
   )}

@@ -1,3 +1,5 @@
+import { animateWindow, cancelWindowAnimation } from './window-motion';
+
 type DesktopWindowState = 'normal' | 'minimized' | 'maximized' | 'closed';
 type WindowCommand = { id?: string; action?: 'restore' | 'maximize' | 'minimize' | 'close' | 'restore-all' };
 type MovingElement = HTMLElement & { moveBefore?: (node: Node, reference: Node | null) => void };
@@ -9,6 +11,8 @@ type DesktopWindow = {
   controls: HTMLElement;
   maximizeButton: HTMLButtonElement;
   lastFocus: HTMLElement | null;
+  request: number;
+  pending?: 'minimize' | 'close';
   placement?: { marker: HTMLElement; parent: MovingElement; portaled: boolean };
 };
 
@@ -52,6 +56,7 @@ function focusWindow(entry: DesktopWindow) {
 function setState(entry: DesktopWindow, state: DesktopWindowState) {
   entry.root.dataset.windowState = state;
   entry.root.hidden = state === 'minimized' || state === 'closed';
+  entry.root.inert = false;
   const action = state === 'maximized' ? 'restore' : 'maximize';
   const label = `${action === 'restore' ? 'Restore' : 'Maximize'} ${entry.title}`;
   entry.maximizeButton.dataset.windowAction = action;
@@ -65,20 +70,20 @@ function restorePlacement(entry: DesktopWindow) {
   if (placement.portaled) {
     // The same state-preserving primitive is used in both directions: no iframe reloads.
     placement.parent.moveBefore!(entry.root, placement.marker);
-  } else {
+  } else if (entry.root.hasAttribute('popover')) {
     entry.root.hidePopover();
     entry.root.removeAttribute('popover');
   }
   placement.marker.remove();
   entry.placement = undefined;
   entry.body.removeAttribute('tabindex');
-  maximizedWindow = undefined;
+  if (maximizedWindow === entry) maximizedWindow = undefined;
   setState(entry, 'normal');
 }
 
 function maximizeWindow(entry: DesktopWindow) {
   if (maximizedWindow === entry) return;
-  if (maximizedWindow) restorePlacement(maximizedWindow);
+  if (maximizedWindow) restoreWindow(maximizedWindow, false);
   setState(entry, 'normal');
   const parent = entry.root.parentElement as MovingElement;
   const marker = document.createElement('div');
@@ -94,7 +99,7 @@ function maximizeWindow(entry: DesktopWindow) {
   setState(entry, 'maximized');
   if (portaled) {
     destination.moveBefore!(entry.root, null);
-  } else {
+  } else if (typeof entry.root.showPopover === 'function') {
     // A manual popover escapes ancestor stacking contexts without disconnecting media
     // in browsers that do not yet implement state-preserving DOM moves.
     entry.root.setAttribute('popover', 'manual');
@@ -103,6 +108,49 @@ function maximizeWindow(entry: DesktopWindow) {
   maximizedWindow = entry;
   entry.body.tabIndex = 0;
   entry.maximizeButton.focus({ preventScroll: true });
+}
+
+function restoreWindow(entry: DesktopWindow, focus = true) {
+  const wasMaximized = maximizedWindow === entry;
+  const wasHidden = entry.root.hidden;
+  const wasMinimized = entry.pending === 'minimize' || entry.root.dataset.windowState === 'minimized';
+  const wasClosing = entry.pending !== undefined;
+  entry.request++;
+  entry.pending = undefined;
+  if (maximizedWindow && !wasMaximized) restoreWindow(maximizedWindow, false);
+  if (entry.placement) {
+    cancelWindowAnimation(entry.root);
+    restorePlacement(entry);
+  }
+  setState(entry, 'normal');
+  if (notice?.reopen.dataset.windowReopen === entry.id) hideNotice();
+  if (wasMaximized || wasMinimized || wasHidden || wasClosing) {
+    const anchor = wasMinimized ? document.querySelector<HTMLElement>('[data-open-start]') ?? undefined : undefined;
+    void animateWindow(entry.root, wasHidden && !wasMinimized ? 'open' : 'restore', anchor);
+  }
+  windowsChanged();
+  if (focus) {
+    if (wasMaximized) entry.maximizeButton.focus({ preventScroll: true });
+    else focusWindow(entry);
+  }
+}
+
+async function hideWindow(entry: DesktopWindow, action: 'minimize' | 'close') {
+  if (entry.root.hidden || entry.pending === action) return;
+  const request = ++entry.request;
+  entry.pending = action;
+  focusStart();
+  entry.root.inert = true;
+  const anchor = document.querySelector<HTMLElement>('[data-open-start]') ?? undefined;
+  const completed = await animateWindow(entry.root, action, anchor);
+  // A restore, another command, or a page swap invalidates this completion.
+  if (!completed || entry.request !== request || desktopWindows.get(entry.id) !== entry) return;
+  entry.pending = undefined;
+  restorePlacement(entry);
+  setState(entry, action === 'close' ? 'closed' : 'minimized');
+  if (action === 'close') showNotice(entry);
+  else if (notice?.reopen.dataset.windowReopen === entry.id) hideNotice();
+  windowsChanged();
 }
 
 function hideNotice() {
@@ -158,55 +206,57 @@ function commandWindow(id: string | undefined, action: string | undefined) {
   if (action === 'restore-all') {
     let focusTarget: DesktopWindow | undefined;
     const previousMaximized = maximizedWindow;
-    if (maximizedWindow) restorePlacement(maximizedWindow);
     for (const entry of desktopWindows.values()) {
-      if (!entry.root.hidden) continue;
-      focusTarget ??= entry;
-      setState(entry, 'normal');
+      if (entry.root.hidden || entry.pending) {
+        focusTarget ??= entry;
+        restoreWindow(entry, false);
+      }
     }
+    if (maximizedWindow) restoreWindow(maximizedWindow, false);
     hideNotice();
     windowsChanged();
     if (focusTarget) focusWindow(focusTarget);
-    else if (previousMaximized) previousMaximized.maximizeButton.focus();
+    else if (previousMaximized) previousMaximized.maximizeButton.focus({ preventScroll: true });
     else focusStart();
     return;
   }
 
   const entry = id ? desktopWindows.get(id) : undefined;
+  // Persistent windows own their commands, but must not recover behind this page's maximum.
+  if ((action === 'maximize' || action === 'restore') && id && maximizedWindow?.id !== id && maximizedWindow) {
+    restoreWindow(maximizedWindow, false);
+  }
   if (!entry) return;
   switch (action) {
-    case 'restore': {
-      const wasMaximized = maximizedWindow === entry;
-      // Recovery must not leave the restored panel underneath another maximized panel.
-      if (maximizedWindow) restorePlacement(maximizedWindow);
-      setState(entry, 'normal');
+    case 'restore':
+      restoreWindow(entry);
+      return;
+    case 'maximize':
+      entry.request++;
+      entry.pending = undefined;
+      entry.root.inert = false;
+      cancelWindowAnimation(entry.root);
+      maximizeWindow(entry);
+      void animateWindow(entry.root, 'restore');
       if (notice?.reopen.dataset.windowReopen === id) hideNotice();
       windowsChanged();
-      if (wasMaximized) entry.maximizeButton.focus();
-      else focusWindow(entry);
       return;
-    }
-    case 'maximize':
-      maximizeWindow(entry);
-      if (notice?.reopen.dataset.windowReopen === id) hideNotice();
-      break;
     case 'minimize':
     case 'close':
-      restorePlacement(entry);
-      setState(entry, action === 'close' ? 'closed' : 'minimized');
-      if (action === 'close') showNotice(entry);
-      else if (notice?.reopen.dataset.windowReopen === id) hideNotice();
-      focusStart();
-      break;
-    default:
+      void hideWindow(entry, action);
       return;
   }
-  windowsChanged();
 }
 
 function cleanupWindows() {
   pageEvents?.abort();
   pageEvents = undefined;
+  for (const entry of desktopWindows.values()) {
+    entry.request++;
+    entry.pending = undefined;
+    cancelWindowAnimation(entry.root);
+    entry.root.inert = false;
+  }
   if (maximizedWindow) {
     restorePlacement(maximizedWindow);
     windowsChanged();
@@ -226,7 +276,7 @@ function initializeWindows() {
   pageEvents = new AbortController();
   const { signal } = pageEvents;
 
-  document.querySelectorAll<HTMLElement>('[data-desktop-window]').forEach((root, index) => {
+  document.querySelectorAll<HTMLElement>('[data-desktop-window]:not([data-persistent-window])').forEach((root, index) => {
     const id = root.dataset.windowId ||= `desktop-window-${index + 1}`;
     const entry: DesktopWindow = {
       id,
@@ -236,10 +286,12 @@ function initializeWindows() {
       controls: root.querySelector<HTMLElement>(':scope > .window-titlebar > [data-window-controls]')!,
       maximizeButton: root.querySelector<HTMLButtonElement>(':scope > .window-titlebar [data-window-maximize]')!,
       lastFocus: null,
+      request: 0,
     };
     desktopWindows.set(id, entry);
     setState(entry, 'normal');
     entry.controls.hidden = false;
+    void animateWindow(root, 'open');
   });
   createNotice();
 
@@ -257,13 +309,17 @@ function initializeWindows() {
     }
     const button = event.target.closest<HTMLButtonElement>('[data-window-action]');
     const root = button?.closest<HTMLElement>('[data-desktop-window]');
-    if (root) commandWindow(root.dataset.windowId, button?.dataset.windowAction);
+    if (root && !root.hasAttribute('data-persistent-window')) {
+      document.dispatchEvent(new CustomEvent<WindowCommand>('gwenlium:window-command', {
+        detail: { id: root.dataset.windowId, action: button?.dataset.windowAction as WindowCommand['action'] },
+      }));
+    }
   }, { signal });
 
   document.addEventListener('focusin', (event) => {
     if (!(event.target instanceof HTMLElement) || event.target.closest('[data-window-action]')) return;
     const root = event.target.closest<HTMLElement>('[data-desktop-window]');
-    const entry = root?.dataset.windowId ? desktopWindows.get(root.dataset.windowId) : undefined;
+    const entry = root?.dataset.windowId && !root.hasAttribute('data-persistent-window') ? desktopWindows.get(root.dataset.windowId) : undefined;
     if (entry) entry.lastFocus = event.target;
   }, { signal });
 
@@ -276,7 +332,8 @@ function initializeWindows() {
   // surfaces can consume Escape before it affects a background window.
   window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing || !maximizedWindow) return;
-    if (document.fullscreenElement || document.querySelector('dialog[open], [popover]:popover-open:not([data-desktop-window])')) return;
+    if (document.fullscreenElement || document.querySelector('dialog[open]')) return;
+    if (typeof HTMLElement.prototype.showPopover === 'function' && document.querySelector('[popover]:popover-open:not([data-desktop-window])')) return;
     event.preventDefault();
     commandWindow(maximizedWindow.id, 'restore');
   }, { signal });
@@ -285,6 +342,8 @@ function initializeWindows() {
 }
 
 document.addEventListener('astro:before-swap', cleanupWindows);
+window.addEventListener('pagehide', cleanupWindows);
+window.addEventListener('pageshow', initializeWindows);
 document.addEventListener('astro:page-load', initializeWindows);
 initializeWindows();
 

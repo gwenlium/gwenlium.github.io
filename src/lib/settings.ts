@@ -32,6 +32,9 @@ export interface SiteSettings {
   githubUrl: string;
   featuredPost: string;
   newsletterUrl: string;
+  newsletterFormAction: string;
+  newsletterHeading: string;
+  newsletterButtonLabel: string;
   game: GameSettings;
   about: AboutSettings;
 }
@@ -64,6 +67,9 @@ export const site: SiteSettings = {
   githubUrl: settings.githubUrl ?? 'https://github.com/gwenlium',
   featuredPost: settings.featuredPost ?? '',
   newsletterUrl: settings.newsletterUrl ?? '',
+  newsletterFormAction: settings.newsletterFormAction ?? '',
+  newsletterHeading: settings.newsletterHeading ?? '',
+  newsletterButtonLabel: settings.newsletterButtonLabel ?? 'Subscribe',
   game: {
     title: '',
     description: '',

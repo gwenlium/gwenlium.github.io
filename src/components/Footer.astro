@@ -1,0 +1,34 @@
+---
+import Icon from './Icon.astro';
+import FollowAttribution from './FollowAttribution.astro';
+import StartMenu from './StartMenu.astro';
+import { site } from '../lib/settings';
+
+const path = Astro.url.pathname;
+const navigation = [
+  { href: '/', label: 'Home' },
+  { href: '/devlog/', label: 'Devlog' },
+  { href: '/game/', label: 'Game' },
+  { href: '/gallery/', label: 'Gallery' },
+  { href: '/music/', label: 'Music' },
+  { href: '/about/', label: 'About' },
+  { href: '/subscribe/', label: 'Subscribe' },
+];
+---
+
+<footer class="site-footer">
+  <nav class="footer-navigation" aria-label="Site navigation">
+    {navigation.map((item) => (
+      <a class="footer-link" href={item.href} aria-current={(item.href === '/' ? path === '/' : path.startsWith(item.href)) ? 'page' : undefined}>
+        <span class="nav-cursor" aria-hidden="true">▸</span>{item.label}
+      </a>
+    ))}
+    <a class="footer-link" href="/rss.xml" data-astro-reload><span class="nav-cursor" aria-hidden="true">▸</span>RSS feed<Icon name="rss" size={12} /></a>
+    <a class="footer-link" href={site.githubUrl}><span class="nav-cursor" aria-hidden="true">▸</span>GitHub<Icon name="external" size={12} /></a>
+    {site.about.links.map((link) => (
+      <a class="footer-link" href={link.url}><span class="nav-cursor" aria-hidden="true">▸</span>{link.label}<Icon name="external" size={12} /></a>
+    ))}
+    <FollowAttribution />
+  </nav>
+  <StartMenu />
+</footer>

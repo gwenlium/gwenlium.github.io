@@ -2,14 +2,8 @@
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 import Icon from '../components/Icon.astro';
-import { site } from '../lib/settings';
+import SubscribeForm from '../components/SubscribeForm.astro';
 const feedUrl = new URL('/rss.xml', Astro.site || 'https://gwenlium.dev').href;
-let newsletterUrl = '';
-try {
-  const url = new URL(site.newsletterUrl);
-  const supportedHost = ['follow.it', 'www.follow.it'].includes(url.hostname);
-  if (url.protocol === 'https:' && supportedHost && url.pathname.replace(/\//g, '') && !url.username && !url.password) newsletterUrl = url.href;
-} catch { /* Email sign-up remains unavailable until a real provider URL is configured. */ }
 ---
 
 <SiteLayout title="Subscriptions">
@@ -23,7 +17,6 @@ try {
       <h2>RSS</h2>
       <p class="option-description">Add the devlog feed to your RSS reader to receive new published posts. No email address or subscription service required.</p>
       <div class="feed-actions">
-        <a class="button" href="/rss.xml">Open RSS feed<Icon name="external" size={14} /></a>
         <button type="button" class="button-secondary" data-copy-feed={feedUrl}>Copy feed address</button>
         <p class="copy-status" role="status" aria-live="polite" data-copy-status></p>
       </div>
@@ -31,23 +24,10 @@ try {
       <input id="feed-address" class="feed-address" type="url" value={feedUrl} readonly data-feed-address aria-label="RSS feed address" />
     </Window>
     <Window title="Email updates" tone="pink">
-      <div class="option-heading"><Icon name="mail" size={30} /><span class="tag">{newsletterUrl ? 'Via follow.it' : 'Not enabled'}</span></div>
-      <h2>Email updates</h2>
-      {newsletterUrl ? (
-        <>
-          <p class="option-description">Subscribe on follow.it for automatic updates when new posts are published. Confirmation, delivery preferences, and unsubscribe options are handled by follow.it.</p>
-          <a class="button" href={newsletterUrl}>Subscribe on follow.it<Icon name="external" size={14} /></a>
-          <p class="privacy-note">This opens the provider’s hosted sign-up page. This website does not collect or store email addresses.</p>
-        </>
-      ) : (
-        <>
-          <p class="option-description">Email subscriptions are not configured. You can follow published posts with the RSS feed instead.</p>
-          <p class="privacy-note">No sign-up form is active, and no email addresses are being collected.</p>
-        </>
-      )}
+      <div class="option-heading"><Icon name="mail" size={30} /><span class="tag">follow.it</span></div>
+      <SubscribeForm />
     </Window>
   </div>
-  <a class="back-link" href="/devlog/"><Icon name="book" size={15} />Browse the devlog</a>
 </SiteLayout>
 
 <style>
@@ -64,6 +44,5 @@ try {
   .feed-label { display: block; margin-top: 1.5rem; font-size: .65rem; color: var(--muted); }
   .feed-address { display: block; width: 100%; min-width: 0; box-sizing: border-box; margin-top: .5rem; padding: .75rem; border: 1px solid var(--line); border-top-color: var(--ink); border-left-color: var(--ink); color: var(--ink); background: var(--surface-raised); font-family: var(--font-ui); font-size: .68rem; }
   .feed-address:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-  .back-link { display: inline-flex; align-items: center; gap: .6rem; margin-top: 2rem; color: var(--muted); font-size: .75rem; text-underline-offset: .25rem; }
   @media (max-width: 820px) { .subscribe-grid { grid-template-columns: 1fr; } }
 </style>

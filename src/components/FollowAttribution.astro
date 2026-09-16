@@ -1,0 +1,14 @@
+---
+import { site } from '../lib/settings';
+---
+{site.newsletterUrl && (
+  <a class="followit-attribution" href="https://follow.it" aria-label="Powered by follow.it">
+    <span>Powered by</span>
+    <img src="/followit-logo.svg" alt="follow.it" width="100" height="17" loading="lazy" />
+  </a>
+)}
+<style>
+  .followit-attribution { display: inline-flex; align-items: center; gap: .6rem; color: var(--muted); font-size: 10px; text-decoration: none; }
+  .followit-attribution:hover { text-decoration: underline; }
+  img { display: block; width: 100px; height: 17px; object-fit: contain; box-sizing: content-box; padding: 3px 5px; border-radius: 3px; background: #fdfbf4; }
+</style>

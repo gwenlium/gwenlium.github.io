@@ -349,6 +349,7 @@ document.addEventListener('astro:before-swap', () => {
   if (previous?.dialog.open) previous.dialog.close();
 }, listenerOptions);
 window.addEventListener('resize', positionMenu, listenerOptions);
+document.addEventListener('gwenlium:chrome-change', positionMenu, listenerOptions);
 window.addEventListener('blur', () => { navigationPrefixExpires = 0; }, listenerOptions);
 window.visualViewport?.addEventListener('resize', positionMenu, listenerOptions);
 window.visualViewport?.addEventListener('scroll', positionMenu, listenerOptions);

@@ -176,6 +176,22 @@ content:
           regex: '^$|^https://(www\.)?follow\.it/[^\s]+$'
           message: Enter your real https://follow.it/ feed subscription URL, or leave empty.
         description: "Create your publisher feed on follow.it using https://gwenlium.dev/rss.xml and paste its public subscription URL. follow.it delivers new posts automatically. Leave empty to disable email signup. No credentials or API keys here."
+      - name: newsletterFormAction
+        label: follow.it form action URL
+        type: string
+        default: ""
+        pattern:
+          regex: '^$|^https://api\.follow\.it/subscription-form/[^\s]+$'
+          message: Paste the HTTPS form action supplied by follow.it.
+        description: Public subscription-form URL only. Never enter a password, secret key, or subscriber address.
+      - name: newsletterHeading
+        label: Newsletter heading
+        type: string
+        default: ""
+      - name: newsletterButtonLabel
+        label: Newsletter button text
+        type: string
+        default: Subscribe
       - name: game
         label: Game
         type: object

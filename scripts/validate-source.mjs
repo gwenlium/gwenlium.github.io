@@ -14,7 +14,7 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
 const relativeName = (root, file) => path.relative(root, file).split(path.sep).join('/');
 const previewPathPattern = /^\/media\/([a-z0-9]+(?:-[a-z0-9]+)*)-preview-[a-f0-9]{32}\.(webp|gif|mp3|mp4)$/;
 const previewKinds = { webp: 'image', gif: 'image', mp3: 'audio', mp4: 'video' };
-export const publicBranding = { '/avatar.webp': true, '/favicon.png': true, '/social-card.png': true };
+export const publicBranding = { '/avatar.webp': true, '/favicon.png': true, '/social-card.png': true, '/followit-logo.svg': true };
 export const mediaFilePattern = /\.(?:avif|bmp|gif|heic|heif|ico|jpe?g|png|psd|svg|tiff?|webp|aac|aiff?|alac|flac|m4a|mp3|oga|ogg|opus|wav|wma|3gp|avi|m4v|mkv|mov|mp4|mpeg|mpg|ogv|webm|wmv)$/i;
 const trailerHosts = { 'youtube.com': true, 'www.youtube.com': true, 'm.youtube.com': true, 'youtu.be': true, 'www.youtube-nocookie.com': true, 'youtube-nocookie.com': true, 'vimeo.com': true, 'www.vimeo.com': true, 'player.vimeo.com': true };
 const importInstruction = 'Keep the original outside this repository; run npm run media:import -- "/absolute/path/to/original", then commit the generated public/media preview and src/content/media-previews.json together.';
@@ -371,7 +371,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
   if (settings) {
     const { file, value } = settings;
     text(value.name, file, 'name', true);
-    optionalStrings(value, ['description', 'intro', 'status', 'featuredPost'], file);
+    optionalStrings(value, ['description', 'intro', 'status', 'featuredPost', 'newsletterHeading', 'newsletterButtonLabel'], file);
     url(value.githubUrl, file, 'githubUrl');
     if (text(value.newsletterUrl, file, 'newsletterUrl')) {
       try {
@@ -380,6 +380,15 @@ export function validateSource(root = projectRoot, now = new Date()) {
       } catch {
         report(file, 'newsletterUrl', 'Use your real absolute HTTPS subscription-page URL, or leave this value empty until an account is configured.');
       }
+    }
+    if (text(value.newsletterFormAction, file, 'newsletterFormAction')) {
+      try {
+        const endpoint = new URL(value.newsletterFormAction);
+        if (endpoint.protocol !== 'https:' || endpoint.hostname !== 'api.follow.it' || !endpoint.pathname.startsWith('/subscription-form/') || endpoint.username || endpoint.password) throw new Error('unsupported form endpoint');
+      } catch {
+        report(file, 'newsletterFormAction', 'Use the HTTPS subscription-form action supplied by follow.it, or leave it empty.');
+      }
+      text(value.newsletterButtonLabel, file, 'newsletterButtonLabel', true);
     }
     if (typeof value.featuredPost === 'string' && value.featuredPost.trim()) {
       if (!posts.some((post) => post.data.permalink === value.featuredPost && isPublishedPost(post.data, now))) report(file, 'featuredPost', 'Choose an existing published post permalink, or leave it empty. Draft and future posts cannot be featured publicly.');

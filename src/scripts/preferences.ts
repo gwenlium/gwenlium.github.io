@@ -26,23 +26,6 @@ const lifetime = new AbortController();
 const listenerOptions = { signal: lifetime.signal };
 let storageAvailable = true;
 let returnFocus: HTMLElement | null = null;
-let observedNavigation: HTMLElement | null = null;
-const navigationObserver = new ResizeObserver(updateNavigationOffset);
-
-function updateNavigationOffset(): void {
-  const height = window.innerWidth <= 760 ? (observedNavigation?.getBoundingClientRect().height ?? 0) + 24 : 24;
-  document.documentElement.style.setProperty('--navigation-offset', `${height}px`);
-}
-
-function trackNavigation(): void {
-  const navigation = document.querySelector<HTMLElement>('.site-rail');
-  if (navigation !== observedNavigation) {
-    navigationObserver.disconnect();
-    observedNavigation = navigation;
-    if (navigation) navigationObserver.observe(navigation);
-  }
-  updateNavigationOffset();
-}
 
 function readPreferences(fallback: Preferences): Preferences {
   let stored: string | null;
@@ -180,12 +163,10 @@ document.addEventListener('astro:before-swap', (event) => {
 document.addEventListener('astro:page-load', () => {
   applyPreferences();
   syncControls();
-  trackNavigation();
 }, listenerOptions);
 
 darkScheme.addEventListener('change', () => applyPreferences(), listenerOptions);
 reducedMotion.addEventListener('change', () => applyPreferences(), listenerOptions);
-window.addEventListener('resize', updateNavigationOffset, listenerOptions);
 window.addEventListener('storage', (event) => {
   if (event.key !== storageKey && event.key !== null) return;
   preferences = readPreferences(preferences);
@@ -195,8 +176,7 @@ window.addEventListener('storage', (event) => {
 
 applyPreferences();
 syncControls();
-trackNavigation();
 
-if (import.meta.hot) import.meta.hot.dispose(() => { lifetime.abort(); navigationObserver.disconnect(); });
+if (import.meta.hot) import.meta.hot.dispose(() => lifetime.abort());
 
 export {};

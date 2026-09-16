@@ -5,7 +5,6 @@ import Media from '../components/Media.astro';
 import Icon from '../components/Icon.astro';
 import { site } from '../lib/settings';
 const about = site.about;
-const links = about.links.filter((link) => link.label && /^(https?:\/\/|mailto:|\/(?!\/))/.test(link.url));
 const paragraphs = about.body.trim() ? about.body.trim().split(/\n\s*\n/) : [];
 ---
 
@@ -28,13 +27,6 @@ const paragraphs = about.body.trim() ? about.body.trim().split(/\n\s*\n/) : [];
           </div>
         )}
       </Window>
-      <Window title="Links" tone="lavender">
-        <nav class="about-links" aria-label="Profile links">
-          {site.githubUrl && <a class="button-secondary" href={site.githubUrl}>GitHub<Icon name="external" size={14} /></a>}
-          {links.map((link) => <a class="button-secondary" href={link.url}>{link.label}<Icon name="external" size={14} /></a>)}
-          <a class="button-secondary" href="/subscribe/">Follow updates<Icon name="rss" size={14} /></a>
-        </nav>
-      </Window>
     </div>
   </div>
 </SiteLayout>
@@ -48,8 +40,6 @@ const paragraphs = about.body.trim() ? about.body.trim().split(/\n\s*\n/) : [];
   .about-body p { white-space: pre-line; overflow-wrap: anywhere; }
   .about-body p:first-child { margin-top: 0; }
   .about-body p:last-child { margin-bottom: 0; }
-  .about-links { display: flex; flex-wrap: wrap; gap: .8rem; }
-  .about-links a { display: inline-flex; align-items: center; gap: .6rem; }
   .empty-state :global(svg) { margin-inline: auto; }
   @media (max-width: 800px) { .about-grid--with-avatar { grid-template-columns: 1fr; } .about-avatar { max-width: 350px; } }
 </style>

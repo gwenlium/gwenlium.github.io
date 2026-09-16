@@ -43,18 +43,21 @@ const { title, id, class: className, tone = 'sage' } = Astro.props;
   .window-control--close { background: color-mix(in srgb, var(--pink) 75%, var(--surface)); }
   .window-control--close:hover { background: var(--pink); }
   .window-control__restore { display: none; }
-  .window[data-window-state='maximized'] { position: fixed; z-index: 40; inset: .75rem .75rem calc(var(--dock-space) + .75rem); display: flex; flex-direction: column; width: auto; height: auto; min-height: 0; max-width: none; max-height: none; margin: 0; overflow: hidden; }
+  .window[data-window-state='maximized'] { position: fixed; z-index: 40; inset: calc(var(--workspace-top, 0px) + var(--app-inset)) var(--app-inset) calc(var(--workspace-bottom, 0px) + var(--app-inset)); display: flex; flex-direction: column; width: auto; height: auto; min-height: 0; max-width: none; max-height: none; margin: 0; overflow: hidden; }
   .window[data-window-state='maximized'] > .window-titlebar { flex-shrink: 0; }
   .window[data-window-state='maximized'] > .window-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scroll-padding-block: 1rem; }
   .window[data-window-state='maximized'] .window-control__maximize { display: none; }
   .window[data-window-state='maximized'] .window-control__restore { display: block; }
   .window[data-window-state='maximized']::backdrop { display: none; }
-  :global(.window-recovery-toast) { position: fixed; z-index: 41; right: .75rem; bottom: calc(var(--dock-space) + 1rem); width: min(28rem, calc(100% - 1.5rem)); padding: .85rem; border: 1px solid var(--line); background: var(--surface-raised); color: var(--ink); font-family: var(--font-ui); font-size: .75rem; box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark), var(--shadow); }
+  :global(.window-recovery-toast) { position: fixed; z-index: 41; right: var(--app-inset); bottom: calc(var(--workspace-bottom, 0px) + var(--app-inset)); width: min(28rem, calc(100% - var(--app-inset) * 2)); max-height: calc(100dvh - var(--workspace-top, 0px) - var(--workspace-bottom, 0px) - var(--app-inset) * 2); overflow: auto; padding: .85rem; border: 1px solid var(--line); background: var(--surface-raised); color: var(--ink); font-family: var(--font-ui); font-size: .75rem; box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark), var(--shadow); }
   :global(.window-recovery-toast[hidden]) { display: none; }
   :global(.window-recovery-toast p) { margin: 0 0 .7rem; }
   :global(.window-recovery-toast__actions) { display: flex; flex-wrap: wrap; gap: .6rem; }
   :global(.window-recovery-toast button) { min-height: 32px; padding: .35rem .65rem; border: 1px solid var(--line); background: var(--surface); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
   :global(.window-recovery-toast button:hover) { background: var(--sage); }
+  @media (min-width: 761px) {
+    .window[data-window-state='maximized'] { left: calc(var(--app-inset) + var(--player-left-space, 0px)); right: calc(var(--app-inset) + var(--player-right-space, 0px)); }
+  }
   @media (pointer: coarse) { .window-control { width: 28px; height: 28px; } }
   @media (forced-colors: active) { .window-control, :global(.window-recovery-toast), :global(.window-recovery-toast button) { border-color: ButtonText; box-shadow: none; } }
   @media print {

@@ -18,7 +18,6 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
 <SiteLayout title="Devlog">
   <header class="page-heading archive-heading">
     <div><p class="eyebrow">The journal</p><h1>Devlog</h1></div>
-    <a class="button button-secondary" href="/rss.xml" data-astro-reload><Icon name="rss" size={15} /> RSS feed</a>
   </header>
 
   <div data-devlog>
@@ -45,7 +44,6 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
       </div>
       {posts.length === 0 && <div class="empty-state archive-empty">
         <Icon name="book" size={36} /><h2>No entries published yet.</h2>
-        <a href="/rss.xml" data-astro-reload>Follow the RSS feed</a>
       </div>}
       <div class="empty-state archive-empty" data-no-results hidden>
         <Icon name="search" size={32} /><h2>No matching entries.</h2><p>Try another search or clear the filters.</p>

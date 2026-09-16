@@ -375,7 +375,8 @@ function animate(timestamp: number): void {
 }
 
 function updateParallax(): void {
-  parallaxY = reduced || mode === 'off' || forcedColors.matches ? 0 : -Math.min(Math.max(scrollY, 0), 1600) * .028;
+  const scrollTop = document.getElementById('page-scroll')?.scrollTop ?? 0;
+  parallaxY = reduced || mode === 'off' || forcedColors.matches ? 0 : -Math.min(Math.max(scrollTop, 0), 1600) * .028;
   // The soft color field moves more slowly than the pattern, without extra canvases.
   root.style.setProperty('--background-parallax-y', `${parallaxY}px`);
   if (mode === 'checker' && !document.hidden) {
@@ -437,7 +438,7 @@ document.addEventListener('visibilitychange', schedule, listenerOptions);
 forcedColors.addEventListener('change', applySettings, listenerOptions);
 window.addEventListener('pagehide', stop, listenerOptions);
 window.addEventListener('pageshow', schedule, listenerOptions);
-window.addEventListener('scroll', updateParallax, { ...listenerOptions, passive: true });
+document.addEventListener('gwenlium:viewport-scroll', updateParallax, listenerOptions);
 window.addEventListener('resize', () => {
   for (const viewport of viewports) viewport.resize();
 }, listenerOptions);
