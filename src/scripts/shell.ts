@@ -147,9 +147,14 @@ function queueGeometry(): void {
 function syncControls(): void {
   const player = document.querySelector<HTMLElement>('gwenlium-player');
   const music = document.getElementById('music-player');
-  document.querySelector('[data-open-player]')?.setAttribute('aria-expanded', String(player?.dataset.playerState === 'open' && Boolean(music && !music.hidden)));
+  const musicControl = document.querySelector<HTMLElement>('[data-open-player]');
+  if (musicControl) {
+    musicControl.setAttribute('aria-expanded', String(player?.dataset.playerState === 'open' && Boolean(music && !music.hidden)));
+    musicControl.dataset.windowState = music?.dataset.windowState || 'normal';
+  }
   document.querySelector('[data-open-start]')?.setAttribute('aria-expanded', String(Boolean(document.querySelector<HTMLDialogElement>('#start-menu')?.open)));
-  document.querySelector('[data-open-settings]')?.setAttribute('aria-expanded', String(Boolean(document.querySelector<HTMLDialogElement>('#site-settings')?.open)));
+  const settings = document.getElementById('site-settings');
+  document.querySelector('[data-open-settings]')?.setAttribute('aria-expanded', String(Boolean(settings && !settings.hidden)));
 }
 
 function detachPage(): void {

@@ -1,0 +1,125 @@
+---
+import Window from './Window.astro';
+---
+
+<Window title="Your playlists" id="music-library" class="music-library" tone="sage">
+    <div class="library-intro">
+      <div><span class="eyebrow">Personal / on this device</span><h2>Make a little collection</h2></div>
+      <span class="library-capacity" data-playlist-capacity>0 / 50 playlists</span>
+    </div>
+    <p class="library-note" data-library-storage>Playlists and reactions save in this browser on this device, not to an account. There are no public reaction counts.</p>
+    <p class="library-status" data-library-status role="status" aria-live="polite"></p>
+    <noscript><p>JavaScript is needed to manage personal playlists, save reactions, and open shared playlists.</p></noscript>
+
+    <fieldset class="library-controls" data-library-controls disabled>
+      <legend class="sr-only">Playlist management</legend>
+
+      <section class="library-panel" data-shared-preview aria-labelledby="shared-playlist-heading" hidden>
+        <span class="eyebrow" data-shared-label>Shared preview / not saved</span>
+        <h3 id="shared-playlist-heading" data-shared-name></h3>
+        <p class="library-note" data-shared-note></p>
+        <ol class="playlist-tracks" data-shared-tracks></ol>
+        <div class="library-actions">
+          <button type="button" class="button" data-library-action="play-shared">Play in order</button>
+          <button type="button" class="button-secondary" data-library-action="save-shared">Save copy to this device</button>
+          <button type="button" class="button-secondary" data-library-action="dismiss-shared">Dismiss preview</button>
+        </div>
+      </section>
+
+      <section class="library-panel library-add" data-add-panel aria-labelledby="add-track-heading" hidden>
+        <h3 id="add-track-heading">Add a track</h3>
+        <p class="library-note" data-add-description></p>
+        <form class="library-form" data-add-track-form data-astro-reload>
+          <label for="playlist-add-target">Destination playlist<select id="playlist-add-target" data-add-target required><option value="">Choose a playlist</option></select></label>
+          <button type="submit" class="button" data-confirm-add>Add track</button>
+          <button type="button" class="button-secondary" data-library-action="cancel-add">Cancel</button>
+        </form>
+        <p class="library-note">Choose a destination, or create a new playlist below. Nothing is added until you press Add track.</p>
+      </section>
+
+      <form class="library-form library-create" data-create-playlist data-astro-reload>
+        <label for="playlist-create-name">New playlist name <span>(1–80 characters)</span><input id="playlist-create-name" data-library-name name="name" type="text" required maxlength="160" autocomplete="off" placeholder="A name for your collection" /></label>
+        <button type="submit" class="button" data-create-button>Create playlist</button>
+      </form>
+
+      <p class="library-note" data-no-playlists>No personal playlists yet. Create one above; an empty playlist is fine while tracks are on their way.</p>
+      <div data-playlist-manager hidden>
+        <label class="library-selection" for="playlist-selection">Your playlists<select id="playlist-selection" data-playlist-select></select></label>
+        <div class="playlist-workspace">
+          <div class="playlist-summary">
+            <span class="eyebrow">Personal playlist</span>
+            <strong class="playlist-summary__name" data-selected-name></strong>
+            <span class="playlist-summary__count" data-selected-count></span>
+            <span class="playlist-summary__limit">Up to 100 tracks / ordered by you</span>
+          </div>
+          <div class="playlist-editor">
+            <form class="library-form" data-rename-playlist data-astro-reload>
+              <label for="playlist-rename-name">Playlist name<input id="playlist-rename-name" data-library-name name="name" type="text" required maxlength="160" autocomplete="off" /></label>
+              <button type="submit" class="button-secondary">Rename</button>
+            </form>
+            <div class="library-actions">
+              <button type="button" class="button" data-library-action="play-playlist">Play in order</button>
+              <button type="button" class="button-secondary" data-library-action="share-playlist">Share playlist</button>
+              <button type="button" class="button-secondary" data-library-action="delete-playlist">Delete playlist</button>
+            </div>
+            <div class="library-delete" data-delete-confirm hidden>
+              <p data-delete-description></p>
+              <div class="library-actions">
+                <button type="button" class="button-secondary" data-library-action="confirm-delete">Delete permanently</button>
+                <button type="button" class="button-secondary" data-library-action="cancel-delete">Keep playlist</button>
+              </div>
+            </div>
+            <p class="library-note" data-playlist-note></p>
+            <ol class="playlist-tracks" data-playlist-tracks></ol>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+</Window>
+
+<style>
+  :global(.music-library) { margin-bottom: 1.5rem; min-width: 0; }
+  .library-intro { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+  .library-intro h2 { margin: 0; font-size: 1.1rem; font-weight: 400; }
+  .library-capacity { flex-shrink: 0; padding: .35rem .5rem; border: 1px solid var(--line); font-size: .65rem; background: var(--surface-raised); }
+  .library-note, .library-status, .library-delete p { color: var(--muted); font-family: var(--font-reading); font-size: .9rem; line-height: 1.6; overflow-wrap: anywhere; }
+  .library-status { color: var(--ink); }
+  .library-status:empty { display: none; }
+  .library-controls { min-width: 0; padding: 0; margin: 0; border: 0; }
+  .library-controls:disabled { opacity: .6; }
+  .library-form { display: flex; flex-wrap: wrap; align-items: end; gap: .65rem; }
+  .library-form label { display: grid; flex: 1 1 14rem; gap: .55rem; min-width: 0; font-size: .7rem; }
+  .library-form label span { display: contents; color: var(--muted); }
+  .library-form input, .library-form select, .library-selection select { width: 100%; min-height: 44px; border-radius: 0; font-family: var(--font-reading); }
+  .library-form button, .library-actions button { min-height: 44px; border-radius: 0; }
+  .library-create { margin-block: 1.2rem; }
+  .library-selection { display: grid; gap: .55rem; margin-block: 1.3rem; font-size: .75rem; }
+  .playlist-workspace { display: grid; grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+  .playlist-summary { display: flex; flex-direction: column; justify-content: space-between; gap: 1rem; aspect-ratio: 1; min-width: 0; padding: 1rem; border: 1px solid var(--line); background: linear-gradient(135deg, var(--sage), var(--surface-raised) 55%, var(--lavender)); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
+  .playlist-summary .eyebrow { font-size: .6rem; margin: 0; }
+  .playlist-summary__name { font-size: 1rem; font-weight: 400; overflow-wrap: anywhere; }
+  .playlist-summary__count { font-size: .75rem; }
+  .playlist-summary__limit { font-family: var(--font-reading); font-size: .7rem; line-height: 1.5; color: var(--muted); }
+  .playlist-editor { min-width: 0; }
+  .library-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .9rem; }
+  .library-panel { padding: 1rem; margin-block: 1rem; border: 1px solid var(--line); background: color-mix(in srgb, var(--lavender) 30%, var(--surface)); }
+  .library-add { background: color-mix(in srgb, var(--sage) 30%, var(--surface)); }
+  .library-panel h3 { font-size: 1rem; font-weight: 400; margin: 0; overflow-wrap: anywhere; }
+  .library-delete { border: 1px solid var(--line); padding: .75rem; background: color-mix(in srgb, var(--pink) 45%, var(--surface)); }
+  .library-delete p { margin-top: 0; color: var(--ink); }
+  .library-delete .library-actions { margin-bottom: 0; }
+  .playlist-tracks { list-style: none; margin: 0; padding: 0; }
+  :global(.music-library .playlist-track) { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; padding: .7rem 0; border-top: 1px solid var(--line); }
+  :global(.music-library .playlist-track__number) { width: 2ch; flex-shrink: 0; font-size: .65rem; color: var(--muted); }
+  :global(.music-library .playlist-track__title) { flex: 1 1 9rem; min-width: 0; overflow-wrap: anywhere; font-family: var(--font-reading); font-size: .9rem; line-height: 1.5; }
+  :global(.music-library .playlist-track__actions) { display: flex; flex-wrap: wrap; gap: .3rem; }
+  :global(.music-library .playlist-track__actions button) { min-height: 40px; padding: .35rem .5rem; border-radius: 0; font-size: .65rem; }
+  :global(.music-library button:disabled) { opacity: .45; cursor: default; transform: none; }
+  :global(.music-library [hidden]) { display: none !important; }
+  @media (max-width: 700px) {
+    .playlist-workspace { grid-template-columns: 1fr; }
+    .playlist-summary { width: min(100%, 14rem); justify-self: center; }
+    .library-intro { flex-wrap: wrap; }
+    .library-panel { padding: .75rem; }
+  }
+</style>

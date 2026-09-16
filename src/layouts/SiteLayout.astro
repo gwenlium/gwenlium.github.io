@@ -5,8 +5,11 @@ import BackgroundVfx from '../components/BackgroundVfx.astro';
 import Player from '../components/Player.astro';
 import Footer from '../components/Footer.astro';
 import PixelTransition from '../components/PixelTransition.astro';
+import Window from '../components/Window.astro';
 import { site } from '../lib/settings';
 import '../styles/global.css';
+import '../styles/window-layout.css';
+import '../styles/page-themes.css';
 
 interface Props {
   title?: string;
@@ -22,10 +25,12 @@ const pageTitle = title ? `${title} · ${site.name}` : site.name;
 const siteUrl = Astro.site ?? new URL('https://gwenlium.dev');
 const canonical = new URL(Astro.url.pathname, siteUrl).href;
 const socialImage = new URL(image || '/social-card.png', siteUrl).href;
+const section = Astro.url.pathname.split('/').filter(Boolean)[0] || 'home';
+const pageTheme = ['home', 'devlog', 'game', 'gallery', 'music', 'about', 'subscribe'].includes(section) ? section : 'not-found';
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-page-theme={pageTheme}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -110,12 +115,13 @@ const socialImage = new URL(image || '/social-card.png', siteUrl).href;
         <button type="button" class="button start-trigger" data-open-start aria-controls="start-menu" aria-haspopup="dialog" aria-expanded="false">
           <img src="/avatar.webp" alt="" width="22" height="22" /><span>Start</span>
         </button>
-        <button type="button" class="button-secondary taskbar-control" data-open-settings aria-controls="site-settings" aria-haspopup="dialog" aria-expanded="false" aria-label="Preferences">
+        <button type="button" class="button-secondary taskbar-control" data-open-settings aria-controls="site-settings" aria-expanded="false" aria-label="Preferences">
           <Icon name="settings" size={17} /><span>Preferences</span>
         </button>
         <button type="button" class="button-secondary taskbar-control" data-open-player aria-controls="music-player" aria-expanded="true" aria-label="Music player">
           <Icon name="music" size={17} /><span>Music</span>
         </button>
+        <div class="taskbar-windows" data-taskbar-windows role="group" aria-label="Open windows"></div>
         <button type="button" class="button-secondary taskbar-control taskbar-restore" data-restore-windows aria-label="Restore windows">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 8V3h13v13h-5M3 8h13v13H3ZM3 12h13" /></svg><span>Restore windows</span>
         </button>
@@ -123,12 +129,7 @@ const socialImage = new URL(image || '/social-card.png', siteUrl).href;
     </div>
 
     <PixelTransition />
-    <dialog id="site-settings" class="settings-dialog" aria-labelledby="settings-title">
-      <div class="window-titlebar">
-        <Icon name="settings" size={16} />
-        <h2 id="settings-title" class="window-titlebar__title">Preferences</h2>
-        <button type="button" class="window-close" data-close-settings aria-label="Close preferences"><Icon name="close" size={16} /></button>
-      </div>
+    <Window id="site-settings" title="Preferences" class="settings-window" floating initiallyClosed>
       <div class="settings-content">
         <p class="settings-note">Display and reading settings.</p>
         <fieldset class="preference-group">
@@ -174,7 +175,7 @@ const socialImage = new URL(image || '/social-card.png', siteUrl).href;
           <button type="button" class="button" data-close-settings>Done<Icon name="arrow" size={16} /></button>
         </div>
       </div>
-    </dialog>
+    </Window>
     <script>
       import '../scripts/preferences';
       import '../scripts/shell';

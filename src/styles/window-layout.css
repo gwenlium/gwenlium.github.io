@@ -1,0 +1,65 @@
+:where([data-desktop-window]) { position: relative; }
+[data-window-drag] { cursor: grab; touch-action: none; user-select: none; }
+[data-window-drag]:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
+[data-window-drag] button, [data-window-drag] input, [data-window-drag] select { cursor: pointer; touch-action: manipulation; }
+[data-desktop-window][data-window-floating] {
+  position: fixed !important;
+  inset: auto !important;
+  left: var(--window-x) !important;
+  top: var(--window-y) !important;
+  width: var(--window-width) !important;
+  height: var(--window-height) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  z-index: var(--window-layer, 10) !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+[data-desktop-window][hidden] { display: none !important; }
+[data-window-floating] > :is(.window-titlebar, .player-titlebar) { flex-shrink: 0; }
+[data-window-floating] > :is(.window-body, .player-body) { flex: 1; min-height: 0; min-width: 0; overflow: auto; overscroll-behavior: contain; }
+[data-window-floating]::backdrop { display: none; }
+[data-window-interacting], [data-window-interacting] [data-window-drag] { cursor: grabbing; }
+html[data-window-interaction] { user-select: none; }
+html[data-window-interaction] iframe { pointer-events: none; }
+[data-window-resize] { position: absolute; z-index: 5; display: block; touch-action: none; user-select: none; }
+[data-window-resize='n'], [data-window-resize='s'] { left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+[data-window-resize='n'] { top: 0; }
+[data-window-resize='s'] { bottom: 0; }
+[data-window-resize='e'], [data-window-resize='w'] { top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+[data-window-resize='e'] { right: 0; }
+[data-window-resize='w'] { left: 0; }
+[data-window-resize='nw'], [data-window-resize='ne'], [data-window-resize='sw'], [data-window-resize='se'] { width: 12px; height: 12px; }
+[data-window-resize='nw'] { top: 0; left: 0; cursor: nwse-resize; }
+[data-window-resize='ne'] { top: 0; right: 0; cursor: nesw-resize; }
+[data-window-resize='sw'] { bottom: 0; left: 0; cursor: nesw-resize; }
+[data-window-resize='se'] { bottom: 0; right: 0; cursor: nwse-resize; background: repeating-linear-gradient(135deg, transparent 0 3px, var(--line) 3px 4px); clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+[data-window-state='maximized'] > [data-window-resize] { display: none; }
+.window-snap-preview { position: fixed; z-index: 9; border: 2px solid var(--focus); background: color-mix(in srgb, var(--sage) 45%, transparent); box-shadow: inset 0 0 0 1px var(--surface-raised); pointer-events: none; }
+.window-snap-preview[hidden] { display: none; }
+.taskbar-windows { display: flex; align-items: center; gap: .35rem; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.taskbar-windows .taskbar-window { min-width: 36px; max-width: 180px; gap: .4rem; }
+.taskbar-window[hidden] { display: none !important; }
+.taskbar-window-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taskbar [data-window-state='minimized'] { box-shadow: inset 0 -2px var(--accent-ink); }
+.taskbar-window:focus-visible { outline-offset: -3px; }
+@media (max-width: 760px) {
+  .taskbar-windows .taskbar-window { max-width: 95px; }
+  .taskbar-window-label { max-width: 7ch; font-size: 9px; }
+}
+@media (pointer: coarse) {
+  [data-window-resize='n'], [data-window-resize='s'] { height: 9px; }
+  [data-window-resize='e'], [data-window-resize='w'] { width: 9px; }
+  [data-window-resize='nw'], [data-window-resize='ne'], [data-window-resize='sw'], [data-window-resize='se'] { width: 16px; height: 16px; }
+}
+@media (forced-colors: active) { .window-snap-preview { background: Canvas; border-color: Highlight; opacity: .65; } }
+@media print {
+  [data-window-resize], .window-snap-preview, [data-window-placeholder] { display: none !important; }
+  [data-desktop-window][data-window-floating] { position: static !important; inset: auto !important; width: auto !important; height: auto !important; display: block; overflow: visible; }
+  [data-window-floating] > .window-body { overflow: visible; }
+  #site-settings { display: none !important; }
+}

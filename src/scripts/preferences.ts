@@ -25,7 +25,6 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const lifetime = new AbortController();
 const listenerOptions = { signal: lifetime.signal };
 let storageAvailable = true;
-let returnFocus: HTMLElement | null = null;
 
 function readPreferences(fallback: Preferences): Preferences {
   let stored: string | null;
@@ -95,36 +94,15 @@ function updateStatus(): void {
 // Astro runs bundled scripts once; delegated listeners also cover swapped pages.
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
-  const opener = event.target.closest<HTMLButtonElement>('[data-open-settings]');
-  const dialog = document.querySelector<HTMLDialogElement>('#site-settings');
-  if (!dialog) return;
-
-  if (opener) {
-    syncControls();
-    returnFocus = opener;
-    if (!dialog.open) dialog.showModal();
-    return;
-  }
-
-  if (event.target.closest('[data-close-settings]')) {
-    dialog.close();
-    return;
-  }
-
-  if (event.target === dialog && event instanceof MouseEvent) {
-    const bounds = dialog.getBoundingClientRect();
-    if (event.clientX < bounds.left || event.clientX > bounds.right
-      || event.clientY < bounds.top || event.clientY > bounds.bottom) {
-      dialog.close();
-    }
+  const opener = event.target.closest('[data-open-settings]');
+  if (opener) syncControls();
+  if (opener || event.target.closest('[data-close-settings]')) {
+    document.dispatchEvent(new CustomEvent('gwenlium:window-command', {
+      detail: { id: 'site-settings', action: opener ? 'restore' : 'close' },
+    }));
   }
 }, listenerOptions);
 
-document.addEventListener('close', (event) => {
-  if (!(event.target instanceof HTMLDialogElement) || event.target.id !== 'site-settings') return;
-  if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
-  returnFocus = null;
-}, { ...listenerOptions, capture: true });
 
 document.addEventListener('change', (event) => {
   const input = event.target;
@@ -156,8 +134,6 @@ document.addEventListener('change', (event) => {
 
 document.addEventListener('astro:before-swap', (event) => {
   applyPreferences((event as BeforeSwapEvent).newDocument.documentElement);
-  const dialog = document.querySelector<HTMLDialogElement>('#site-settings');
-  if (dialog?.open) dialog.close();
 }, listenerOptions);
 
 document.addEventListener('astro:page-load', () => {

@@ -8,6 +8,7 @@ const root = document.documentElement;
 const lifetime = new AbortController();
 const listenerOptions = { signal: lifetime.signal };
 const forcedColors = matchMedia('(forced-colors: active)');
+const darkScheme = matchMedia('(prefers-color-scheme: dark)');
 const viewports: BackgroundViewport[] = [];
 const frameInterval = 1000 / 30;
 const tau = Math.PI * 2;
@@ -391,13 +392,18 @@ function applySettings(): void {
   mode = nextMode;
   reduced = root.dataset.motion !== 'full';
   const styles = getComputedStyle(root);
-  ink = styles.getPropertyValue('--accent-ink').trim();
-  line = styles.getPropertyValue('--line').trim();
-  accent = styles.getPropertyValue('--focus').trim();
-  tint = styles.getPropertyValue('--sage').trim();
+  const nextInk = styles.getPropertyValue('--accent-ink').trim();
+  const nextLine = styles.getPropertyValue('--line').trim();
+  const nextAccent = styles.getPropertyValue('--focus').trim();
+  const nextTint = styles.getPropertyValue('--sage').trim();
+  const colorsChanged = ink !== nextInk || line !== nextLine || accent !== nextAccent || tint !== nextTint;
+  ink = nextInk;
+  line = nextLine;
+  accent = nextAccent;
+  tint = nextTint;
   updateParallax();
   for (const viewport of viewports) {
-    if (changed || mode === 'checker') viewport.rebuild();
+    if (changed || (mode === 'checker' && colorsChanged)) viewport.rebuild();
     viewport.draw(reduced ? 18 : elapsed);
   }
   schedule();
@@ -410,17 +416,18 @@ function syncViewports(): void {
       viewports.splice(index, 1);
     }
   }
+  // Swaps can replace styles without changing attributes; refresh before attaching new canvases.
+  applySettings();
   for (const canvas of document.querySelectorAll<HTMLCanvasElement>('[data-background-canvas]')) {
     if (viewports.some((viewport) => viewport.canvas === canvas)) continue;
     const context = canvas.getContext('2d');
     if (context) viewports.push(new BackgroundViewport(canvas, context));
   }
-  updateParallax();
   schedule();
 }
 
 const settingsObserver = new MutationObserver(applySettings);
-settingsObserver.observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-motion', 'data-background-active'] });
+settingsObserver.observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-page-theme', 'data-motion', 'data-background-active'] });
 // Removal outside ClientRouter also releases each viewport's observers and pixel buffer.
 const removalObserver = new MutationObserver(() => {
   for (const viewport of viewports) {
@@ -436,6 +443,7 @@ document.addEventListener('astro:after-swap', syncViewports, listenerOptions);
 document.addEventListener('astro:page-load', syncViewports, listenerOptions);
 document.addEventListener('visibilitychange', schedule, listenerOptions);
 forcedColors.addEventListener('change', applySettings, listenerOptions);
+darkScheme.addEventListener('change', applySettings, listenerOptions);
 window.addEventListener('pagehide', stop, listenerOptions);
 window.addEventListener('pageshow', schedule, listenerOptions);
 document.addEventListener('gwenlium:viewport-scroll', updateParallax, listenerOptions);
@@ -443,7 +451,6 @@ window.addEventListener('resize', () => {
   for (const viewport of viewports) viewport.resize();
 }, listenerOptions);
 
-applySettings();
 syncViewports();
 
 if (import.meta.hot) import.meta.hot.dispose(() => {

@@ -1,8 +1,8 @@
+import { registerWindow, resetWindowLayout, setWindowMaximized, unregisterWindow } from './window-layout';
 import { animateWindow, cancelWindowAnimation } from './window-motion';
 
 type DesktopWindowState = 'normal' | 'minimized' | 'maximized' | 'closed';
 type WindowCommand = { id?: string; action?: 'restore' | 'maximize' | 'minimize' | 'close' | 'restore-all' };
-type MovingElement = HTMLElement & { moveBefore?: (node: Node, reference: Node | null) => void };
 type DesktopWindow = {
   id: string;
   title: string;
@@ -10,10 +10,11 @@ type DesktopWindow = {
   body: HTMLElement;
   controls: HTMLElement;
   maximizeButton: HTMLButtonElement;
+  taskbarButton: HTMLButtonElement;
+  pinned: boolean;
   lastFocus: HTMLElement | null;
   request: number;
   pending?: 'minimize' | 'close';
-  placement?: { marker: HTMLElement; parent: MovingElement; portaled: boolean };
 };
 
 const desktopWindows = new Map<string, DesktopWindow>();
@@ -31,6 +32,21 @@ function windowsChanged() {
 
 function focusStart() {
   document.querySelector<HTMLButtonElement>('[data-open-start]')?.focus({ preventScroll: true });
+}
+
+function createTaskbarButton(id: string, title: string) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'button-secondary taskbar-window';
+  button.dataset.taskbarWindow = id;
+  button.setAttribute('aria-label', title);
+  button.title = title;
+  button.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 3h12v10H2zM2 5.5h12" /></svg>';
+  const label = document.createElement('span');
+  label.className = 'taskbar-window-label';
+  label.textContent = title;
+  button.append(label);
+  return button;
 }
 
 function usableControl(element: HTMLElement, root: HTMLElement) {
@@ -57,56 +73,26 @@ function setState(entry: DesktopWindow, state: DesktopWindowState) {
   entry.root.dataset.windowState = state;
   entry.root.hidden = state === 'minimized' || state === 'closed';
   entry.root.inert = false;
+  entry.taskbarButton.hidden = !entry.pinned && state === 'closed';
+  entry.taskbarButton.dataset.windowState = state;
   const action = state === 'maximized' ? 'restore' : 'maximize';
   const label = `${action === 'restore' ? 'Restore' : 'Maximize'} ${entry.title}`;
   entry.maximizeButton.dataset.windowAction = action;
   entry.maximizeButton.setAttribute('aria-label', label);
   entry.maximizeButton.title = label;
-}
-
-function restorePlacement(entry: DesktopWindow) {
-  const placement = entry.placement;
-  if (!placement) return;
-  if (placement.portaled) {
-    // The same state-preserving primitive is used in both directions: no iframe reloads.
-    placement.parent.moveBefore!(entry.root, placement.marker);
-  } else if (entry.root.hasAttribute('popover')) {
-    entry.root.hidePopover();
-    entry.root.removeAttribute('popover');
+  setWindowMaximized(entry.root, state === 'maximized');
+  if (state === 'maximized') entry.body.tabIndex = 0;
+  else {
+    entry.body.removeAttribute('tabindex');
+    if (maximizedWindow === entry) maximizedWindow = undefined;
   }
-  placement.marker.remove();
-  entry.placement = undefined;
-  entry.body.removeAttribute('tabindex');
-  if (maximizedWindow === entry) maximizedWindow = undefined;
-  setState(entry, 'normal');
 }
 
 function maximizeWindow(entry: DesktopWindow) {
   if (maximizedWindow === entry) return;
   if (maximizedWindow) restoreWindow(maximizedWindow, false);
-  setState(entry, 'normal');
-  const parent = entry.root.parentElement as MovingElement;
-  const marker = document.createElement('div');
-  marker.dataset.windowPlaceholder = entry.id;
-  marker.setAttribute('aria-hidden', 'true');
-  marker.style.height = `${entry.root.getBoundingClientRect().height}px`;
-  marker.style.margin = getComputedStyle(entry.root).margin;
-  parent.insertBefore(marker, entry.root);
-
-  const destination = document.body as MovingElement;
-  const portaled = typeof destination.moveBefore === 'function';
-  entry.placement = { marker, parent, portaled };
   setState(entry, 'maximized');
-  if (portaled) {
-    destination.moveBefore!(entry.root, null);
-  } else if (typeof entry.root.showPopover === 'function') {
-    // A manual popover escapes ancestor stacking contexts without disconnecting media
-    // in browsers that do not yet implement state-preserving DOM moves.
-    entry.root.setAttribute('popover', 'manual');
-    entry.root.showPopover();
-  }
   maximizedWindow = entry;
-  entry.body.tabIndex = 0;
   entry.maximizeButton.focus({ preventScroll: true });
 }
 
@@ -118,14 +104,11 @@ function restoreWindow(entry: DesktopWindow, focus = true) {
   entry.request++;
   entry.pending = undefined;
   if (maximizedWindow && !wasMaximized) restoreWindow(maximizedWindow, false);
-  if (entry.placement) {
-    cancelWindowAnimation(entry.root);
-    restorePlacement(entry);
-  }
+  cancelWindowAnimation(entry.root);
   setState(entry, 'normal');
   if (notice?.reopen.dataset.windowReopen === entry.id) hideNotice();
   if (wasMaximized || wasMinimized || wasHidden || wasClosing) {
-    const anchor = wasMinimized ? document.querySelector<HTMLElement>('[data-open-start]') ?? undefined : undefined;
+    const anchor = wasMinimized ? entry.taskbarButton : undefined;
     void animateWindow(entry.root, wasHidden && !wasMinimized ? 'open' : 'restore', anchor);
   }
   windowsChanged();
@@ -139,15 +122,16 @@ async function hideWindow(entry: DesktopWindow, action: 'minimize' | 'close') {
   if (entry.root.hidden || entry.pending === action) return;
   const request = ++entry.request;
   entry.pending = action;
-  focusStart();
+  if (action === 'minimize') entry.taskbarButton.focus({ preventScroll: true });
+  else focusStart();
   entry.root.inert = true;
-  const anchor = document.querySelector<HTMLElement>('[data-open-start]') ?? undefined;
+  const anchor = action === 'minimize' ? entry.taskbarButton : document.querySelector<HTMLElement>('[data-open-start]') ?? undefined;
   const completed = await animateWindow(entry.root, action, anchor);
   // A restore, another command, or a page swap invalidates this completion.
   if (!completed || entry.request !== request || desktopWindows.get(entry.id) !== entry) return;
   entry.pending = undefined;
-  restorePlacement(entry);
   setState(entry, action === 'close' ? 'closed' : 'minimized');
+  if (action === 'minimize') entry.taskbarButton.focus({ preventScroll: true });
   if (action === 'close') showNotice(entry);
   else if (notice?.reopen.dataset.windowReopen === entry.id) hideNotice();
   windowsChanged();
@@ -207,12 +191,10 @@ function commandWindow(id: string | undefined, action: string | undefined) {
     let focusTarget: DesktopWindow | undefined;
     const previousMaximized = maximizedWindow;
     for (const entry of desktopWindows.values()) {
-      if (entry.root.hidden || entry.pending) {
-        focusTarget ??= entry;
-        restoreWindow(entry, false);
-      }
+      if (entry.root.hidden || entry.pending) focusTarget ??= entry;
+      restoreWindow(entry, false);
+      resetWindowLayout(entry.root);
     }
-    if (maximizedWindow) restoreWindow(maximizedWindow, false);
     hideNotice();
     windowsChanged();
     if (focusTarget) focusWindow(focusTarget);
@@ -251,20 +233,21 @@ function commandWindow(id: string | undefined, action: string | undefined) {
 function cleanupWindows() {
   pageEvents?.abort();
   pageEvents = undefined;
+  const hadMaximized = maximizedWindow !== undefined;
   for (const entry of desktopWindows.values()) {
     entry.request++;
     entry.pending = undefined;
     cancelWindowAnimation(entry.root);
     entry.root.inert = false;
+    if (maximizedWindow === entry) setState(entry, 'normal');
+    unregisterWindow(entry.root);
+    entry.controls.hidden = true;
+    if (!entry.pinned) entry.taskbarButton.remove();
   }
-  if (maximizedWindow) {
-    restorePlacement(maximizedWindow);
-    windowsChanged();
-  }
+  if (hadMaximized) windowsChanged();
   hideNotice();
   notice?.root.remove();
   notice = undefined;
-  for (const entry of desktopWindows.values()) entry.controls.hidden = true;
   desktopWindows.clear();
   pageBody = undefined;
 }
@@ -275,28 +258,43 @@ function initializeWindows() {
   pageBody = document.body;
   pageEvents = new AbortController();
   const { signal } = pageEvents;
+  const taskbar = document.querySelector<HTMLElement>('[data-taskbar-windows]')!;
 
   document.querySelectorAll<HTMLElement>('[data-desktop-window]:not([data-persistent-window])').forEach((root, index) => {
-    const id = root.dataset.windowId ||= `desktop-window-${index + 1}`;
+    const id = root.dataset.windowId ||= root.id || `desktop-window-${index + 1}`;
+    const title = root.dataset.windowTitle || root.getAttribute('aria-label') || 'Window';
+    const pinnedButton = id === 'site-settings' ? document.querySelector<HTMLButtonElement>('[data-open-settings]') : null;
     const entry: DesktopWindow = {
       id,
-      title: root.dataset.windowTitle || root.getAttribute('aria-label') || 'Window',
+      title,
       root,
       body: root.querySelector<HTMLElement>(':scope > .window-body')!,
       controls: root.querySelector<HTMLElement>(':scope > .window-titlebar > [data-window-controls]')!,
       maximizeButton: root.querySelector<HTMLButtonElement>(':scope > .window-titlebar [data-window-maximize]')!,
+      taskbarButton: pinnedButton || createTaskbarButton(id, title),
+      pinned: Boolean(pinnedButton),
       lastFocus: null,
       request: 0,
     };
     desktopWindows.set(id, entry);
-    setState(entry, 'normal');
+    if (!entry.pinned) taskbar.append(entry.taskbarButton);
+    registerWindow(root, { floating: root.hasAttribute('data-window-default-floating') });
+    setState(entry, root.dataset.windowInitialState === 'closed' ? 'closed' : 'normal');
     entry.controls.hidden = false;
-    void animateWindow(root, 'open');
+    if (!root.hidden) void animateWindow(root, 'open');
   });
   createNotice();
 
   document.addEventListener('click', (event) => {
     if (!(event.target instanceof Element)) return;
+    const taskbarButton = event.target.closest<HTMLButtonElement>('[data-taskbar-window]');
+    const taskbarId = taskbarButton?.dataset.taskbarWindow;
+    if (taskbarId && desktopWindows.has(taskbarId)) {
+      document.dispatchEvent(new CustomEvent<WindowCommand>('gwenlium:window-command', {
+        detail: { id: taskbarId, action: 'restore' },
+      }));
+      return;
+    }
     const reopen = event.target.closest<HTMLButtonElement>('[data-window-reopen]');
     if (reopen) {
       commandWindow(reopen.dataset.windowReopen, 'restore');

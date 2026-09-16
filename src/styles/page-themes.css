@@ -1,0 +1,492 @@
+/* Route palettes share the existing light/dark preference and beveled UI tokens.
+   Keep drawing tokens as literal colors: the canvas renderer reads these values. */
+
+/* Sage */
+:root[data-page-theme='home'] {
+  --page-bg: #e7eadc;
+  --surface: #f5f4e9;
+  --surface-raised: #fdfbef;
+  --ink: #293f32;
+  --muted: #50614c;
+  --line: #7e9178;
+  --sage: #c7d8bc;
+  --pink: #ecd3d9;
+  --lavender: #dcd4e8;
+  --accent-ink: #39563a;
+  --focus: #734a9b;
+  --titlebar: #c6d8bd;
+  --titlebar-bottom: #b3c8a7;
+  --bevel-light: #fffff1;
+  --bevel-dark: #71866a;
+  --shadow: 3px 4px 0 #374e3424, 0 10px 30px #374e340a;
+}
+
+:root[data-page-theme='home'][data-theme='dark'] {
+  --page-bg: #1d2c25;
+  --surface: #283b30;
+  --surface-raised: #314737;
+  --ink: #eef2e6;
+  --muted: #c5d2bb;
+  --line: #839878;
+  --sage: #435c42;
+  --pink: #604b58;
+  --lavender: #534c65;
+  --accent-ink: #d0dfbb;
+  --focus: #d7b8f0;
+  --titlebar: #435b40;
+  --titlebar-bottom: #344b32;
+  --bevel-light: #7b8f72;
+  --bevel-dark: #132319;
+  --shadow: 3px 4px 0 #07160e70, 0 10px 30px #07160e20;
+}
+
+/* Lavender */
+:root[data-page-theme='devlog'] {
+  --page-bg: #e9e3f2;
+  --surface: #f5f0fa;
+  --surface-raised: #fdf9ff;
+  --ink: #3d3150;
+  --muted: #685674;
+  --line: #8d789e;
+  --sage: #d5c4e9;
+  --pink: #edcfdf;
+  --lavender: #c9c5eb;
+  --accent-ink: #5b3e79;
+  --focus: #73378b;
+  --titlebar: #d3c1e7;
+  --titlebar-bottom: #bda7d6;
+  --bevel-light: #fffaff;
+  --bevel-dark: #89709b;
+  --shadow: 3px 4px 0 #49345e24, 0 10px 30px #49345e0a;
+}
+
+:root[data-page-theme='devlog'][data-theme='dark'] {
+  --page-bg: #282233;
+  --surface: #342b42;
+  --surface-raised: #40344f;
+  --ink: #f4ecfb;
+  --muted: #cbbbd9;
+  --line: #9a83b2;
+  --sage: #59466e;
+  --pink: #694b62;
+  --lavender: #554c79;
+  --accent-ink: #e1c4fd;
+  --focus: #f2c6f1;
+  --titlebar: #58436d;
+  --titlebar-bottom: #493657;
+  --bevel-light: #927ba7;
+  --bevel-dark: #1c1328;
+  --shadow: 3px 4px 0 #100a1c70, 0 10px 30px #100a1c20;
+}
+
+/* Blue */
+:root[data-page-theme='game'] {
+  --page-bg: #dce8f1;
+  --surface: #edf5fa;
+  --surface-raised: #f8fcff;
+  --ink: #243e52;
+  --muted: #4d677c;
+  --line: #6b8aa2;
+  --sage: #b9d7ea;
+  --pink: #e4cddf;
+  --lavender: #ccd2ed;
+  --accent-ink: #275778;
+  --focus: #7b3f90;
+  --titlebar: #b4d2e7;
+  --titlebar-bottom: #9abcd5;
+  --bevel-light: #f7fdff;
+  --bevel-dark: #66859c;
+  --shadow: 3px 4px 0 #28496224, 0 10px 30px #2849620a;
+}
+
+:root[data-page-theme='game'][data-theme='dark'] {
+  --page-bg: #192b39;
+  --surface: #233a4b;
+  --surface-raised: #2c485b;
+  --ink: #eaf4fc;
+  --muted: #b2cbdc;
+  --line: #729ab5;
+  --sage: #3d607a;
+  --pink: #654b68;
+  --lavender: #505879;
+  --accent-ink: #b9e1fc;
+  --focus: #efc0ec;
+  --titlebar: #345d79;
+  --titlebar-bottom: #284c67;
+  --bevel-light: #7397af;
+  --bevel-dark: #101f2c;
+  --shadow: 3px 4px 0 #07121d70, 0 10px 30px #07121d20;
+}
+
+/* Rose */
+:root[data-page-theme='gallery'] {
+  --page-bg: #f0e0e6;
+  --surface: #fbf0f3;
+  --surface-raised: #fff9fb;
+  --ink: #512e3d;
+  --muted: #755363;
+  --line: #a57a8c;
+  --sage: #e9bfcd;
+  --pink: #edc6d3;
+  --lavender: #dcd0ec;
+  --accent-ink: #853e5c;
+  --focus: #703ba0;
+  --titlebar: #e5b6c7;
+  --titlebar-bottom: #d59aaf;
+  --bevel-light: #fff7fc;
+  --bevel-dark: #a17688;
+  --shadow: 3px 4px 0 #65344924, 0 10px 30px #6534490a;
+}
+
+:root[data-page-theme='gallery'][data-theme='dark'] {
+  --page-bg: #34232c;
+  --surface: #452f3a;
+  --surface-raised: #533a46;
+  --ink: #ffedf3;
+  --muted: #e4c5d1;
+  --line: #b28297;
+  --sage: #694255;
+  --pink: #71475b;
+  --lavender: #60506f;
+  --accent-ink: #ffd0e0;
+  --focus: #e4c2ff;
+  --titlebar: #694055;
+  --titlebar-bottom: #563246;
+  --bevel-light: #a4778c;
+  --bevel-dark: #26131e;
+  --shadow: 3px 4px 0 #1c081270, 0 10px 30px #1c081220;
+}
+
+/* Amber */
+:root[data-page-theme='music'] {
+  --page-bg: #f0e7ce;
+  --surface: #faf4e4;
+  --surface-raised: #fffbee;
+  --ink: #4b3a22;
+  --muted: #725c3a;
+  --line: #a28a58;
+  --sage: #e9d391;
+  --pink: #e9c7b5;
+  --lavender: #dfd0df;
+  --accent-ink: #765010;
+  --focus: #6846a0;
+  --titlebar: #e4c77e;
+  --titlebar-bottom: #d2b064;
+  --bevel-light: #fffbe7;
+  --bevel-dark: #987f4d;
+  --shadow: 3px 4px 0 #63502524, 0 10px 30px #6350250a;
+}
+
+:root[data-page-theme='music'][data-theme='dark'] {
+  --page-bg: #302719;
+  --surface: #3f3422;
+  --surface-raised: #4e402b;
+  --ink: #fff1d7;
+  --muted: #e6d4b4;
+  --line: #ad945d;
+  --sage: #69522b;
+  --pink: #704e42;
+  --lavender: #60516b;
+  --accent-ink: #f8d68a;
+  --focus: #e0c4ff;
+  --titlebar: #6b5329;
+  --titlebar-bottom: #564020;
+  --bevel-light: #a18b58;
+  --bevel-dark: #23190d;
+  --shadow: 3px 4px 0 #1b100470, 0 10px 30px #1b100420;
+}
+
+/* Teal */
+:root[data-page-theme='about'] {
+  --page-bg: #dbece6;
+  --surface: #edf7f2;
+  --surface-raised: #f8fdf8;
+  --ink: #254940;
+  --muted: #4b6b61;
+  --line: #6a988b;
+  --sage: #b5dcd0;
+  --pink: #e8d0cc;
+  --lavender: #cadce8;
+  --accent-ink: #286856;
+  --focus: #80519a;
+  --titlebar: #aed5c8;
+  --titlebar-bottom: #91bdb0;
+  --bevel-light: #f5fff9;
+  --bevel-dark: #668f82;
+  --shadow: 3px 4px 0 #28594a24, 0 10px 30px #28594a0a;
+}
+
+:root[data-page-theme='about'][data-theme='dark'] {
+  --page-bg: #192e2b;
+  --surface: #233e38;
+  --surface-raised: #2c4a42;
+  --ink: #e8faf0;
+  --muted: #b9d8c9;
+  --line: #73a595;
+  --sage: #355b50;
+  --pink: #69504d;
+  --lavender: #4a6071;
+  --accent-ink: #a6e6c7;
+  --focus: #ebc5fb;
+  --titlebar: #355e50;
+  --titlebar-bottom: #284a3f;
+  --bevel-light: #739c8c;
+  --bevel-dark: #10231e;
+  --shadow: 3px 4px 0 #071b1670, 0 10px 30px #071b1620;
+}
+
+/* Peach */
+:root[data-page-theme='subscribe'] {
+  --page-bg: #f3e2d6;
+  --surface: #fcf1e7;
+  --surface-raised: #fff9f2;
+  --ink: #533925;
+  --muted: #785a43;
+  --line: #aa8769;
+  --sage: #edc6a3;
+  --pink: #e6c0bc;
+  --lavender: #ddd0e6;
+  --accent-ink: #854f2c;
+  --focus: #70479b;
+  --titlebar: #e8bd97;
+  --titlebar-bottom: #d6a37a;
+  --bevel-light: #fff7eb;
+  --bevel-dark: #a17d5f;
+  --shadow: 3px 4px 0 #68432924, 0 10px 30px #6843290a;
+}
+
+:root[data-page-theme='subscribe'][data-theme='dark'] {
+  --page-bg: #34271f;
+  --surface: #453329;
+  --surface-raised: #544035;
+  --ink: #fff0e3;
+  --muted: #e4c7b0;
+  --line: #b48d70;
+  --sage: #72523c;
+  --pink: #714d4b;
+  --lavender: #62516b;
+  --accent-ink: #ffd0a6;
+  --focus: #e8c5ff;
+  --titlebar: #6b4b35;
+  --titlebar-bottom: #573b28;
+  --bevel-light: #a58a70;
+  --bevel-dark: #26180f;
+  --shadow: 3px 4px 0 #1d0d0570, 0 10px 30px #1d0d0520;
+}
+
+/* Slate */
+:root[data-page-theme='not-found'] {
+  --page-bg: #e0e6ea;
+  --surface: #f0f4f5;
+  --surface-raised: #fafcfc;
+  --ink: #33424d;
+  --muted: #536570;
+  --line: #8297a4;
+  --sage: #c1d0d8;
+  --pink: #dfccd3;
+  --lavender: #cfd1e3;
+  --accent-ink: #496378;
+  --focus: #654b91;
+  --titlebar: #beccd7;
+  --titlebar-bottom: #a3b6c4;
+  --bevel-light: #f8feff;
+  --bevel-dark: #7d919e;
+  --shadow: 3px 4px 0 #354b5b24, 0 10px 30px #354b5b0a;
+}
+
+:root[data-page-theme='not-found'][data-theme='dark'] {
+  --page-bg: #242b34;
+  --surface: #303945;
+  --surface-raised: #3b4653;
+  --ink: #edf3f8;
+  --muted: #c1ceda;
+  --line: #8b9dac;
+  --sage: #4f6477;
+  --pink: #675660;
+  --lavender: #5c5c7b;
+  --accent-ink: #d1e2ef;
+  --focus: #dbc8ff;
+  --titlebar: #4a6074;
+  --titlebar-bottom: #3b4e60;
+  --bevel-light: #8798a8;
+  --bevel-dark: #17202a;
+  --shadow: 3px 4px 0 #0a121c70, 0 10px 30px #0a121c20;
+}
+
+/* Without JavaScript, the route still follows the system color scheme. */
+@media (prefers-color-scheme: dark) {
+  :root[data-page-theme='home']:not([data-theme]) {
+    --page-bg: #1d2c25;
+    --surface: #283b30;
+    --surface-raised: #314737;
+    --ink: #eef2e6;
+    --muted: #c5d2bb;
+    --line: #839878;
+    --sage: #435c42;
+    --pink: #604b58;
+    --lavender: #534c65;
+    --accent-ink: #d0dfbb;
+    --focus: #d7b8f0;
+    --titlebar: #435b40;
+    --titlebar-bottom: #344b32;
+    --bevel-light: #7b8f72;
+    --bevel-dark: #132319;
+    --shadow: 3px 4px 0 #07160e70, 0 10px 30px #07160e20;
+  }
+
+  :root[data-page-theme='devlog']:not([data-theme]) {
+    --page-bg: #282233;
+    --surface: #342b42;
+    --surface-raised: #40344f;
+    --ink: #f4ecfb;
+    --muted: #cbbbd9;
+    --line: #9a83b2;
+    --sage: #59466e;
+    --pink: #694b62;
+    --lavender: #554c79;
+    --accent-ink: #e1c4fd;
+    --focus: #f2c6f1;
+    --titlebar: #58436d;
+    --titlebar-bottom: #493657;
+    --bevel-light: #927ba7;
+    --bevel-dark: #1c1328;
+    --shadow: 3px 4px 0 #100a1c70, 0 10px 30px #100a1c20;
+  }
+
+  :root[data-page-theme='game']:not([data-theme]) {
+    --page-bg: #192b39;
+    --surface: #233a4b;
+    --surface-raised: #2c485b;
+    --ink: #eaf4fc;
+    --muted: #b2cbdc;
+    --line: #729ab5;
+    --sage: #3d607a;
+    --pink: #654b68;
+    --lavender: #505879;
+    --accent-ink: #b9e1fc;
+    --focus: #efc0ec;
+    --titlebar: #345d79;
+    --titlebar-bottom: #284c67;
+    --bevel-light: #7397af;
+    --bevel-dark: #101f2c;
+    --shadow: 3px 4px 0 #07121d70, 0 10px 30px #07121d20;
+  }
+
+  :root[data-page-theme='gallery']:not([data-theme]) {
+    --page-bg: #34232c;
+    --surface: #452f3a;
+    --surface-raised: #533a46;
+    --ink: #ffedf3;
+    --muted: #e4c5d1;
+    --line: #b28297;
+    --sage: #694255;
+    --pink: #71475b;
+    --lavender: #60506f;
+    --accent-ink: #ffd0e0;
+    --focus: #e4c2ff;
+    --titlebar: #694055;
+    --titlebar-bottom: #563246;
+    --bevel-light: #a4778c;
+    --bevel-dark: #26131e;
+    --shadow: 3px 4px 0 #1c081270, 0 10px 30px #1c081220;
+  }
+
+  :root[data-page-theme='music']:not([data-theme]) {
+    --page-bg: #302719;
+    --surface: #3f3422;
+    --surface-raised: #4e402b;
+    --ink: #fff1d7;
+    --muted: #e6d4b4;
+    --line: #ad945d;
+    --sage: #69522b;
+    --pink: #704e42;
+    --lavender: #60516b;
+    --accent-ink: #f8d68a;
+    --focus: #e0c4ff;
+    --titlebar: #6b5329;
+    --titlebar-bottom: #564020;
+    --bevel-light: #a18b58;
+    --bevel-dark: #23190d;
+    --shadow: 3px 4px 0 #1b100470, 0 10px 30px #1b100420;
+  }
+
+  :root[data-page-theme='about']:not([data-theme]) {
+    --page-bg: #192e2b;
+    --surface: #233e38;
+    --surface-raised: #2c4a42;
+    --ink: #e8faf0;
+    --muted: #b9d8c9;
+    --line: #73a595;
+    --sage: #355b50;
+    --pink: #69504d;
+    --lavender: #4a6071;
+    --accent-ink: #a6e6c7;
+    --focus: #ebc5fb;
+    --titlebar: #355e50;
+    --titlebar-bottom: #284a3f;
+    --bevel-light: #739c8c;
+    --bevel-dark: #10231e;
+    --shadow: 3px 4px 0 #071b1670, 0 10px 30px #071b1620;
+  }
+
+  :root[data-page-theme='subscribe']:not([data-theme]) {
+    --page-bg: #34271f;
+    --surface: #453329;
+    --surface-raised: #544035;
+    --ink: #fff0e3;
+    --muted: #e4c7b0;
+    --line: #b48d70;
+    --sage: #72523c;
+    --pink: #714d4b;
+    --lavender: #62516b;
+    --accent-ink: #ffd0a6;
+    --focus: #e8c5ff;
+    --titlebar: #6b4b35;
+    --titlebar-bottom: #573b28;
+    --bevel-light: #a58a70;
+    --bevel-dark: #26180f;
+    --shadow: 3px 4px 0 #1d0d0570, 0 10px 30px #1d0d0520;
+  }
+
+  :root[data-page-theme='not-found']:not([data-theme]) {
+    --page-bg: #242b34;
+    --surface: #303945;
+    --surface-raised: #3b4653;
+    --ink: #edf3f8;
+    --muted: #c1ceda;
+    --line: #8b9dac;
+    --sage: #4f6477;
+    --pink: #675660;
+    --lavender: #5c5c7b;
+    --accent-ink: #d1e2ef;
+    --focus: #dbc8ff;
+    --titlebar: #4a6074;
+    --titlebar-bottom: #3b4e60;
+    --bevel-light: #8798a8;
+    --bevel-dark: #17202a;
+    --shadow: 3px 4px 0 #0a121c70, 0 10px 30px #0a121c20;
+  }
+}
+
+/* Let the user's high-contrast colors replace every decorative route palette. */
+@media (forced-colors: active) {
+  :root[data-page-theme][data-theme],
+  :root[data-page-theme]:not([data-theme]) {
+    --page-bg: Canvas;
+    --surface: Canvas;
+    --surface-raised: ButtonFace;
+    --ink: CanvasText;
+    --muted: CanvasText;
+    --line: ButtonText;
+    --sage: ButtonFace;
+    --pink: ButtonFace;
+    --lavender: ButtonFace;
+    --accent-ink: LinkText;
+    --focus: Highlight;
+    --titlebar: ButtonFace;
+    --titlebar-bottom: ButtonFace;
+    --bevel-light: Canvas;
+    --bevel-dark: ButtonText;
+    --shadow: none;
+  }
+}

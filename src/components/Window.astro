@@ -4,12 +4,14 @@ interface Props {
   id?: string;
   class?: string;
   tone?: 'sage' | 'pink' | 'lavender';
+  floating?: boolean;
+  initiallyClosed?: boolean;
 }
 
-const { title, id, class: className, tone = 'sage' } = Astro.props;
+const { title, id, class: className, tone = 'sage', floating = false, initiallyClosed = false } = Astro.props;
 ---
 
-<section id={id} class:list={['window', `window--${tone}`, className]} aria-label={title} data-desktop-window data-window-title={title} data-window-state="normal" tabindex="-1">
+<section id={id} class:list={['window', `window--${tone}`, className]} aria-label={title} data-desktop-window data-window-title={title} data-window-state={initiallyClosed ? 'closed' : 'normal'} data-window-default-floating={floating || undefined} data-window-initial-state={initiallyClosed ? 'closed' : undefined} hidden={initiallyClosed} tabindex="-1">
   <div class="window-titlebar">
     <span class="window-titlebar__mark" aria-hidden="true"></span>
     <span class="window-titlebar__title" title={title}>{title}</span>
@@ -34,7 +36,7 @@ const { title, id, class: className, tone = 'sage' } = Astro.props;
 </script>
 
 <style>
-  .window[hidden], .window-controls[hidden] { display: none; }
+  .window[hidden], .window-controls[hidden] { display: none !important; }
   .window-controls { display: flex; flex-shrink: 0; align-items: center; gap: 3px; margin-left: auto; }
   .window-control { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; padding: 0; border: 1px solid var(--line); border-radius: 0; color: var(--ink); background: linear-gradient(var(--surface-raised), var(--surface)); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
   .window-control:hover { background: var(--sage); }
@@ -43,26 +45,23 @@ const { title, id, class: className, tone = 'sage' } = Astro.props;
   .window-control--close { background: color-mix(in srgb, var(--pink) 75%, var(--surface)); }
   .window-control--close:hover { background: var(--pink); }
   .window-control__restore { display: none; }
-  .window[data-window-state='maximized'] { position: fixed; z-index: 40; inset: calc(var(--workspace-top, 0px) + var(--app-inset)) var(--app-inset) calc(var(--workspace-bottom, 0px) + var(--app-inset)); display: flex; flex-direction: column; width: auto; height: auto; min-height: 0; max-width: none; max-height: none; margin: 0; overflow: hidden; }
-  .window[data-window-state='maximized'] > .window-titlebar { flex-shrink: 0; }
-  .window[data-window-state='maximized'] > .window-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scroll-padding-block: 1rem; }
+  .window[data-window-floating] { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .window[data-window-floating] > .window-titlebar { flex-shrink: 0; }
+  .window[data-window-floating] > .window-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scroll-padding-block: 1rem; }
   .window[data-window-state='maximized'] .window-control__maximize { display: none; }
   .window[data-window-state='maximized'] .window-control__restore { display: block; }
-  .window[data-window-state='maximized']::backdrop { display: none; }
+  .window[data-window-floating]::backdrop { display: none; }
   :global(.window-recovery-toast) { position: fixed; z-index: 41; right: var(--app-inset); bottom: calc(var(--workspace-bottom, 0px) + var(--app-inset)); width: min(28rem, calc(100% - var(--app-inset) * 2)); max-height: calc(100dvh - var(--workspace-top, 0px) - var(--workspace-bottom, 0px) - var(--app-inset) * 2); overflow: auto; padding: .85rem; border: 1px solid var(--line); background: var(--surface-raised); color: var(--ink); font-family: var(--font-ui); font-size: .75rem; box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark), var(--shadow); }
   :global(.window-recovery-toast[hidden]) { display: none; }
   :global(.window-recovery-toast p) { margin: 0 0 .7rem; }
   :global(.window-recovery-toast__actions) { display: flex; flex-wrap: wrap; gap: .6rem; }
   :global(.window-recovery-toast button) { min-height: 32px; padding: .35rem .65rem; border: 1px solid var(--line); background: var(--surface); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
   :global(.window-recovery-toast button:hover) { background: var(--sage); }
-  @media (min-width: 761px) {
-    .window[data-window-state='maximized'] { left: calc(var(--app-inset) + var(--player-left-space, 0px)); right: calc(var(--app-inset) + var(--player-right-space, 0px)); }
-  }
   @media (pointer: coarse) { .window-control { width: 28px; height: 28px; } }
   @media (forced-colors: active) { .window-control, :global(.window-recovery-toast), :global(.window-recovery-toast button) { border-color: ButtonText; box-shadow: none; } }
   @media print {
     .window-controls, :global(.window-recovery-toast), :global([data-window-placeholder]) { display: none !important; }
-    .window[data-window-state='maximized'] { position: static; display: block; overflow: visible; }
-    .window[data-window-state='maximized'] > .window-body { overflow: visible; }
+    .window[data-window-floating] { display: block; overflow: visible; }
+    .window[data-window-floating] > .window-body { overflow: visible; }
   }
 </style>
