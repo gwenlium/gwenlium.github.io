@@ -30,9 +30,8 @@ let indexPromise: Promise<void> | undefined;
 let searchState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
 let searchIndex: SearchIndex | undefined;
 let resultLimit = 10;
-let navigationPrefixExpires = 0;
 const navigationShortcuts: Record<string, string | undefined> = {
-  h: '/', d: '/devlog/', p: '/game/', i: '/gallery/', m: '/music/', a: '/about/',
+  h: '/', d: '/devlog/', g: '/game/', i: '/gallery/', m: '/music/', a: '/about/', s: '/subscribe/',
 };
 
 
@@ -346,23 +345,20 @@ document.addEventListener('keydown', (event) => {
       return;
     }
   }
-  if (handleControlKeydown(event)) { navigationPrefixExpires = 0; return; }
+  if (handleControlKeydown(event)) return;
   if (event.defaultPrevented || event.isComposing || event.repeat) return;
   const key = event.key.toLowerCase();
   const searchShortcut = key === 'k' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
   if ((event.altKey || event.ctrlKey || event.metaKey) && !searchShortcut) {
-    navigationPrefixExpires = 0;
     return;
   }
   if (event.target instanceof HTMLElement
     && (event.target.isContentEditable || event.target.closest('input, textarea, select, [role="textbox"]'))) {
-    navigationPrefixExpires = 0;
     return;
   }
 
   const openDialog = document.querySelector<HTMLDialogElement>('dialog[open]');
   if (searchShortcut || key === '/' || key === '?') {
-    navigationPrefixExpires = 0;
     if (openDialog && openDialog !== menu?.dialog) return;
     const trigger = document.querySelector<HTMLElement>('[data-open-start]');
     if (!trigger) return;
@@ -372,24 +368,12 @@ document.addEventListener('keydown', (event) => {
     else menu?.input.focus({ preventScroll: true });
     return;
   }
-  if (openDialog) {
-    navigationPrefixExpires = 0;
-    return;
-  }
+  if (openDialog) return;
 
-  const now = performance.now();
-  if (navigationPrefixExpires > now) {
-    navigationPrefixExpires = 0;
-    const destination = Object.hasOwn(navigationShortcuts, key) ? navigationShortcuts[key] : undefined;
-    if (destination) {
-      event.preventDefault();
-      void navigate(destination);
-      return;
-    }
-  }
-  if (key === 'g') {
-    navigationPrefixExpires = now + 1000;
+  const destination = Object.hasOwn(navigationShortcuts, key) ? navigationShortcuts[key] : undefined;
+  if (destination) {
     event.preventDefault();
+    void navigate(destination);
     return;
   }
   const control = key === 'p'
@@ -404,7 +388,6 @@ document.addEventListener('keydown', (event) => {
 document.addEventListener('gwenlium:windows-changed', renderWindows, listenerOptions);
 document.addEventListener('astro:page-load', initializeMenu, listenerOptions);
 document.addEventListener('astro:before-swap', () => {
-  navigationPrefixExpires = 0;
   const previous = menu;
   menu = null;
   dockObserver.disconnect();
@@ -412,7 +395,6 @@ document.addEventListener('astro:before-swap', () => {
 }, listenerOptions);
 window.addEventListener('resize', positionMenu, listenerOptions);
 document.addEventListener('gwenlium:chrome-change', positionMenu, listenerOptions);
-window.addEventListener('blur', () => { navigationPrefixExpires = 0; }, listenerOptions);
 window.visualViewport?.addEventListener('resize', positionMenu, listenerOptions);
 window.visualViewport?.addEventListener('scroll', positionMenu, listenerOptions);
 

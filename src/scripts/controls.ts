@@ -2,7 +2,7 @@ type Direction = 'left' | 'right' | 'up' | 'down';
 
 const lifetime = new AbortController();
 const listenerOptions = { signal: lifetime.signal };
-const controls = 'a[href], area[href], button, input:not([type="hidden"]), select, textarea, summary, [tabindex], [contenteditable="true"], [role="button"], [role="tab"], [role="menuitem"], [role="option"], [data-window-drag]';
+const controls = 'a[href], area[href], button, input:not([type="hidden"]), select, textarea, summary, [contenteditable="true"], [role="button"], [role="tab"], [role="menuitem"], [role="option"]';
 const regions = '[data-desktop-window], .taskbar, .footer-navigation, #page-scroll';
 const nativeArrows = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [role="slider"], [role="spinbutton"], video, audio, [data-window-drag]';
 const rememberedFocus = new WeakMap<HTMLElement, HTMLElement>();
@@ -89,6 +89,11 @@ function positionCaret(): void {
   caretFrame = 0;
   if (!target || !activePage() || !allowed(target)) {
     setTarget(null);
+    return;
+  }
+  // The current page already has a persistent footer marker.
+  if (target.matches('.footer-link[aria-current="page"]')) {
+    hideCaret();
     return;
   }
   const anchor = anchorFor(target);
@@ -216,7 +221,8 @@ function cycleRegion(reverse: boolean): boolean {
     available(root) && candidates(root).some((item) => item.closest(selector) === root));
   if (!roots.length) return modal ? moveFocus(reverse ? 'up' : 'down') : false;
   const current = currentControl();
-  const index = roots.findIndex((root) => current?.closest(selector) === root);
+  const region = (current ?? document.activeElement)?.closest(selector);
+  const index = roots.findIndex((root) => region === root);
   const next = index < 0 ? (reverse ? roots.length - 1 : 0) : (index + (reverse ? -1 : 1) + roots.length) % roots.length;
   const root = roots[next];
   const remembered = rememberedFocus.get(root);

@@ -41,7 +41,8 @@ html[data-window-interaction] iframe { pointer-events: none; }
 [data-window-state='maximized'] > [data-window-resize] { display: none; }
 .window-snap-preview { position: fixed; z-index: 9; border: 2px solid var(--focus); background: color-mix(in srgb, var(--sage) 45%, transparent); box-shadow: inset 0 0 0 1px var(--surface-raised); pointer-events: none; }
 .window-snap-preview[hidden] { display: none; }
-.taskbar-windows { display: flex; align-items: center; gap: .35rem; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+/* Reserve room for button hover/press movement without introducing vertical scrollbars. */
+.taskbar-windows { display: flex; align-items: center; gap: .35rem; flex: 1; min-width: 0; padding-block: 2px; overflow-x: auto; scrollbar-width: thin; }
 .taskbar-windows .taskbar-window { min-width: 36px; max-width: 180px; gap: .4rem; }
 .taskbar-window[hidden] { display: none !important; }
 .taskbar-window-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
