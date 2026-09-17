@@ -21,7 +21,7 @@ const posts = defineCollection({
     title: z.string().default(''),
     permalink: z.string().default(''),
     date: z.union([z.string(), z.date()]).optional().transform(calendarDate),
-    excerpt: z.string().optional(),
+    excerpt: z.string().default(''),
     draft: z.boolean().default(true),
     tags: z.array(z.string()).default([]),
     cover: z.string().default(''),
@@ -47,10 +47,7 @@ const posts = defineCollection({
     if (!Number.isFinite(post.date.getTime())) {
       required('date', 'Use a valid ISO calendar date: YYYY-MM-DD.');
     }
-    if (post.excerpt === undefined) {
-      required('excerpt', 'Include your own excerpt, or an empty string.');
-    }
-  }).transform((post) => ({ ...post, excerpt: post.excerpt ?? '' })),
+  }),
 });
 
 export const collections = { posts };

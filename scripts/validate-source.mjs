@@ -348,7 +348,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
     text(data.title, file, 'title', true);
     if (typeof data.permalink !== 'string' || !permalinkPattern.test(data.permalink)) report(file, 'permalink', 'Provide a lowercase slug containing letters, digits and single hyphens, for example my-post.');
     if (!date) report(file, 'date', 'Provide a real calendar date in YYYY-MM-DD format.');
-    if (typeof data.excerpt !== 'string') report(file, 'excerpt', 'Provide a text string; an empty string is allowed.');
+    if (data.excerpt !== undefined && typeof data.excerpt !== 'string') report(file, 'excerpt', 'Provide a text string, or leave the excerpt empty.');
     if (data.tags !== undefined && (!Array.isArray(data.tags) || data.tags.some((tag) => typeof tag !== 'string'))) report(file, 'tags', 'Use an array of text strings.');
     if (data.featured !== undefined && typeof data.featured !== 'boolean') report(file, 'featured', 'Use the YAML boolean true or false.');
     const base = `${siteOrigin}/devlog/${permalinkPattern.test(data.permalink ?? '') ? data.permalink : 'post'}/`;

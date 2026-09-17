@@ -131,6 +131,9 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
           <Icon name="music" size={17} /><span>{playerWindow.title}</span>
         </button>
         <div class="taskbar-windows" data-taskbar-windows role="group" aria-label="Open windows"></div>
+        <button type="button" class="button-secondary taskbar-control" data-auto-arrange-windows aria-label="Auto arrange windows" title="Arrange open windows and save their positions on this device">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" /></svg><span>Auto arrange</span>
+        </button>
         <button type="button" class="button-secondary taskbar-control taskbar-restore" data-restore-windows aria-label="Restore windows">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 8V3h13v13h-5M3 8h13v13H3ZM3 12h13" /></svg><span>Restore windows</span>
         </button>

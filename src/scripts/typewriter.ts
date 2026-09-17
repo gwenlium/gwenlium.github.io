@@ -231,8 +231,8 @@ function bindPage(): void {
   contentObserver.disconnect();
   // Wait for the page's widget initialization before taking text snapshots.
   document.querySelectorAll<HTMLElement>(roots).forEach(queueRoot);
-  const content = document.querySelector('#main-content');
-  if (content) contentObserver.observe(content, {
+  // Floating page windows live outside main, including restored layouts on reload.
+  contentObserver.observe(document.body, {
     subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'open'],
   });
 }

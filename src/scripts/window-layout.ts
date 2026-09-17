@@ -35,6 +35,7 @@ type Gesture = {
 
 const layouts = new Map<HTMLElement, Layout>();
 const interactive = 'button, a, input, select, textarea, [contenteditable="true"]';
+const storagePrefix = 'gwenlium:window-layout:';
 let gesture: Gesture | undefined;
 let moveFrame = 0;
 let resizeFrame = 0;
@@ -56,6 +57,85 @@ function bounded(rect: Box, bounds: Box): Box {
     y: Math.max(bounds.y, Math.min(bounds.y + bounds.height - height, rect.y)), width, height,
   };
 }
+
+function readBox(value: unknown): Box | undefined {
+  if (!value || typeof value !== 'object') return;
+  const box = value as Partial<Box>;
+  for (const key of ['x', 'y', 'width', 'height'] as const) {
+    if (typeof box[key] !== 'number' || !Number.isFinite(box[key])) return;
+  }
+  if (box.width! <= 0 || box.height! <= 0) return;
+  return { x: box.x!, y: box.y!, width: box.width!, height: box.height! };
+}
+
+function restoreLayout(entry: Layout): boolean {
+  const id = entry.root.dataset.windowId;
+  if (!id) return false;
+  try {
+    const saved = JSON.parse(localStorage.getItem(storagePrefix + id) || 'null');
+    const rect = readBox(saved?.rect);
+    if (!rect) return false;
+    entry.rect = rect;
+    entry.freeRect = readBox(saved.freeRect);
+    if (typeof saved.snap === 'string' && /^(?:left|right|(?:top|bottom)-(?:left|right))$/.test(saved.snap)) {
+      entry.snap = saved.snap as Snap;
+    }
+    return true;
+  } catch { return false; }
+}
+
+function rememberLayout(entry: Layout): void {
+  const id = entry.root.dataset.windowId;
+  if (!id) return;
+  // Maximizing is temporary; retain the normal position rather than the full screen.
+  const layout = entry.maximized ? entry.beforeMaximum : entry;
+  try {
+    if (layout?.rect) localStorage.setItem(storagePrefix + id, JSON.stringify({ rect: layout.rect, snap: layout.snap, freeRect: layout.freeRect }));
+    else localStorage.removeItem(storagePrefix + id);
+  } catch { /* Moving and arranging still work when browser storage is unavailable. */ }
+}
+
+function arrangeWindows(): void {
+  finishGesture(true);
+  const visible = [...layouts.values()].filter(entry => entry.root.isConnected && !entry.root.hidden && !entry.root.inert
+    && entry.root.getClientRects().length && getComputedStyle(entry.root).visibility !== 'hidden');
+  if (!visible.length) return;
+  visible.sort((a, b) => (a.root.dataset.windowId || '').localeCompare(b.root.dataset.windowId || ''));
+  for (const entry of visible) if (entry.maximized) command(entry, 'restore');
+  const bounds = workspace();
+  const gap = 8;
+  const maxColumns = Math.max(1, Math.floor((bounds.width + gap) / (240 + gap)));
+  const maxRows = Math.max(1, Math.floor((bounds.height + gap) / (140 + gap)));
+  const tiled = visible.length <= maxColumns * maxRows;
+  const columns = Math.min(maxColumns, visible.length, Math.max(Math.ceil(visible.length / maxRows),
+    Math.ceil(Math.sqrt(visible.length * bounds.width / bounds.height))));
+  const rows = Math.ceil(visible.length / columns);
+  // A small screen cannot fit every window without overlap; keep their titlebars accessible.
+  const cascade = Math.max(0, Math.min(bounds.width - 240, bounds.height - 140, (visible.length - 1) * 24));
+  const steps = Math.floor(cascade / 24) + 1;
+  visible.forEach((entry, index) => {
+    cancelWindowAnimation(entry.root);
+    entry.snap = entry.freeRect = entry.beforeMaximum = undefined;
+    if (tiled) {
+      const row = Math.floor(index / columns);
+      const rowCount = Math.min(columns, visible.length - row * columns);
+      const width = (bounds.width - gap * (rowCount - 1)) / rowCount;
+      const height = (bounds.height - gap * (rows - 1)) / rows;
+      entry.rect = { x: bounds.x + (index % columns) * (width + gap), y: bounds.y + row * (height + gap), width, height };
+    } else {
+      const offset = (index % steps) * 24;
+      entry.rect = { x: bounds.x + offset, y: bounds.y + offset, width: bounds.width - cascade, height: bounds.height - cascade };
+    }
+    apply(entry, bounds);
+    rememberLayout(entry);
+    raise(entry);
+  });
+  document.dispatchEvent(new CustomEvent('gwenlium:windows-changed'));
+}
+
+document.addEventListener('click', event => {
+  if (event.target instanceof Element && event.target.closest('[data-auto-arrange-windows]')) arrangeWindows();
+});
 
 function snapBox(snap: Snap | 'maximize', bounds: Box): Box {
   if (snap === 'maximize') return { ...bounds };
@@ -145,6 +225,8 @@ export function registerWindow(root: HTMLElement, options: { floating?: boolean 
   if (existing) { apply(existing); return; }
   const titlebar = root.querySelector<HTMLElement>(':scope > .window-titlebar, :scope > .player-titlebar');
   if (!titlebar) return;
+  // Keep page content opted into typing after its window moves outside main.
+  if (root.closest('#main-content')) root.querySelector(':scope > .window-body')?.setAttribute('data-typewriter', '');
   const entry: Layout = {
     root, host: root.closest<HTMLElement>('gwenlium-player') || root, titlebar,
     defaultFloating: Boolean(options.floating), maximized: false,
@@ -153,7 +235,7 @@ export function registerWindow(root: HTMLElement, options: { floating?: boolean 
   titlebar.tabIndex = 0;
   titlebar.setAttribute('role', 'group');
   titlebar.setAttribute('aria-label', `${root.dataset.windowTitle || 'Window'} position and size`);
-  titlebar.title = 'Drag to move; double-click to maximize. Arrow keys move; Shift + arrows resize; Alt + arrows snap. Escape cancels dragging.';
+  titlebar.title = 'Drag to move; double-click to maximize. Arrow keys move; Shift + arrows resize; Alt + arrows snap. Escape cancels dragging. Positions and sizes are saved on this device.';
   titlebar.dataset.windowDrag = '';
   for (const edge of ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']) {
     const handle = document.createElement('span');
@@ -161,7 +243,8 @@ export function registerWindow(root: HTMLElement, options: { floating?: boolean 
     handle.setAttribute('aria-hidden', 'true');
     root.append(handle);
   }
-  if (entry.defaultFloating) resetWindowLayout(root);
+  if (restoreLayout(entry)) apply(entry);
+  else if (entry.defaultFloating) resetWindowLayout(root);
   raise(entry);
 }
 
@@ -188,6 +271,7 @@ export function resetWindowLayout(root: HTMLElement): void {
   entry.rect = entry.snap = entry.freeRect = entry.beforeMaximum = undefined;
   entry.maximized = false;
   apply(entry);
+  rememberLayout(entry);
   if (entry.defaultFloating) {
     const hidden = root.hidden;
     root.hidden = false;
@@ -339,6 +423,7 @@ function finishGesture(cancelled: boolean): void {
     if (original.maximized) command(current.entry, 'maximize');
     else apply(current.entry);
   } else if (current.snap) applySnap(current.entry, current.snap, current.bounds);
+  if (!cancelled) rememberLayout(current.entry);
 }
 
 document.addEventListener('pointerdown', (event) => {
@@ -414,6 +499,7 @@ document.addEventListener('keydown', (event) => {
       } else command(entry, 'restore');
     }
     else if (bounds.width >= 486) applySnap(entry, event.key === 'ArrowLeft' ? 'left' : 'right', bounds);
+    rememberLayout(entry);
     return;
   }
   if (entry.maximized) command(entry, 'restore');
@@ -429,6 +515,7 @@ document.addEventListener('keydown', (event) => {
   entry.freeRect = undefined;
   entry.rect = bounded(box, bounds);
   apply(entry, bounds);
+  rememberLayout(entry);
 });
 
 function reflow(): void {
