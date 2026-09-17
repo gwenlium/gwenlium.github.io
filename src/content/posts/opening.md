@@ -5,7 +5,7 @@ permalink: opening
 date: 2026-09-17
 featured: false
 ---
-Today marks and important day! I finally got to create my devlog and put it live.
+Today marks an important day! I finally got to create my devlog and put it live.
 
 I'm very much looking forward to all the things I share with the world here.
 
