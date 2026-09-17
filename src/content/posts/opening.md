@@ -1,5 +1,5 @@
 ---
-draft: true
+draft: false
 title: Grand opening
 permalink: opening
 date: 2026-09-17
