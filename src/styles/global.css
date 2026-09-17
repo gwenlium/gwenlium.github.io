@@ -168,7 +168,7 @@ summary { cursor: pointer; }
   box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark), 2px 2px 0 #374e341a;
 }
 .brand-caret { color: var(--muted); margin-left: 3px; }
-.text-caret { display: inline-block; animation: text-caret-blink 1s step-end infinite; }
+ .text-caret { display: inline-block; }
 @keyframes text-caret-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 .site-status { display: inline-flex; align-items: center; gap: .65rem; max-width: 24rem; color: var(--muted); font-size: 11px; }
 .site-status i { width: 6px; height: 6px; background: var(--accent-ink); flex-shrink: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--sage) 65%, transparent); }

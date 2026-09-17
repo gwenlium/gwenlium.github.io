@@ -1,0 +1,648 @@
+backend:
+  name: gwenlium-github
+  repo: gwenlium/gwenlium.github.io
+  branch: main
+  base_url: https://gwenlium-cms-auth.gwenlium.workers.dev
+  auth_endpoint: auth
+  site_domain: gwenlium.dev
+site_url: https://gwenlium.dev
+display_url: https://gwenlium.dev
+logo_url: /avatar.webp
+media_folder: public/media
+public_folder: /media
+media_library:
+  name: gwenlium-previews
+collections:
+  - name: posts
+    label: Devlog
+    folder: src/content/posts
+    create: true
+    extension: md
+    format: frontmatter
+    slug: "{{fields.permalink}}"
+    identifier_field: title
+    preview_path: devlog/{{fields.permalink}}
+    fields:
+      - name: draft
+        label: Draft — excluded from the website, NOT private
+        widget: boolean
+        required: false
+        default: true
+        hint: This repository is PUBLIC. Saving a draft commits its text publicly on
+          GitHub. Draft only hides a post from the website and RSS; it does not
+          protect confidential content. Deleting a file does not remove Git
+          history.
+      - name: title
+        label: Title
+        widget: string
+        required: true
+        pattern:
+          - .*\S.*
+          - Enter a title, not only spaces.
+      - name: permalink
+        label: Permanent URL slug
+        widget: string
+        required: true
+        hint: Must be unique. The address is /devlog/your-slug/. Keep this unchanged
+          after publication so shared links continue to work.
+        pattern:
+          - ^[a-z0-9]+(?:-[a-z0-9]+)*$
+          - Use lowercase letters and numbers, separated by single hyphens.
+      - name: date
+        label: Publication date (UTC)
+        widget: datetime
+        required: true
+        hint: Future dates stay off the website and RSS until a successful build on or
+          after that UTC date. Draft must also be switched off.
+        format: YYYY-MM-DD
+        date_format: YYYY-MM-DD
+        time_format: false
+        picker_utc: true
+      - name: excerpt
+        label: Your excerpt
+        widget: text
+        required: false
+        default: ""
+        hint: Write the summary used in cards, metadata and RSS. Leave empty to omit it;
+          no summary is generated.
+      - name: tags
+        label: Tags
+        widget: list
+        required: false
+        default: []
+        field:
+          name: item
+          label: Item
+          widget: string
+          required: true
+      - name: featured
+        label: Feature this post
+        widget: boolean
+        required: false
+        default: false
+        hint: Available to the homepage when no specific published post is selected in
+          Site settings.
+      - name: cover
+        label: Cover image
+        widget: image
+        required: false
+        default: ""
+        hint: Choose an existing preview or upload an image. Only the resized,
+          watermarked preview is published; the original stays on your device.
+      - name: coverAlt
+        label: Cover alternative text
+        widget: string
+        required: false
+        default: ""
+        hint: Required when a cover is set. Describe what the image shows.
+      - name: body
+        label: Article
+        widget: markdown
+        required: false
+        default: ""
+        hint: Write Markdown or use the rich-text editor. Image uploads are processed on
+          this device before publication. Add video in the media fields below.
+          Saved content is public on GitHub, including drafts.
+        editor_components:
+          - image
+      - name: media
+        label: Additional media
+        widget: list
+        required: false
+        default: []
+        fields:
+          - name: type
+            label: Media type
+            widget: select
+            required: true
+            default: image
+            options: &a1
+              - image
+              - video
+              - audio
+          - name: src
+            label: Media preview
+            widget: file
+            required: true
+            hint: Upload an image or video, or choose an existing preview. Choose the
+              matching media type above. Originals stay on your device.
+          - name: alt
+            label: Description or alternative text
+            widget: string
+            required: false
+            default: ""
+            hint: Describe images for people who cannot see them; name video and audio
+              content.
+          - name: caption
+            label: Caption
+            widget: text
+            required: false
+            default: ""
+          - name: poster
+            label: Poster image
+            widget: image
+            required: false
+            default: ""
+            hint: Choose an existing preview or upload an image. Only the resized,
+              watermarked preview is published; the original stays on your
+              device.
+        collapsed: true
+  - name: site
+    label: Site, game & about
+    files:
+      - name: site
+        label: Site, game & about
+        file: src/content/site.json
+        fields:
+          - name: name
+            label: Display name
+            widget: string
+            required: true
+            default: Gwenlium
+          - name: description
+            label: Site description
+            widget: text
+            required: false
+            default: ""
+            hint: Your description for search engines and previews. All fields in this
+              public repository are publicly readable.
+          - name: intro
+            label: Homepage introduction
+            widget: text
+            required: false
+            default: ""
+          - name: status
+            label: Short status
+            widget: string
+            required: false
+            default: ""
+          - name: githubUrl
+            label: GitHub profile URL
+            widget: string
+            required: false
+            default: https://github.com/gwenlium
+          - name: featuredPost
+            label: Featured post slug
+            widget: string
+            required: false
+            default: ""
+            hint: Select a published entry by its permanent URL slug. Leave empty to use a
+              featured post, then the latest post.
+            pattern:
+              - ^$|^[a-z0-9]+(?:-[a-z0-9]+)*$
+              - Leave empty or enter the permanent URL slug of a post.
+          - name: newsletterUrl
+            label: follow.it subscription URL
+            widget: string
+            required: false
+            default: ""
+            hint: Create your publisher feed on follow.it using https://gwenlium.dev/rss.xml
+              and paste its public subscription URL. follow.it delivers new
+              posts automatically. Leave empty to disable email signup. No
+              credentials or API keys here.
+            pattern:
+              - ^$|^https://(www\.)?follow\.it/[^\s]+$
+              - Enter your real https://follow.it/ feed subscription URL, or
+                leave empty.
+          - name: newsletterFormAction
+            label: follow.it form action URL
+            widget: string
+            required: false
+            default: ""
+            hint: Public subscription-form URL only. Never enter a password, secret key, or
+              subscriber address.
+            pattern:
+              - ^$|^https://api\.follow\.it/subscription-form/[^\s]+$
+              - Paste the HTTPS form action supplied by follow.it.
+          - name: newsletterHeading
+            label: Newsletter heading
+            widget: string
+            required: false
+            default: ""
+          - name: newsletterButtonLabel
+            label: Newsletter button text
+            widget: string
+            required: false
+            default: Subscribe
+          - name: game
+            label: Game
+            widget: object
+            required: false
+            fields:
+              - name: title
+                label: Game title
+                widget: string
+                required: false
+                default: ""
+              - name: description
+                label: Description
+                widget: text
+                required: false
+                default: ""
+              - name: status
+                label: Development status
+                widget: string
+                required: false
+                default: ""
+              - name: cover
+                label: Cover image
+                widget: image
+                required: false
+                default: ""
+                hint: Choose an existing preview or upload an image. Only the resized,
+                  watermarked preview is published; the original stays on your
+                  device.
+              - name: coverAlt
+                label: Cover alternative text
+                widget: string
+                required: false
+                default: ""
+                hint: Required when a cover is set.
+              - name: trailerUrl
+                label: Trailer URL
+                widget: string
+                required: false
+                default: ""
+                hint: Public YouTube/Vimeo trailer link, or an imported /media/... MP4 preview
+                  URL. External trailers are not protected.
+              - name: links
+                label: Game links
+                widget: list
+                required: false
+                default: []
+                fields:
+                  - name: label
+                    label: Link label
+                    widget: string
+                    required: true
+                  - name: url
+                    label: URL
+                    widget: string
+                    required: true
+                    hint: Use a complete https:// URL, or a site path beginning with /.
+                collapsed: true
+          - name: about
+            label: About
+            widget: object
+            required: false
+            fields:
+              - name: body
+                label: Your bio
+                widget: text
+                required: false
+                default: ""
+                hint: Plain text; blank lines separate paragraphs.
+              - name: avatar
+                label: Portrait
+                widget: image
+                required: false
+                default: ""
+                hint: Choose an existing preview or upload an image. Only the resized,
+                  watermarked preview is published; the original stays on your
+                  device.
+              - name: avatarAlt
+                label: Portrait alternative text
+                widget: string
+                required: false
+                default: ""
+                hint: Required when a portrait is set.
+              - name: links
+                label: Profile links
+                widget: list
+                required: false
+                default: []
+                fields:
+                  - name: label
+                    label: Link label
+                    widget: string
+                    required: true
+                  - name: url
+                    label: URL
+                    widget: string
+                    required: true
+                    hint: Use a complete https:// URL, or a site path beginning with /.
+                collapsed: true
+  - name: gallery
+    label: Gallery
+    files:
+      - name: gallery
+        label: Gallery
+        file: src/content/gallery.json
+        fields:
+          - name: items
+            label: Gallery items
+            widget: list
+            required: false
+            default: []
+            fields:
+              - name: id
+                label: Unique ID
+                widget: string
+                required: true
+                hint: Keep stable; must be unique within the gallery.
+              - name: title
+                label: Title
+                widget: string
+                required: true
+              - name: type
+                label: Media type
+                widget: select
+                required: true
+                default: image
+                options:
+                  - image
+                  - video
+              - name: src
+                label: Media preview
+                widget: file
+                required: true
+                hint: Upload an image or video, or choose an existing preview. Choose the
+                  matching media type above. Originals stay on your device.
+              - name: alt
+                label: Description / alternative text
+                widget: string
+                required: true
+              - name: caption
+                label: Caption
+                widget: text
+                required: false
+                default: ""
+              - name: poster
+                label: Poster image
+                widget: image
+                required: false
+                default: ""
+                hint: Choose an existing preview or upload an image. Only the resized,
+                  watermarked preview is published; the original stays on your
+                  device.
+            collapsed: true
+  - name: music
+    label: Music
+    files:
+      - name: music
+        label: Music
+        file: src/content/music.json
+        fields:
+          - name: tracks
+            label: Tracks
+            widget: list
+            required: false
+            default: []
+            fields:
+              - name: id
+                label: Unique ID
+                widget: string
+                required: true
+                hint: Keep stable; must be unique within the track list.
+              - name: title
+                label: Track title
+                widget: string
+                required: true
+              - name: src
+                label: Prepared audio preview URL
+                widget: string
+                required: true
+                hint: Import the original audio outside this repository, then paste the
+                  generated /media/... MP3 preview URL.
+              - name: cover
+                label: Cover image
+                widget: image
+                required: false
+                default: ""
+                hint: Choose an existing preview or upload an image. Only the resized,
+                  watermarked preview is published; the original stays on your
+                  device.
+              - name: coverAlt
+                label: Cover alternative text
+                widget: string
+                required: false
+                default: ""
+                hint: Required when cover art is set.
+            collapsed: true
+  - name: windows
+    label: Windows
+    files:
+      - name: windows
+        label: Windows
+        file: src/content/windows.json
+        fields:
+          - name: windows
+            label: Desktop windows
+            widget: list
+            required: false
+            default: []
+            hint: Add, edit, reorder or delete windows here. Saved content is PUBLIC on
+              GitHub, even when Enabled is off; deletion does not remove Git
+              history. Keep built-in IDs and pages unchanged. Deleting or
+              disabling an ordinary built-in window removes it. Keep
+              site-settings, music-player and start-menu present, enabled, on
+              page all and using default content so site controls continue
+              working.
+            fields:
+              - name: id
+                label: Unique window ID
+                widget: string
+                required: true
+                hint: New windows MUST start with custom-, for example custom-welcome. Every ID
+                  must be unique. Keep IDs stable so links to windows continue
+                  working. Never rename built-in IDs.
+                pattern:
+                  - ^[a-z0-9]+(?:-[a-z0-9]+)*$
+                  - Use lowercase letters and numbers separated by single
+                    hyphens.
+              - name: page
+                label: Page
+                widget: select
+                required: true
+                default: home
+                hint: "Choose where a custom window appears: post means every devlog article;
+                  all means every page. Do not change a built-in window's
+                  assigned page. Reorder custom windows in this list to change
+                  their order on the page."
+                options:
+                  - home
+                  - devlog
+                  - post
+                  - game
+                  - gallery
+                  - music
+                  - about
+                  - subscribe
+                  - not-found
+                  - all
+              - name: title
+                label: Window title
+                widget: string
+                required: true
+                default: New window
+                pattern:
+                  - .*\S.*
+                  - Enter a title, not only spaces.
+              - name: enabled
+                label: Enabled — visible on website, NOT a privacy setting
+                widget: boolean
+                required: false
+                default: false
+                hint: Switch off while preparing a window. Its saved text is still public in
+                  this repository. site-settings, music-player and start-menu
+                  must remain enabled.
+              - name: tone
+                label: Title bar color
+                widget: select
+                required: true
+                default: sage
+                options:
+                  - sage
+                  - pink
+                  - lavender
+              - name: floating
+                label: Start as a floating window
+                widget: boolean
+                required: false
+                default: false
+                hint: Otherwise the window starts in the page layout. Keep this on for
+                  site-settings, music-player and start-menu. Visitors can still
+                  move and resize windows.
+              - name: initiallyClosed
+                label: Start closed
+                widget: boolean
+                required: false
+                default: false
+                hint: Visitors can reopen ordinary windows from Start. Keep this on for
+                  start-menu so it opens only when requested; site-settings and
+                  music-player can start open or closed. The player's saved
+                  visibility takes precedence.
+              - name: width
+                label: Initial width (pixels)
+                widget: number
+                required: true
+                default: 0
+                hint: 0 keeps the existing automatic width. Use a whole number of pixels; the
+                  window is constrained to the available screen.
+                value_type: int
+                min: 0
+                step: 1
+              - name: height
+                label: Initial height (pixels)
+                widget: number
+                required: true
+                default: 0
+                hint: 0 keeps the existing automatic height. Use a whole number of pixels.
+                  Floating windows fit the workspace; in-page windows scroll
+                  their content within this height.
+                value_type: int
+                min: 0
+                step: 1
+              - name: content
+                label: What this window shows
+                widget: select
+                required: true
+                default: text
+                hint: default preserves the built-in content and is forbidden for custom
+                  windows. Other choices replace a built-in window's content.
+                  site-settings, music-player and start-menu must use default.
+                  Edit original default content in Site, Devlog, Gallery or
+                  Music.
+                options:
+                  - default
+                  - text
+                  - media
+                  - links
+                  - devlog
+                  - gallery
+                  - music
+                  - subscribe
+              - name: body
+                label: Markdown text
+                widget: markdown
+                required: false
+                default: ""
+                hint: Write Markdown or use the rich-text editor. Image uploads are processed on
+                  this device before publication. Add video in the media fields
+                  below. Saved content is public on GitHub, including drafts.
+                editor_components:
+                  - image
+              - name: media
+                label: Media previews
+                widget: list
+                required: false
+                default: []
+                hint: Choose media content to display these prepared previews in list order.
+                fields:
+                  - name: type
+                    label: Media type
+                    widget: select
+                    required: true
+                    default: image
+                    options: *a1
+                  - name: src
+                    label: Media preview
+                    widget: file
+                    required: true
+                    hint: Upload an image or video, or choose an existing preview. Choose the
+                      matching media type above. Originals stay on your device.
+                  - name: alt
+                    label: Description or alternative text
+                    widget: string
+                    required: false
+                    default: ""
+                    hint: Describe images for people who cannot see them; name video and audio
+                      content.
+                  - name: caption
+                    label: Caption
+                    widget: text
+                    required: false
+                    default: ""
+                  - name: poster
+                    label: Poster image
+                    widget: image
+                    required: false
+                    default: ""
+                    hint: Choose an existing preview or upload an image. Only the resized,
+                      watermarked preview is published; the original stays on
+                      your device.
+                collapsed: true
+              - name: links
+                label: Links
+                widget: list
+                required: false
+                default: []
+                hint: Choose links content to display these links in list order.
+                fields:
+                  - name: label
+                    label: Link label
+                    widget: string
+                    required: true
+                  - name: url
+                    label: URL
+                    widget: string
+                    required: true
+                    hint: Use a complete https:// URL, or a site path beginning with /.
+                collapsed: true
+              - name: items
+                label: Selected item IDs (optional)
+                widget: list
+                required: false
+                default: []
+                hint: For devlog, enter published permanent URL slugs; for gallery, gallery IDs;
+                  for music, track IDs. The order here is the display order.
+                  Leave empty to use all available items. Draft and future posts
+                  cannot appear. Leave empty for other content types. Disabled
+                  windows may keep unfinished selections.
+                field:
+                  name: item
+                  label: Item
+                  widget: string
+                  required: true
+              - name: limit
+                label: Maximum list items
+                widget: number
+                required: true
+                default: 0
+                hint: Applies to media, links, devlog, gallery and music lists. 0 shows all
+                  available or selected items. Otherwise enter a positive whole
+                  number to limit the displayed list.
+                value_type: int
+                min: 0
+                step: 1
+            collapsed: true

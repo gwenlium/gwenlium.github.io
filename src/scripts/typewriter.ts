@@ -1,5 +1,7 @@
 import { playInterfaceSound } from './interface-audio';
 
+export type TypewriterRevealDetail = { blocks: HTMLElement[] };
+
 type TextRun = { node: Text; text: string; ends: number[]; hidden: Range; position: number };
 type Writer = {
   root: HTMLElement;
@@ -252,6 +254,24 @@ forcedColors.addEventListener('change', refresh, listenerOptions);
 document.addEventListener('visibilitychange', refresh, listenerOptions);
 document.addEventListener('gwenlium:windows-changed', () => {
   document.querySelectorAll<HTMLElement>(roots).forEach(queueRoot);
+}, listenerOptions);
+// Restart only the selected dialogue blocks, using their existing window writer.
+document.addEventListener('gwenlium:typewriter-reveal', event => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement) || !target.isConnected) return;
+  const root = target.closest<HTMLElement>(roots);
+  const detail = (event as CustomEvent<TypewriterRevealDetail>).detail;
+  if (!root || !Array.isArray(detail?.blocks)) return;
+  const blocks = detail.blocks.filter(block => block instanceof HTMLElement && target.contains(block));
+  if (!blocks.length) return;
+  const current = writers.get(root);
+  if (current) finish(current);
+  for (const block of blocks) {
+    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+    let node: Node | null;
+    while ((node = walker.nextNode())) seenText.delete(node as Text);
+  }
+  queueRoot(root);
 }, listenerOptions);
 document.addEventListener('scroll', queueCursors, { ...listenerOptions, capture: true, passive: true });
 document.addEventListener('toggle', event => {

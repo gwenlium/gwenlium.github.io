@@ -1,0 +1,18 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "gwenlium-cms-auth",
+  "account_id": "b7bc6541cb1fc226d1d2bb3c4ba2a8bd",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-17",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": false
+  },
+  "vars": {
+    "SITE_ORIGIN": "https://gwenlium.dev",
+    "AUTH_ORIGIN": "https://gwenlium-cms-auth.gwenlium.workers.dev",
+    "ALLOWED_USER_ID": "47855927",
+    "GITHUB_REPOSITORY_ID": "1373528386"
+  }
+}

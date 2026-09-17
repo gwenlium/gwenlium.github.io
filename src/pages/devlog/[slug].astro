@@ -44,8 +44,25 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
           <h2>On this page</h2>
           <ol>{contents.map((heading) => <li class:list={{ nested: heading.depth === 3 }}><a href={`#${heading.slug}`}>{heading.text}</a></li>)}</ol>
         </nav>}
-        <div class="prose entry-body"><Content /></div>
-        {post.data.media.length > 0 && <div class="entry-media">{post.data.media.map((media) => <Media {...media} />)}</div>}
+        <div class="dialogue-option" data-dialogue-option hidden>
+          <button class="button button-secondary" type="button" data-dialogue-enter aria-controls="entry-content">Dialogue mode</button>
+          <span>Read one block at a time.</span>
+        </div>
+        <div class="dialogue-reader" data-dialogue-reader>
+          <div class="dialogue-heading" data-dialogue-heading hidden>
+            <span class="eyebrow">Dialogue mode</span>
+            <button class="button button-secondary" type="button" data-dialogue-exit>Read full post</button>
+          </div>
+          <div id="entry-content" data-dialogue-content>
+            <div class="prose entry-body" data-dialogue-blocks><Content /></div>
+            {post.data.media.length > 0 && <div class="entry-media" data-dialogue-blocks>{post.data.media.map((media) => <Media {...media} />)}</div>}
+          </div>
+          <nav class="dialogue-controls" aria-label="Dialogue reading" data-dialogue-controls hidden>
+            <button class="button button-secondary" type="button" data-dialogue-back disabled>Back</button>
+            <span class="dialogue-progress" role="status" aria-live="polite" aria-atomic="true" data-dialogue-progress></span>
+            <button class="button" type="button" data-dialogue-next>Continue</button>
+          </nav>
+        </div>
         <footer class="entry-footer" data-share-entry>
           <button class="button button-secondary" type="button" data-copy-link={shareUrl}><Icon name="external" size={15} /> Copy link</button>
           <span class="copy-feedback" role="status" aria-live="polite" data-copy-feedback></span>
@@ -66,6 +83,8 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
 </SiteLayout>
 
 <script>
+  import '../../scripts/dialogue-reader';
+
   let shareController: AbortController | undefined;
   function initializeSharing() {
     shareController?.abort();
@@ -114,6 +133,27 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
   .contents a { text-underline-offset: .2em; }
   .entry-body :global(h2), .entry-body :global(h3) { scroll-margin-top: 2rem; }
   .entry-media { display: grid; gap: 1.5rem; margin-top: 2rem; }
+  .dialogue-option { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-block: 1.5rem; }
+  .dialogue-option > span { color: var(--muted); font-family: var(--font-reading); font-size: .9rem; }
+  .dialogue-option[hidden], .dialogue-heading[hidden], .dialogue-controls[hidden], .dialogue-reader :global([data-dialogue-hidden]) { display: none !important; }
+  .dialogue-reader[data-dialogue-active] { border: 2px solid var(--line); background: var(--surface); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
+  .dialogue-heading { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: .75rem; border-bottom: 1px solid var(--line); background: var(--surface-raised); }
+  .dialogue-heading .eyebrow { font-size: .65rem; }
+  .dialogue-heading button, .dialogue-controls button { min-height: 2.5rem; font-size: .7rem; }
+  .dialogue-reader[data-dialogue-active] [data-dialogue-content] { padding: clamp(.85rem, 3vw, 1.5rem); min-height: 8rem; }
+  .dialogue-reader[data-dialogue-active] .entry-body > :global(:first-child) { margin-top: 0; }
+  .dialogue-reader[data-dialogue-active] .entry-media { margin-top: 0; }
+  .dialogue-controls { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: .75rem; border-top: 1px solid var(--line); background: var(--surface-raised); }
+  .dialogue-progress { flex: 1; text-align: center; font-family: var(--font-reading); font-size: .9rem; color: var(--muted); }
+  .dialogue-controls button:disabled { cursor: default; opacity: .5; }
+  @media print {
+    :global(#post-entry) { display: block !important; position: static !important; width: auto !important; height: auto !important; max-height: none !important; overflow: visible !important; transform: none !important; break-inside: auto; }
+    :global(#post-entry > .window-body) { display: block !important; height: auto !important; max-height: none !important; overflow: visible !important; }
+    .dialogue-option, .dialogue-heading, .dialogue-controls { display: none !important; }
+    .dialogue-reader[data-dialogue-active] { border: 0; box-shadow: none; background: none; }
+    .dialogue-reader[data-dialogue-active] [data-dialogue-content] { padding: 0; min-height: 0; }
+    .dialogue-reader :global([data-dialogue-hidden]) { display: revert !important; }
+  }
   .entry-footer { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; padding-top: 1.5rem; margin-top: 2.5rem; border-top: 1px solid var(--line); }
   .copy-feedback { color: var(--muted); font-size: .7rem; }
   .copy-fallback { flex-basis: 100%; font-size: .75rem; }

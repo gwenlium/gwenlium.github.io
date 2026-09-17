@@ -4,6 +4,9 @@ dist/
 .env
 .env.*
 .DS_Store
+.dev.vars
+.dev.vars.*
+.wrangler/
 Thumbs.db
 src/generated/media.json
 public/_generated/
