@@ -27,7 +27,7 @@ components:
         required: true
         description: "Paste the /media/... URL printed by npm run media:import. Never upload or commit original masters."
       - name: alt
-        label: Description / alternative text
+        label: Description or alternative text
         type: string
         default: ""
         description: Describe images for people who cannot see them; name video and audio content.
@@ -342,3 +342,131 @@ content:
             type: string
             default: ""
             description: Required when cover art is set.
+
+  - name: windows
+    label: Windows
+    type: file
+    path: src/content/windows.json
+    format: json
+    fields:
+      - name: windows
+        label: Desktop windows
+        type: object
+        list:
+          collapsible:
+            collapsed: true
+            summary: "{title} ({id})"
+        default: []
+        description: "Add, edit, reorder or delete windows here. Saved content is PUBLIC on GitHub, even when Enabled is off; deletion does not remove Git history. Keep built-in IDs and pages unchanged. Deleting or disabling an ordinary built-in window removes it. Keep site-settings, music-player and start-menu present, enabled, on page all and using default content so site controls continue working."
+        fields:
+          - name: id
+            label: Unique window ID
+            type: string
+            required: true
+            pattern:
+              regex: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+              message: Use lowercase letters and numbers separated by single hyphens.
+            description: "New windows MUST start with custom-, for example custom-welcome. Every ID must be unique. Keep IDs stable so links to windows continue working. Never rename built-in IDs."
+          - name: page
+            label: Page
+            type: select
+            required: true
+            default: home
+            options:
+              values: [home, devlog, post, game, gallery, music, about, subscribe, not-found, all]
+            description: "Choose where a custom window appears: post means every devlog article; all means every page. Do not change a built-in window's assigned page. Reorder custom windows in this list to change their order on the page."
+          - name: title
+            label: Window title
+            type: string
+            required: true
+            default: New window
+            pattern:
+              regex: '.*\S.*'
+              message: Enter a title, not only spaces.
+          - name: enabled
+            label: Enabled — visible on website, NOT a privacy setting
+            type: boolean
+            default: false
+            description: "Switch off while preparing a window. Its saved text is still public in this repository. site-settings, music-player and start-menu must remain enabled."
+          - name: tone
+            label: Title bar color
+            type: select
+            required: true
+            default: sage
+            options:
+              values: [sage, pink, lavender]
+          - name: floating
+            label: Start as a floating window
+            type: boolean
+            default: false
+            description: "Otherwise the window starts in the page layout. Keep this on for site-settings, music-player and start-menu. Visitors can still move and resize windows."
+          - name: initiallyClosed
+            label: Start closed
+            type: boolean
+            default: false
+            description: "Visitors can reopen ordinary windows from Start. Keep this on for start-menu so it opens only when requested; site-settings and music-player can start open or closed. The player's saved visibility takes precedence."
+          - name: width
+            label: Initial width (pixels)
+            type: number
+            required: true
+            default: 0
+            options:
+              min: 0
+              step: 1
+            description: "0 keeps the existing automatic width. Use a whole number of pixels; the window is constrained to the available screen."
+          - name: height
+            label: Initial height (pixels)
+            type: number
+            required: true
+            default: 0
+            options:
+              min: 0
+              step: 1
+            description: "0 keeps the existing automatic height. Use a whole number of pixels. Floating windows fit the workspace; in-page windows scroll their content within this height."
+          - name: content
+            label: What this window shows
+            type: select
+            required: true
+            default: text
+            options:
+              values: [default, text, media, links, devlog, gallery, music, subscribe]
+            description: "default preserves the built-in content and is forbidden for custom windows. Other choices replace a built-in window's content. site-settings, music-player and start-menu must use default. Edit original default content in Site, Devlog, Gallery or Music."
+          - name: body
+            label: Markdown text
+            type: rich-text
+            default: ""
+            description: "Write Markdown here; embedded HTML and uploads are disabled. In Source mode, use ![meaningful alternative text](/media/your-prepared-preview.webp) with the exact URL printed by media:import. Never commit original masters. All saved content, including disabled windows, is public."
+            options:
+              format: markdown
+              switcher: true
+              media: false
+          - name: media
+            label: Media previews
+            component: media
+            list:
+              collapsible:
+                collapsed: true
+                summary: "{type}: {caption}"
+            default: []
+            description: Choose media content to display these prepared previews in list order.
+          - name: links
+            label: Links
+            component: link
+            list: true
+            default: []
+            description: Choose links content to display these links in list order.
+          - name: items
+            label: Selected item IDs (optional)
+            type: string
+            list: true
+            default: []
+            description: "For devlog, enter published permanent URL slugs; for gallery, gallery IDs; for music, track IDs. The order here is the display order. Leave empty to use all available items. Draft and future posts cannot appear. Leave empty for other content types. Disabled windows may keep unfinished selections."
+          - name: limit
+            label: Maximum list items
+            type: number
+            required: true
+            default: 0
+            options:
+              min: 0
+              step: 1
+            description: "Applies to media, links, devlog, gallery and music lists. 0 shows all available or selected items. Otherwise enter a positive whole number to limit the displayed list."

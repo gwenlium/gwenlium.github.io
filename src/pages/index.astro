@@ -6,6 +6,7 @@ import Media from '../components/Media.astro';
 import PostCard from '../components/PostCard.astro';
 import { site, gallery, tracks } from '../lib/settings';
 import { getPosts, postUrl, formatDate } from '../lib/content';
+import { hasWindowOverride } from '../lib/windows';
 
 const posts = await getPosts();
 const featuredPost = posts.find((post) => post.data.permalink === site.featuredPost)
@@ -21,19 +22,19 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
 
 <SiteLayout>
   <div class="home-page">
-    <Window title={`${site.name} / home`} class="home-hero">
+    <Window windowId="home-intro" class="home-hero">
       <div class="hero-inner">
         <div class="hero-copy">
           <span class="hero-location"><span aria-hidden="true"></span>Home</span>
-          <h1>{site.name}<span aria-hidden="true">_</span></h1>
+          <h1>{site.name}<span class="text-caret" aria-hidden="true">|</span></h1>
           {site.intro && <p class="hero-intro">{site.intro}</p>}
         </div>
       </div>
       <div class="hero-statusbar"><span><img src="/avatar.webp" alt="" width="16" height="16" />gwenlium.dev</span><span aria-hidden="true">◆ &nbsp; ◇ &nbsp; ◇</span></div>
     </Window>
 
-    {hasGame && (
-      <Window title="Featured game" class="featured-game">
+    {(hasGame || hasWindowOverride('home-game')) && (
+      <Window windowId="home-game" class="featured-game">
         <div class:list={['game-preview', { 'game-preview--with-media': game.cover || gameVideo }]}>
           {(game.cover || gameVideo) && (
             <div class="game-preview__media">
@@ -56,7 +57,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
     )}
 
     <div class="home-columns">
-      <Window title={featuredPost && (site.featuredPost === featuredPost.data.permalink || featuredPost.data.featured) ? 'Featured devlog' : 'Latest devlog'} class="home-devlog">
+      <Window windowId="home-devlog" class="home-devlog">
         {featuredPost ? (
           <>
             <PostCard post={featuredPost} />
@@ -81,8 +82,8 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
 
     </div>
 
-    {galleryPreview.length > 0 && (
-      <Window title="Gallery" tone="pink" class="home-gallery">
+    {(galleryPreview.length > 0 || hasWindowOverride('home-gallery')) && (
+      <Window windowId="home-gallery" class="home-gallery">
         <div class="section-heading"><h2><Icon name="image" size={20} />Gallery</h2></div>
         <div class="gallery-preview">
           {galleryPreview.map((item) => (
@@ -95,8 +96,8 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
       </Window>
     )}
 
-    {musicPreview.length > 0 && (
-      <Window title="Music" tone="lavender" class="home-music">
+    {(musicPreview.length > 0 || hasWindowOverride('home-music')) && (
+      <Window windowId="home-music" class="home-music">
         <div class="section-heading"><h2><Icon name="music" size={20} />Music</h2></div>
         <ul class="music-preview">
           {musicPreview.map((track, index) => (

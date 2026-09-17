@@ -1,0 +1,14 @@
+---
+import Window from './Window.astro';
+import { customWindowsForPage, type WindowPage } from '../lib/windows';
+
+interface Props { page: WindowPage }
+const windows = customWindowsForPage(Astro.props.page);
+---
+
+{windows.length > 0 && <div class="custom-windows">{windows.map((definition) => <Window windowId={definition.id} />)}</div>}
+
+<style>
+  .custom-windows { display: grid; align-items: start; gap: 1.5rem; min-width: 0; margin-top: 1.8rem; }
+  @media (max-width: 640px) { .custom-windows { gap: 1rem; margin-top: 1.5rem; } }
+</style>

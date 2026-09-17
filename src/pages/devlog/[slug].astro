@@ -5,6 +5,7 @@ import Window from '../../components/Window.astro';
 import Icon from '../../components/Icon.astro';
 import Media from '../../components/Media.astro';
 import { getPosts, postUrl, formatDate, type Post } from '../../lib/content';
+import { hasWindowOverride } from '../../lib/windows';
 
 export async function getStaticPaths() {
   const posts = await getPosts();
@@ -30,7 +31,7 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
 <SiteLayout title={post.data.title} description={post.data.excerpt} image={post.data.cover} imageAlt={post.data.coverAlt} article>
   <a class="back-link" href="/devlog/"><span aria-hidden="true">←</span> All entries</a>
   <div class="article-layout">
-    <Window title="devlog / entry">
+    <Window windowId="post-entry">
       <article class="entry">
         <header class="entry-header">
           <p class="eyebrow"><time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time></p>
@@ -58,7 +59,7 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
       {newer && <a href={postUrl(newer)} rel="next"><span class="eyebrow">Newer entry →</span><span>{newer.data.title}</span></a>}
     </nav>}
 
-    {related.length > 0 && <Window title="devlog / related entries" tone="lavender">
+    {(related.length > 0 || hasWindowOverride('post-related')) && <Window windowId="post-related">
       <nav aria-label="Related entries"><ul class="related-list">{related.map(({ candidate }) => <li><a href={postUrl(candidate)}>{candidate.data.title}</a><time datetime={candidate.data.date.toISOString().slice(0, 10)}>{formatDate(candidate.data.date)}</time></li>)}</ul></nav>
     </Window>}
   </div>

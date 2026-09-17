@@ -1,6 +1,9 @@
 ---
 import { site } from '../lib/settings';
 
+interface Props { idPrefix: string }
+const emailId = `${Astro.props.idPrefix}-email`;
+
 let action = '';
 if (site.newsletterFormAction) {
   const endpoint = new URL(site.newsletterFormAction);
@@ -14,8 +17,8 @@ if (site.newsletterFormAction) {
 {action ? (
   <form class="newsletter-form" action={action} method="post" data-followit-form>
     {site.newsletterHeading && <h2>{site.newsletterHeading}</h2>}
-    <label for="followit-email">Email address</label>
-    <input id="followit-email" type="email" name="email" required placeholder="Enter your email" autocomplete="email" spellcheck="false" />
+    <label for={emailId}>Email address</label>
+    <input id={emailId} type="email" name="email" required placeholder="Enter your email" autocomplete="email" spellcheck="false" />
     <button class="button" type="submit">{site.newsletterButtonLabel}</button>
     <p>Your email is submitted directly to follow.it. Confirm your subscription using the email they send.</p>
   </form>

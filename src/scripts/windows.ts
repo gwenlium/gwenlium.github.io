@@ -41,6 +41,7 @@ function createTaskbarButton(id: string, title: string) {
   button.dataset.taskbarWindow = id;
   button.setAttribute('aria-label', title);
   button.title = title;
+  button.setAttribute('aria-controls', id);
   button.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 3h12v10H2zM2 5.5h12" /></svg>';
   const label = document.createElement('span');
   label.className = 'taskbar-window-label';
@@ -75,6 +76,7 @@ function setState(entry: DesktopWindow, state: DesktopWindowState) {
   entry.root.inert = false;
   entry.taskbarButton.hidden = !entry.pinned && state === 'closed';
   entry.taskbarButton.dataset.windowState = state;
+  entry.taskbarButton.setAttribute('aria-expanded', String(state === 'normal' || state === 'maximized'));
   const action = state === 'maximized' ? 'restore' : 'maximize';
   const label = `${action === 'restore' ? 'Restore' : 'Maximize'} ${entry.title}`;
   entry.maximizeButton.dataset.windowAction = action;
@@ -331,7 +333,7 @@ function initializeWindows() {
   window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing || !maximizedWindow) return;
     if (document.fullscreenElement || document.querySelector('dialog[open]')) return;
-    if (typeof HTMLElement.prototype.showPopover === 'function' && document.querySelector('[popover]:popover-open:not([data-desktop-window])')) return;
+    if (typeof HTMLElement.prototype.showPopover === 'function' && document.querySelector('[popover]:popover-open:not([data-desktop-window]):not([aria-hidden="true"])')) return;
     event.preventDefault();
     commandWindow(maximizedWindow.id, 'restore');
   }, { signal });

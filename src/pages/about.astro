@@ -4,8 +4,10 @@ import Window from '../components/Window.astro';
 import Media from '../components/Media.astro';
 import Icon from '../components/Icon.astro';
 import { site } from '../lib/settings';
+import { getWindowDefinition, hasWindowOverride } from '../lib/windows';
 const about = site.about;
 const paragraphs = about.body.trim() ? about.body.trim().split(/\n\s*\n/) : [];
+const showPortrait = Boolean(getWindowDefinition('about-portrait')?.enabled && (about.avatar || hasWindowOverride('about-portrait')));
 ---
 
 <SiteLayout title="About" image={about.avatar || undefined} imageAlt={about.avatarAlt || undefined}>
@@ -13,17 +15,16 @@ const paragraphs = about.body.trim() ? about.body.trim().split(/\n\s*\n/) : [];
     <span class="eyebrow">Profile</span>
     <h1>About {site.name}</h1>
   </header>
-  <div class:list={['about-grid', { 'about-grid--with-avatar': about.avatar }]}>
-    {about.avatar && <aside class="about-avatar"><Window title={site.name} tone="pink"><Media src={about.avatar} alt={about.avatarAlt} eager sizes="(max-width: 800px) 300px, 25vw" /></Window></aside>}
+  <div class:list={['about-grid', { 'about-grid--with-avatar': showPortrait }]}>
+    {showPortrait && <aside class="about-avatar"><Window windowId="about-portrait"><Media src={about.avatar} alt={about.avatarAlt} eager sizes="(max-width: 800px) 300px, 25vw" /></Window></aside>}
     <div class="about-main">
-      <Window title="About" tone="sage">
+      <Window windowId="about-bio">
         {paragraphs.length ? (
           <div class="prose about-body">{paragraphs.map((paragraph) => <p>{paragraph}</p>)}</div>
         ) : (
           <div class="empty-state">
             <Icon name="user" size={36} />
             <h2>No bio published yet</h2>
-            <p>About information will appear here when added.</p>
           </div>
         )}
       </Window>

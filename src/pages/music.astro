@@ -11,10 +11,9 @@ import { tracks } from '../lib/settings';
   <header class="page-heading">
     <span class="eyebrow">Tracks</span>
     <h1>Music</h1>
-    <p>Make playlists for this device, keep personal reactions, and share links. {tracks.length > 0 ? 'Press play to listen; music keeps playing as you explore the site.' : 'There are no published tracks yet, but you can start a collection with an empty playlist.'}</p>
   </header>
   <MusicLibrary />
-  <Window title="Track list" id="music-catalogue" tone="lavender">
+  <Window windowId="music-catalogue">
     {tracks.length ? (
       <ol class="track-list">
         {tracks.map((track, index) => (
@@ -40,7 +39,6 @@ import { tracks } from '../lib/settings';
       <div class="empty-state">
         <Icon name="music" size={36} />
         <h2>No tracks published yet</h2>
-        <p>Published tracks will be listed here. Audio does not autoplay.</p>
       </div>
     )}
   </Window>

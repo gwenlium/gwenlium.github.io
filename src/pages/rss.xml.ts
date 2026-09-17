@@ -1,6 +1,7 @@
 import rss from '@astrojs/rss';
 import type { APIContext } from 'astro';
-import { getPosts, postUrl } from '../lib/content';
+import { load } from 'cheerio';
+import { getPosts, postUrl, type Post } from '../lib/content';
 import { site } from '../lib/settings';
 
 const htmlEscapes: Record<string, string> = {
@@ -9,6 +10,38 @@ const htmlEscapes: Record<string, string> = {
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => htmlEscapes[character]!);
+}
+
+function articleContent(post: Post, base: URL): string {
+  if (post.rendered?.html === undefined) throw new Error(`Missing rendered RSS content for ${post.id}`);
+  const { cover, coverAlt, excerpt, media } = post.data;
+  const parts = [
+    cover ? `<p><img src="${escapeHtml(cover)}" alt="${escapeHtml(coverAlt)}" /></p>` : '',
+    excerpt ? `<p>${escapeHtml(excerpt)}</p>` : '',
+    post.rendered.html,
+    ...media.map((item) => {
+      const src = escapeHtml(item.src);
+      const caption = item.caption ? `<figcaption>${escapeHtml(item.caption)}</figcaption>` : '';
+      const content = item.type === 'image'
+        ? `<img src="${src}" alt="${escapeHtml(item.alt)}" />`
+        : `<${item.type} controls src="${src}"${item.type === 'video' && item.poster ? ` poster="${escapeHtml(item.poster)}"` : ''}></${item.type}><p><a href="${src}">${escapeHtml(item.alt || `Open ${item.type}`)}</a></p>`;
+      return `<figure>${content}${caption}</figure>`;
+    }),
+  ];
+  const $ = load(parts.join('\n'), {}, false);
+  const articleUrl = new URL(postUrl(post), base);
+  // Feed readers have no page URL against which to resolve links or media.
+  for (const attribute of ['href', 'src', 'poster']) {
+    $(`[${attribute}]`).each((_, element) => {
+      const node = $(element);
+      const value = node.attr(attribute);
+      if (value) node.attr(attribute, new URL(value, articleUrl).href);
+    });
+  }
+  // Keep the original image rather than site-only responsive variants in readers.
+  $('picture > source').remove();
+  $('[srcset]').removeAttr('srcset').removeAttr('sizes');
+  return $.html();
 }
 
 export async function GET(context: APIContext): Promise<Response> {
@@ -21,17 +54,14 @@ export async function GET(context: APIContext): Promise<Response> {
     trailingSlash: true,
     customData: '<language>en</language>',
     items: posts.map((post) => {
-      const { title, date, excerpt, tags, cover, coverAlt } = post.data;
-      const coverHtml = cover
-        ? `<p><img src="${escapeHtml(new URL(cover, base).href)}" alt="${escapeHtml(coverAlt)}" /></p>`
-        : '';
+      const { title, date, excerpt, tags } = post.data;
       return {
         title,
         link: new URL(postUrl(post), base).href,
         pubDate: date,
         description: excerpt,
         categories: tags,
-        ...(coverHtml ? { content: `${coverHtml}${excerpt ? `<p>${escapeHtml(excerpt)}</p>` : ''}` } : {}),
+        content: articleContent(post, base),
       };
     }),
   });

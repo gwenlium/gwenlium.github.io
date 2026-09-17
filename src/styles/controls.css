@@ -1,0 +1,45 @@
+.control-caret {
+  position: fixed;
+  inset: auto;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  width: 12px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  color: var(--ink, #183326);
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(1px 2px 0 rgb(0 0 0 / .25));
+}
+.control-caret[hidden] { display: none !important; }
+.control-caret::backdrop { background: transparent; pointer-events: none; }
+.control-caret::before,
+.control-caret::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  clip-path: polygon(0 0, 4px 0, 4px 2px, 7px 2px, 7px 4px, 10px 4px, 10px 6px, 12px 6px, 12px 8px, 10px 8px, 10px 10px, 7px 10px, 7px 12px, 4px 12px, 4px 14px, 0 14px);
+}
+.control-caret::after {
+  background: var(--surface-raised, #fff9ef);
+  transform: scale(.65);
+  transform-origin: 40% 50%;
+}
+.control-caret[data-side='right'] { rotate: 180deg; }
+.control-caret[data-side='above'] { rotate: 90deg; }
+.control-caret[data-side='below'] { rotate: -90deg; }
+/* No ambient movement: the marker follows input, never replaces native focus/cursors. */
+@media (prefers-reduced-motion: reduce) {
+  .control-caret { animation: none; transition: none; }
+}
+html[data-motion='reduced'] .control-caret { animation: none; transition: none; }
+@media (forced-colors: active) {
+  .control-caret { color: CanvasText; filter: none; forced-color-adjust: none; }
+  .control-caret::after { background: Canvas; }
+}
+@media print { .control-caret { display: none !important; } }

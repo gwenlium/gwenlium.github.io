@@ -3,6 +3,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 import Icon from '../components/Icon.astro';
 import SubscribeForm from '../components/SubscribeForm.astro';
+import FollowAttribution from '../components/FollowAttribution.astro';
 const feedUrl = new URL('/rss.xml', Astro.site || 'https://gwenlium.dev').href;
 ---
 
@@ -12,10 +13,10 @@ const feedUrl = new URL('/rss.xml', Astro.site || 'https://gwenlium.dev').href;
     <h1>Subscriptions</h1>
   </header>
   <div class="subscribe-grid">
-    <Window title="RSS feed" tone="sage">
+    <Window windowId="subscribe-rss">
       <div class="option-heading"><Icon name="rss" size={30} /><span class="tag">No account needed</span></div>
       <h2>RSS</h2>
-      <p class="option-description">Add the devlog feed to your RSS reader to receive new published posts. No email address or subscription service required.</p>
+      <p class="option-description">Full devlog posts in your RSS reader.</p>
       <div class="feed-actions">
         <button type="button" class="button-secondary" data-copy-feed={feedUrl}>Copy feed address</button>
         <p class="copy-status" role="status" aria-live="polite" data-copy-status></p>
@@ -23,9 +24,10 @@ const feedUrl = new URL('/rss.xml', Astro.site || 'https://gwenlium.dev').href;
       <label class="feed-label" for="feed-address">Feed address</label>
       <input id="feed-address" class="feed-address" type="url" value={feedUrl} readonly data-feed-address aria-label="RSS feed address" />
     </Window>
-    <Window title="Email updates" tone="pink">
+    <Window windowId="subscribe-email">
       <div class="option-heading"><Icon name="mail" size={30} /><span class="tag">follow.it</span></div>
-      <SubscribeForm />
+      <SubscribeForm idPrefix="subscribe-form" />
+      <FollowAttribution />
     </Window>
   </div>
 </SiteLayout>

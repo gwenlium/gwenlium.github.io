@@ -216,7 +216,7 @@ function renderLibrary(): void {
   if (!library) return;
   library.querySelector<HTMLFieldSetElement>('[data-library-controls]')!.disabled = false;
   library.querySelector<HTMLButtonElement>('[data-create-button]')!.disabled = state.playlists.length >= MAX_PLAYLISTS;
-  setText('[data-playlist-capacity]', `${state.playlists.length} / ${MAX_PLAYLISTS} playlists`);
+  setText('[data-playlist-capacity]', `${state.playlists.length} of ${MAX_PLAYLISTS} playlists`);
   updateStorageStatus();
 
   const selection = library.querySelector<HTMLSelectElement>('[data-playlist-select]')!;
@@ -241,7 +241,7 @@ function renderLibrary(): void {
   library.querySelector<HTMLElement>('[data-playlist-manager]')!.hidden = !playlist;
   if (playlist) {
     setText('[data-selected-name]', playlist.name);
-    setText('[data-selected-count]', `${playlist.ids.length} / ${MAX_TRACKS} tracks`);
+    setText('[data-selected-count]', `${playlist.ids.length} of ${MAX_TRACKS} tracks`);
     library.querySelector<HTMLInputElement>('#playlist-rename-name')!.value = playlist.name;
     library.querySelector<HTMLInputElement>('#playlist-rename-name')!.setCustomValidity('');
     const playable = playlist.ids.filter((id) => catalogue.get(id)?.src).length;
@@ -258,7 +258,7 @@ function renderLibrary(): void {
 
   library.querySelector<HTMLElement>('[data-shared-preview]')!.hidden = !shared;
   if (shared) {
-    setText('[data-shared-label]', shared.savedId ? 'Shared preview / personal copy added' : 'Shared preview / not saved');
+    setText('[data-shared-label]', shared.savedId ? 'Shared preview · personal copy added' : 'Shared preview · not saved');
     setText('[data-shared-name]', shared.name);
     const playable = shared.ids.filter((id) => catalogue.get(id)?.src).length;
     setText('[data-shared-note]', [
@@ -363,7 +363,7 @@ function showCopyDialog(url: string, title: string): void {
   Object.assign(input.style, { display: 'block', width: '100%', marginBlock: '.65rem 1rem' });
   const status = document.createElement('p');
   status.setAttribute('role', 'status');
-  status.textContent = 'The link is selected. Use Copy (Ctrl+C / Command+C), or touch and hold to copy.';
+  status.textContent = 'The link is selected. Use Copy (Ctrl+C or Command+C), or touch and hold to copy.';
   const actions = document.createElement('div');
   actions.className = 'settings-bottom';
   actions.style.flexWrap = 'wrap';
@@ -384,7 +384,7 @@ function showCopyDialog(url: string, title: string): void {
     } catch {
       input.focus();
       input.select();
-      status.textContent = 'Automatic copying is unavailable. Use your browser’s Copy command on the selected link (Ctrl+C / Command+C), or touch and hold to copy.';
+      status.textContent = 'Automatic copying is unavailable. Use your browser’s Copy command on the selected link (Ctrl+C or Command+C), or touch and hold to copy.';
     }
   });
   const close = document.createElement('button');
@@ -484,7 +484,7 @@ function readPageLink(): void {
 function initializePage(): void {
   readCatalogue();
   syncTrackControls();
-  const nextLibrary = document.getElementById('music-library');
+  const nextLibrary = document.querySelector<HTMLElement>('#music-library:has([data-library-controls])');
   if (library !== nextLibrary) {
     library = nextLibrary;
     if (library) {

@@ -190,7 +190,11 @@ function applyScroll(request: ScrollRequest): void {
     let fragment = request.hash.slice(1);
     try { fragment = decodeURIComponent(fragment); } catch { /* Keep a literal malformed fragment navigable. */ }
     const target = fragment ? document.getElementById(fragment) ?? document.getElementsByName(fragment)[0] : null;
-    if (target && viewport.contains(target)) {
+    const desktopWindow = target?.closest<HTMLElement>('[data-desktop-window]');
+    if (desktopWindow?.hidden && desktopWindow.dataset.windowId) {
+      document.dispatchEvent(new CustomEvent('gwenlium:window-command', { detail: { id: desktopWindow.dataset.windowId, action: 'restore' } }));
+    }
+    if (target && (viewport.contains(target) || desktopWindow)) {
       target.scrollIntoView({ block: 'start', behavior: 'auto' });
       if (request.focus && target instanceof HTMLElement) {
         const temporaryTabindex = !target.hasAttribute('tabindex') && target.tabIndex < 0;

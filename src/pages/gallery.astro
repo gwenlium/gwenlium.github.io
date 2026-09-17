@@ -13,6 +13,7 @@ const videos = gallery.filter((item) => item.type === 'video').length;
     <span class="eyebrow">Images & videos</span>
     <h1>Gallery</h1>
   </header>
+  <Window windowId="gallery-content">
   {gallery.length ? (
     <section data-gallery aria-label="Gallery">
       <div class="gallery-toolbar">
@@ -35,14 +36,12 @@ const videos = gallery.filter((item) => item.type === 'video').length;
       </div>
     </section>
   ) : (
-    <Window title="Gallery" tone="pink">
       <div class="empty-state">
         <Icon name="image" size={36} />
         <h2>No work published yet</h2>
-        <p>Images and videos will appear here when added to the gallery.</p>
       </div>
-    </Window>
   )}
+  </Window>
 </SiteLayout>
 
 <style>

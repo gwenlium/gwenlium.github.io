@@ -1,11 +1,16 @@
 import { navigate } from 'astro:transitions/client';
+import { handleControlKeydown } from './controls';
+import { createSearchIndex } from '../lib/search';
+import { searchKindLabels, type SearchEntry, type SearchIndex, type SearchKind } from '../lib/search-types';
 
-type SearchEntry = { title: string; url: string; kind: 'page' | 'post'; text: string };
 type WindowCommand = { id: string; action: 'restore' } | { action: 'restore-all' };
 type StartMenu = {
   dialog: HTMLDialogElement;
   input: HTMLInputElement;
   form: HTMLFormElement;
+  kind: HTMLSelectElement;
+  clear: HTMLButtonElement;
+  more: HTMLButtonElement;
   results: HTMLUListElement;
   status: HTMLElement;
   windows: HTMLUListElement;
@@ -23,7 +28,8 @@ const dockObserver = new ResizeObserver(positionMenu);
 let menu: StartMenu | null = null;
 let indexPromise: Promise<void> | undefined;
 let searchState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
-let entries: SearchEntry[] = [];
+let searchIndex: SearchIndex | undefined;
+let resultLimit = 10;
 let navigationPrefixExpires = 0;
 const navigationShortcuts: Record<string, string | undefined> = {
   h: '/', d: '/devlog/', p: '/game/', i: '/gallery/', m: '/music/', a: '/about/',
@@ -41,16 +47,19 @@ function loadIndex(): void {
       if (!payload || typeof payload !== 'object' || !('entries' in payload) || !Array.isArray(payload.entries)) {
         throw new Error('Invalid search index');
       }
-      entries = payload.entries.map((entry: unknown) => {
+      const entries: SearchEntry[] = payload.entries.map((entry: unknown) => {
         if (!entry || typeof entry !== 'object'
+          || !('id' in entry) || typeof entry.id !== 'string'
           || !('title' in entry) || typeof entry.title !== 'string'
           || !('url' in entry) || typeof entry.url !== 'string' || !entry.url.startsWith('/') || entry.url.startsWith('//')
-          || !('kind' in entry) || (entry.kind !== 'page' && entry.kind !== 'post')
-          || !('text' in entry) || typeof entry.text !== 'string') {
+          || !('kind' in entry) || typeof entry.kind !== 'string' || !Object.hasOwn(searchKindLabels, entry.kind)
+          || !('text' in entry) || typeof entry.text !== 'string'
+          || !('tags' in entry) || !Array.isArray(entry.tags) || !entry.tags.every((tag) => typeof tag === 'string')) {
           throw new Error('Invalid search entry');
         }
-        return { title: entry.title, url: entry.url, kind: entry.kind, text: entry.text.normalize('NFKC').toLocaleLowerCase('en') };
+        return { id: entry.id, title: entry.title, url: entry.url, kind: entry.kind as SearchKind, text: entry.text, tags: entry.tags };
       });
+      searchIndex = createSearchIndex(entries);
       searchState = 'ready';
       renderSearch();
     })
@@ -60,12 +69,30 @@ function loadIndex(): void {
     });
 }
 
+function highlightedText(text: string, terms: string[]): DocumentFragment {
+  const fragment = document.createDocumentFragment();
+  let position = 0;
+  for (const match of text.matchAll(/[\p{L}\p{N}\p{M}]+/gu)) {
+    const word = match[0].normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
+    if (!terms.includes(word)) continue;
+    fragment.append(text.slice(position, match.index));
+    const mark = document.createElement('mark');
+    mark.textContent = match[0];
+    fragment.append(mark);
+    position = match.index + match[0].length;
+  }
+  fragment.append(text.slice(position));
+  return fragment;
+}
+
 function renderSearch(): void {
   if (!menu) return;
-  const { input, results, status } = menu;
+  const { input, kind, clear, more, results, status } = menu;
   results.replaceChildren();
   results.hidden = true;
-  results.setAttribute('aria-busy', searchState === 'loading' ? 'true' : 'false');
+  more.hidden = true;
+  clear.hidden = !input.value && kind.value === 'all';
+  results.setAttribute('aria-busy', String(searchState === 'loading'));
   if (searchState === 'loading') {
     status.textContent = 'Loading search…';
     return;
@@ -74,38 +101,38 @@ function renderSearch(): void {
     status.textContent = 'Search could not load. Page links and window recovery are still available below.';
     return;
   }
-  const terms = input.value.normalize('NFKC').toLocaleLowerCase('en').trim().split(/\s+/).filter(Boolean);
-  if (searchState !== 'ready' || terms.length === 0) {
-    status.textContent = 'Search pages and published posts.';
+  if (!searchIndex || (!input.value.trim() && kind.value === 'all')) {
+    status.textContent = 'Search the site. Typos and partial words work too.';
     return;
   }
-
-  const matches: SearchEntry[] = [];
-  let count = 0;
-  for (const entry of entries) {
-    if (!terms.every((term) => entry.text.includes(term))) continue;
-    count += 1;
-    if (matches.length < 10) matches.push(entry);
-  }
-  status.textContent = count === 0
-    ? 'No matching pages or posts.'
-    : count > 10 ? `Showing the first 10 of ${count} results. Refine your search to narrow them down.`
+  const matches = searchIndex.search(input.value, kind.value as SearchKind | 'all');
+  const count = matches.length;
+  status.textContent = count === 0 ? 'No matching content.'
+    : count > resultLimit ? `Showing ${resultLimit} of ${count} results, ranked by relevance.`
       : `${count} ${count === 1 ? 'result' : 'results'}.`;
   const fragment = document.createDocumentFragment();
-  for (const entry of matches) {
+  for (const entry of matches.slice(0, resultLimit)) {
     const item = document.createElement('li');
     const link = document.createElement('a');
     link.href = entry.url;
     const title = document.createElement('span');
-    title.textContent = entry.title;
-    const kind = document.createElement('small');
-    kind.textContent = entry.kind === 'post' ? 'Post' : 'Page';
-    link.append(title, kind);
+    title.className = 'start-result-title';
+    title.append(highlightedText(entry.title, entry.terms));
+    const category = document.createElement('small');
+    category.textContent = searchKindLabels[entry.kind];
+    link.append(title, category);
+    if (entry.snippet) {
+      const snippet = document.createElement('span');
+      snippet.className = 'start-result-snippet';
+      snippet.append(highlightedText(entry.snippet, entry.terms));
+      link.append(snippet);
+    }
     item.append(link);
     fragment.append(item);
   }
   results.append(fragment);
   results.hidden = count === 0;
+  more.hidden = count <= resultLimit;
 }
 
 function renderWindows(): void {
@@ -174,6 +201,9 @@ function initializeMenu(): void {
     dialog,
     input: dialog.querySelector<HTMLInputElement>('#start-query')!,
     form: dialog.querySelector<HTMLFormElement>('[data-start-search]')!,
+    kind: dialog.querySelector<HTMLSelectElement>('[data-start-kind]')!,
+    clear: dialog.querySelector<HTMLButtonElement>('[data-clear-start-search]')!,
+    more: dialog.querySelector<HTMLButtonElement>('[data-more-start-results]')!,
     results: dialog.querySelector<HTMLUListElement>('[data-start-results]')!,
     status: dialog.querySelector<HTMLElement>('#start-search-status')!,
     windows: dialog.querySelector<HTMLUListElement>('[data-start-windows]')!,
@@ -227,6 +257,21 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (!dialog.contains(event.target)) return;
+  if (event.target.closest('[data-clear-start-search]')) {
+    menu.input.value = '';
+    menu.kind.value = 'all';
+    resultLimit = 10;
+    renderSearch();
+    menu.input.focus();
+    return;
+  }
+  if (event.target.closest('[data-more-start-results]')) {
+    const next = resultLimit;
+    resultLimit += 10;
+    renderSearch();
+    menu.results.querySelectorAll<HTMLAnchorElement>('a')[next]?.focus();
+    return;
+  }
   if (event.target.closest('[data-close-start]')) {
     dialog.close();
     return;
@@ -267,29 +312,46 @@ document.addEventListener('close', (event) => {
 }, { ...listenerOptions, capture: true });
 
 document.addEventListener('input', (event) => {
-  if (event.target === menu?.input) renderSearch();
+  if (event.target === menu?.input) { resultLimit = 10; renderSearch(); }
+}, listenerOptions);
+
+document.addEventListener('change', (event) => {
+  if (event.target === menu?.kind) { resultLimit = 10; renderSearch(); }
 }, listenerOptions);
 
 document.addEventListener('submit', (event) => {
   if (!menu || event.target !== menu.form) return;
   event.preventDefault();
-  menu.results.querySelector<HTMLAnchorElement>('a')?.focus();
+  menu.results.querySelector<HTMLAnchorElement>('a')?.click();
 }, listenerOptions);
 
 document.addEventListener('keydown', (event) => {
+  if (!event.defaultPrevented && !event.isComposing && !event.altKey && !event.ctrlKey && !event.metaKey && menu?.dialog.open) {
+    const links = Array.from(menu.results.querySelectorAll<HTMLAnchorElement>('a'));
+    const active = document.activeElement;
+    let destination: HTMLElement | undefined;
+    if (active === menu.input && event.key === 'ArrowDown') destination = links[0];
+    else if (active === menu.input && event.key === 'ArrowUp') destination = links[links.length - 1];
+    else if (active instanceof HTMLAnchorElement && links.includes(active)) {
+      const index = links.indexOf(active);
+      if (event.key === 'ArrowDown') destination = links[Math.min(index + 1, links.length - 1)];
+      else if (event.key === 'ArrowUp') destination = index === 0 ? menu.input : links[index - 1];
+      else if (event.key === 'Home') destination = links[0];
+      else if (event.key === 'End') destination = links[links.length - 1];
+    }
+    if (destination) {
+      event.preventDefault();
+      destination.focus();
+      destination.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+  }
+  if (handleControlKeydown(event)) { navigationPrefixExpires = 0; return; }
   if (event.defaultPrevented || event.isComposing || event.repeat) return;
   const key = event.key.toLowerCase();
   const searchShortcut = key === 'k' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
   if ((event.altKey || event.ctrlKey || event.metaKey) && !searchShortcut) {
     navigationPrefixExpires = 0;
-    return;
-  }
-  if (event.key === 'ArrowDown' && menu?.dialog.open && event.target === menu.input) {
-    const firstResult = menu.results.querySelector<HTMLAnchorElement>('a');
-    if (firstResult) {
-      event.preventDefault();
-      firstResult.focus();
-    }
     return;
   }
   if (event.target instanceof HTMLElement

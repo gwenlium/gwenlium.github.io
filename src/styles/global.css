@@ -18,7 +18,7 @@
   --pink: #ecd3d9;
   --lavender: #dcd4e8;
   --font-ui: 'Departure Mono', 'Courier New', monospace;
-  --font-reading: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-reading: var(--font-ui);
   --shadow: 3px 4px 0 #374e3424, 0 10px 30px #374e340a;
   --bevel-light: #fffff1;
   --bevel-dark: #71866a;
@@ -76,7 +76,7 @@
   }
 }
 
-:root[data-reading='pixel'] { --font-reading: var(--font-ui); }
+:root[data-reading='readable'] { --font-reading: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 * { box-sizing: border-box; }
 html { min-width: 280px; height: 100%; overflow: hidden; }
 body {
@@ -167,6 +167,8 @@ summary { cursor: pointer; }
   box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark), 2px 2px 0 #374e341a;
 }
 .brand-caret { color: var(--muted); margin-left: 3px; }
+.text-caret { display: inline-block; animation: text-caret-blink 1s step-end infinite; }
+@keyframes text-caret-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 .site-status { display: inline-flex; align-items: center; gap: .65rem; max-width: 24rem; color: var(--muted); font-size: 11px; }
 .site-status i { width: 6px; height: 6px; background: var(--accent-ink); flex-shrink: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--sage) 65%, transparent); }
 #page-scroll { min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; scroll-padding-block: 1rem; padding: .65rem .5rem 1.2rem; }
@@ -205,9 +207,6 @@ summary { cursor: pointer; }
 .footer-link { display: inline-flex; align-items: center; gap: .4rem; position: relative; min-height: 32px; padding: .3rem .4rem .3rem 1rem; border: 0; font-size: 11px; line-height: 1.4; text-decoration: none; white-space: nowrap; }
 .footer-link:hover { color: var(--accent-ink); text-decoration: none; }
 .footer-link[aria-current='page'] { color: var(--accent-ink); }
-.nav-cursor { position: absolute; left: .2rem; opacity: 0; font-size: 14px; transform: translateX(-2px); transition: opacity 120ms; }
-.footer-link:is(:hover, :focus-visible, [aria-current='page']) .nav-cursor { opacity: 1; animation: jrpg-caret 1.1s ease-in-out infinite; }
-@keyframes jrpg-caret { 0%, 100% { opacity: 1; transform: translateX(-2px); } 50% { opacity: .72; transform: translateX(2px); } }
 
 .page-heading { margin-bottom: 1.7rem; }
 h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); letter-spacing: -.045em; margin-top: 0; }

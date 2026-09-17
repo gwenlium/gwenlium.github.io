@@ -22,6 +22,9 @@ let frame = 0;
 let lastFrame = 0;
 let elapsed = 18;
 let parallaxY = 0;
+let activeWindow: HTMLElement | null = null;
+let scrollSource: HTMLElement | null = null;
+const scrollResizeObserver = new ResizeObserver(() => updateParallax());
 
 function polygonEdgeDistance(sides: number, radius: number, rotation: number, direction: number): number {
   const sector = tau / sides;
@@ -60,14 +63,16 @@ class BackgroundViewport {
     const height = Math.round(bounds.height);
     // Bound pixel memory as well as DPR, including ultrawide / high-density screens.
     const ratio = Math.min(devicePixelRatio || 1, 1.5, Math.sqrt(2_400_000 / Math.max(1, width * height)));
-    if (width === this.width && height === this.height && ratio === this.ratio) return;
-    this.width = width;
-    this.height = height;
-    this.ratio = ratio;
-    this.canvas.width = Math.round(width * ratio);
-    this.canvas.height = Math.round(height * ratio);
-    this.context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    this.rebuild();
+    if (width !== this.width || height !== this.height || ratio !== this.ratio) {
+      this.width = width;
+      this.height = height;
+      this.ratio = ratio;
+      this.canvas.width = Math.round(width * ratio);
+      this.canvas.height = Math.round(height * ratio);
+      this.context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      this.rebuild();
+    }
+    // Static modes also need repainting on resize and when a page becomes visible again.
     this.draw(reduced ? 18 : elapsed);
     schedule();
   }
@@ -375,9 +380,58 @@ function animate(timestamp: number): void {
   frame = requestAnimationFrame(animate);
 }
 
+function visibleWindow(element: HTMLElement): boolean {
+  return element.isConnected && !element.closest('[hidden], [inert]')
+    && element.getClientRects().length > 0 && getComputedStyle(element).visibility === 'visible';
+}
+
+function activateWindow(event: Event): void {
+  if (!(event.target instanceof Element)) return;
+  const next = event.target.closest<HTMLElement>('[data-desktop-window]');
+  if (next && visibleWindow(next)) activeWindow = next;
+  else if (event.target.closest('#page-scroll')) activeWindow = null;
+  else return;
+  updateParallax();
+}
+
+function onScroll(event: Event): void {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (target.id === 'page-scroll') activeWindow = null;
+  else {
+    const window = target.parentElement;
+    if (!target.matches('.window-body, .player-body')
+      || !window?.matches('[data-desktop-window]:is([data-window-floating], [data-window-sized])') || !visibleWindow(window)) return;
+    activeWindow = window;
+  }
+  updateParallax();
+}
+
 function updateParallax(): void {
-  const scrollTop = document.getElementById('page-scroll')?.scrollTop ?? 0;
-  parallaxY = reduced || mode === 'off' || forcedColors.matches ? 0 : -Math.min(Math.max(scrollTop, 0), 1600) * .028;
+  if (activeWindow && !visibleWindow(activeWindow)) {
+    activeWindow = null;
+    let layer = -Infinity;
+    for (const candidate of document.querySelectorAll<HTMLElement>('[data-desktop-window]')) {
+      const nextLayer = Number(candidate.style.getPropertyValue('--window-layer'));
+      if (nextLayer >= layer && visibleWindow(candidate)) {
+        activeWindow = candidate;
+        layer = nextLayer;
+      }
+    }
+  }
+  // Resizing detaches a window from page-scroll; its body then owns the scroll offset.
+  const nextSource = activeWindow?.matches('[data-window-floating], [data-window-sized]')
+    ? activeWindow.querySelector<HTMLElement>(':scope > .window-body, :scope > .player-body')
+    : document.getElementById('page-scroll');
+  if (scrollSource !== nextSource) {
+    scrollResizeObserver.disconnect();
+    scrollSource = nextSource;
+    if (scrollSource) scrollResizeObserver.observe(scrollSource);
+  }
+  const scrollTop = scrollSource?.scrollTop ?? 0;
+  const nextParallax = reduced || mode === 'off' || forcedColors.matches ? 0 : -Math.min(Math.max(scrollTop, 0), 1600) * .028;
+  if (nextParallax === parallaxY) return;
+  parallaxY = nextParallax;
   // The soft color field moves more slowly than the pattern, without extra canvases.
   root.style.setProperty('--background-parallax-y', `${parallaxY}px`);
   if (mode === 'checker' && !document.hidden) {
@@ -409,6 +463,12 @@ function applySettings(): void {
   schedule();
 }
 
+function refresh(): void {
+  updateParallax();
+  for (const viewport of viewports) viewport.resize();
+  schedule();
+}
+
 function syncViewports(): void {
   for (let index = viewports.length - 1; index >= 0; index--) {
     if (!viewports[index].canvas.isConnected) {
@@ -428,28 +488,39 @@ function syncViewports(): void {
 
 const settingsObserver = new MutationObserver(applySettings);
 settingsObserver.observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-page-theme', 'data-motion', 'data-background-active'] });
-// Removal outside ClientRouter also releases each viewport's observers and pixel buffer.
-const removalObserver = new MutationObserver(() => {
+// Follow ownership and visibility across portals and swaps, including body replacement.
+const documentObserver = new MutationObserver((records) => {
   for (const viewport of viewports) {
     if (!viewport.canvas.isConnected) {
       syncViewports();
       return;
     }
   }
+  if (records.some((record) => record.type === 'attributes' && record.target instanceof HTMLElement
+    && record.target.matches('[data-desktop-window]')
+    && record.oldValue !== record.target.getAttribute(record.attributeName!))
+    || (activeWindow && !activeWindow.isConnected)) updateParallax();
 });
-removalObserver.observe(document.body, { childList: true, subtree: true });
+documentObserver.observe(root, {
+  childList: true, subtree: true, attributes: true, attributeOldValue: true,
+  attributeFilter: ['data-window-floating', 'data-window-sized', 'hidden', 'inert'],
+});
 
 document.addEventListener('astro:after-swap', syncViewports, listenerOptions);
 document.addEventListener('astro:page-load', syncViewports, listenerOptions);
-document.addEventListener('visibilitychange', schedule, listenerOptions);
+document.addEventListener('visibilitychange', refresh, listenerOptions);
 forcedColors.addEventListener('change', applySettings, listenerOptions);
 darkScheme.addEventListener('change', applySettings, listenerOptions);
 window.addEventListener('pagehide', stop, listenerOptions);
-window.addEventListener('pageshow', schedule, listenerOptions);
+window.addEventListener('pageshow', refresh, listenerOptions);
 document.addEventListener('gwenlium:viewport-scroll', updateParallax, listenerOptions);
-window.addEventListener('resize', () => {
-  for (const viewport of viewports) viewport.resize();
-}, listenerOptions);
+document.addEventListener('gwenlium:windows-changed', updateParallax, listenerOptions);
+document.addEventListener('pointerdown', activateWindow, listenerOptions);
+document.addEventListener('focusin', activateWindow, listenerOptions);
+// Element scroll does not bubble, including bodies moved out of the page viewport.
+document.addEventListener('scroll', onScroll, { ...listenerOptions, capture: true, passive: true });
+window.addEventListener('resize', refresh, listenerOptions);
+window.visualViewport?.addEventListener('resize', refresh, listenerOptions);
 
 syncViewports();
 
@@ -457,7 +528,9 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   stop();
   lifetime.abort();
   settingsObserver.disconnect();
-  removalObserver.disconnect();
+  documentObserver.disconnect();
+  scrollResizeObserver.disconnect();
+  activeWindow = scrollSource = null;
   visibility.disconnect();
   for (const viewport of viewports) viewport.destroy();
   viewports.length = 0;

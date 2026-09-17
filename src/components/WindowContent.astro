@@ -1,0 +1,143 @@
+---
+import { createMarkdownProcessor } from '@astrojs/markdown-remark';
+import { load } from 'cheerio';
+import Media from './Media.astro';
+import PostCard from './PostCard.astro';
+import SubscribeForm from './SubscribeForm.astro';
+import Icon from './Icon.astro';
+import { getPosts } from '../lib/content';
+import { gallery, tracks } from '../lib/settings';
+import type { WindowDefinition } from '../lib/windows';
+import rehypeMedia from '../plugins/rehype-media.mjs';
+
+interface Props { definition: WindowDefinition }
+const { definition } = Astro.props;
+
+function limitItems<T>(items: T[]): T[] {
+  return definition.limit > 0 ? items.slice(0, definition.limit) : items;
+}
+
+function selectItems<T>(items: T[], getId: (item: T) => string): T[] {
+  if (!definition.items.length) return limitItems(items);
+  const byId = new Map(items.map((item) => [getId(item), item]));
+  return limitItems(definition.items.flatMap((id) => {
+    const item = byId.get(id);
+    return item === undefined ? [] : [item];
+  }));
+}
+
+let body = '';
+if (definition.content === 'text' && definition.body.trim()) {
+  const markdown = await createMarkdownProcessor({
+    rehypePlugins: [rehypeMedia],
+    remarkRehype: { allowDangerousHtml: false },
+  });
+  const rendered = await markdown.render(definition.body);
+  const $ = load(rendered.code, {}, false);
+  const ids = new Map<string, string>();
+  // Headings and footnotes can repeat in other windows or the page's own Markdown.
+  $('[id]').each((index, element) => {
+    const node = $(element);
+    const original = node.attr('id')!;
+    const scoped = `window-${definition.id}-content-${index}`;
+    if (!ids.has(original)) ids.set(original, scoped);
+    node.attr('id', scoped);
+  });
+  $('[href^="#"]').each((_, element) => {
+    const node = $(element);
+    const fragment = node.attr('href')!.slice(1);
+    let original = fragment;
+    try { original = decodeURIComponent(fragment); } catch { /* Keep a literal authored fragment. */ }
+    const scoped = ids.get(original);
+    if (scoped) node.attr('href', `#${scoped}`);
+  });
+  $('[aria-describedby], [aria-labelledby], [for]').each((_, element) => {
+    const node = $(element);
+    for (const attribute of ['aria-describedby', 'aria-labelledby', 'for']) {
+      const references = node.attr(attribute);
+      if (references) node.attr(attribute, references.split(/\s+/).map((id) => ids.get(id) ?? id).join(' '));
+    }
+  });
+  body = $.html();
+}
+
+const posts = definition.content === 'devlog' ? selectItems(await getPosts(), (post) => post.data.permalink) : [];
+const galleryItems = definition.content === 'gallery' ? selectItems(gallery, (item) => item.id) : [];
+const musicTracks = definition.content === 'music' ? selectItems(tracks, (track) => track.id) : [];
+---
+
+{definition.content === 'text' && <div class="prose window-text" set:html={body} />}
+
+{definition.content === 'media' && (
+  definition.media.length ? <div class="window-media-list">{limitItems(definition.media).map((media) => <Media {...media} />)}</div>
+    : <p class="empty-state">No media published yet.</p>
+)}
+
+{definition.content === 'links' && (
+  definition.links.length ? <ul class="window-links">{limitItems(definition.links).map((link) => (
+    <li><a href={link.url}>{link.label}</a></li>
+  ))}</ul> : <p class="empty-state">No links published yet.</p>
+)}
+
+{definition.content === 'devlog' && (
+  posts.length ? <div class="window-posts">{posts.map((post) => <PostCard post={post} />)}</div>
+    : <p class="empty-state">No entries published yet.</p>
+)}
+
+{definition.content === 'gallery' && (
+  galleryItems.length ? <div class="window-gallery">{galleryItems.map((item) => (
+    <article class="window-gallery-item">
+      <h2>{item.title}</h2>
+      <Media src={item.src} alt={item.alt} caption={item.caption} type={item.type} poster={item.poster} />
+    </article>
+  ))}</div> : <p class="empty-state">No work published yet.</p>
+)}
+
+{definition.content === 'music' && (
+  musicTracks.length ? <ol class="window-tracks">{musicTracks.map((track, index) => (
+    <li class="window-track" data-track-row data-track-id={track.id}>
+      <span class="window-track-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+      <div class:list={['window-track-cover', { 'window-track-cover--empty': !track.cover }]}>
+        {track.cover ? <Media src={track.cover} alt={track.coverAlt} sizes="56px" /> : <Icon name="music" size={24} />}
+      </div>
+      <div class="window-track-meta">
+        <h2>{track.title}</h2>
+        <p data-track-state>{track.src ? 'Ready' : 'Audio unavailable'}</p>
+      </div>
+      <button type="button" class="button window-track-play" data-play-track={track.id} aria-label={`Play ${track.title}`} aria-pressed="false" disabled={!track.src}>
+        <span data-track-button-label>Play</span>
+      </button>
+    </li>
+  ))}</ol> : <p class="empty-state">No tracks published yet.</p>
+)}
+
+{definition.content === 'subscribe' && <SubscribeForm idPrefix={`window-${definition.id}`} />}
+
+<style>
+  .window-text, .window-posts { min-width: 0; }
+  .window-media-list { display: grid; gap: 1.5rem; min-width: 0; }
+  .window-links { display: grid; gap: .65rem; margin: 0; padding: 0; list-style: none; }
+  .window-links a { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--font-reading); line-height: 1.6; overflow-wrap: anywhere; text-underline-offset: .2em; }
+  .window-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 1.5rem; align-items: start; }
+  .window-gallery-item { min-width: 0; }
+  .window-gallery-item h2 { margin: 0 0 .8rem; font-size: .9rem; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
+  .window-gallery-item :global(img) { max-height: 470px; object-fit: contain; }
+  .window-tracks { margin: 0; padding: 0; list-style: none; }
+  .window-track { display: flex; flex-wrap: wrap; align-items: center; gap: .8rem; padding: 1rem 0; border-bottom: 1px solid var(--line); }
+  .window-track:first-child { padding-top: 0; }
+  .window-track:last-child { padding-bottom: 0; border-bottom: 0; }
+  .window-track-number { flex-shrink: 0; width: 2ch; color: var(--muted); font-size: .7rem; }
+  .window-track-cover { flex-shrink: 0; width: 56px; padding: .2rem; background: var(--surface-raised); border: 1px solid var(--line); }
+  .window-track-cover--empty { display: grid; place-items: center; aspect-ratio: 1; color: var(--muted); background: linear-gradient(140deg, var(--sage), var(--lavender)); }
+  .window-track-cover :global(img) { aspect-ratio: 1; object-fit: cover; }
+  .window-track-meta { flex: 1 1 8rem; min-width: 0; }
+  .window-track-meta h2 { margin: 0; font-size: .85rem; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
+  .window-track-meta p { margin: .5rem 0 0; color: var(--muted); font-size: .65rem; }
+  .window-track-play { min-width: 5rem; min-height: 44px; border-radius: 0; font: inherit; font-size: .7rem; cursor: pointer; }
+  .window-track-play[aria-pressed='true'] { background: var(--ink); color: var(--surface); }
+  .window-track-play:disabled { opacity: .45; cursor: default; transform: none; }
+  .empty-state { margin: 0; }
+  @media (max-width: 640px) {
+    .window-media-list, .window-gallery { gap: 1rem; }
+  }
+</style>

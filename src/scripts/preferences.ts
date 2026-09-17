@@ -17,7 +17,7 @@ type Preferences = {
 type BeforeSwapEvent = Event & { newDocument: Document };
 
 const storageKey = 'gwenlium:preferences';
-const defaults: Preferences = { theme: 'system', motion: 'system', reading: 'readable', background: 'auto' };
+const defaults: Preferences = { theme: 'system', motion: 'system', reading: 'pixel', background: 'auto' };
 // The first-paint script chooses once; this value survives all ClientRouter swaps.
 const autoBackground = document.documentElement.dataset.backgroundAuto || 'dots';
 const darkScheme = window.matchMedia('(prefers-color-scheme: dark)');
@@ -47,7 +47,7 @@ function readPreferences(fallback: Preferences): Preferences {
   return {
     theme: value.theme === 'light' || value.theme === 'dark' ? value.theme : 'system',
     motion: value.motion === 'full' || value.motion === 'reduced' ? value.motion : 'system',
-    reading: value.reading === 'pixel' ? 'pixel' : 'readable',
+    reading: value.reading === 'readable' ? 'readable' : 'pixel',
     background: typeof value.background === 'string' && Object.hasOwn(backgroundOptions, value.background)
       ? backgroundOptions[value.background] ?? 'auto'
       : 'auto',

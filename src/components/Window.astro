@@ -1,17 +1,18 @@
 ---
+import { getWindowDefinition } from '../lib/windows';
+import WindowContent from './WindowContent.astro';
+
 interface Props {
-  title: string;
-  id?: string;
+  windowId: string;
   class?: string;
-  tone?: 'sage' | 'pink' | 'lavender';
-  floating?: boolean;
-  initiallyClosed?: boolean;
 }
 
-const { title, id, class: className, tone = 'sage', floating = false, initiallyClosed = false } = Astro.props;
+const { windowId, class: className } = Astro.props;
+const definition = getWindowDefinition(windowId);
+const title = definition?.title ?? '';
 ---
 
-<section id={id} class:list={['window', `window--${tone}`, className]} aria-label={title} data-desktop-window data-window-title={title} data-window-state={initiallyClosed ? 'closed' : 'normal'} data-window-default-floating={floating || undefined} data-window-initial-state={initiallyClosed ? 'closed' : undefined} hidden={initiallyClosed} tabindex="-1">
+{definition?.enabled && <section id={definition.id} class:list={['window', `window--${definition.tone}`, className]} aria-label={title} data-desktop-window data-window-title={title} data-window-state={definition.initiallyClosed ? 'closed' : 'normal'} data-window-default-floating={definition.floating || undefined} data-window-initial-state={definition.initiallyClosed ? 'closed' : undefined} data-window-sized={definition.height > 0 || undefined} hidden={definition.initiallyClosed} tabindex="-1" style={{ width: definition.width > 0 ? `min(${definition.width}px, 100%)` : undefined, height: definition.height > 0 ? `${definition.height}px` : undefined }}>
   <div class="window-titlebar">
     <span class="window-titlebar__mark" aria-hidden="true"></span>
     <span class="window-titlebar__title" title={title}>{title}</span>
@@ -28,8 +29,8 @@ const { title, id, class: className, tone = 'sage', floating = false, initiallyC
       </button>
     </div>
   </div>
-  <div class="window-body"><slot /></div>
-</section>
+  <div class="window-body">{definition.content === 'default' ? <slot /> : <WindowContent definition={definition} />}</div>
+</section>}
 
 <script>
   import '../scripts/windows';
@@ -45,9 +46,9 @@ const { title, id, class: className, tone = 'sage', floating = false, initiallyC
   .window-control--close { background: color-mix(in srgb, var(--pink) 75%, var(--surface)); }
   .window-control--close:hover { background: var(--pink); }
   .window-control__restore { display: none; }
-  .window[data-window-floating] { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-  .window[data-window-floating] > .window-titlebar { flex-shrink: 0; }
-  .window[data-window-floating] > .window-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scroll-padding-block: 1rem; }
+  .window:is([data-window-floating], [data-window-sized]) { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .window:is([data-window-floating], [data-window-sized]) > .window-titlebar { flex-shrink: 0; }
+  .window:is([data-window-floating], [data-window-sized]) > .window-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scroll-padding-block: 1rem; }
   .window[data-window-state='maximized'] .window-control__maximize { display: none; }
   .window[data-window-state='maximized'] .window-control__restore { display: block; }
   .window[data-window-floating]::backdrop { display: none; }

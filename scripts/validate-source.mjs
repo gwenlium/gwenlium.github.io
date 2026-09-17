@@ -6,6 +6,7 @@ import matter from 'gray-matter';
 import { parse as parseYaml } from 'yaml';
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import { load } from 'cheerio';
+import { builtinWindowPages, systemWindowIds, windowContents, windowPages, windowTones } from '../src/lib/window-catalogue.mjs';
 
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 export const siteOrigin = 'https://gwenlium.dev';
@@ -309,7 +310,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
       if (element.tagName === 'img' && (node.attr('src') || node.attr('srcset'))) text(node.attr('alt'), file, `${field} <img>[alt]`, true);
     });
   };
-  const markdown = (source, file, base) => {
+  const markdown = (source, file, base, prefix = 'body') => {
     const tree = fromMarkdown(source);
     const definitions = new Map();
     const visit = (node, callback) => {
@@ -320,7 +321,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
       if (node.type === 'definition' && !definitions.has(node.identifier)) definitions.set(node.identifier, node);
     });
     visit(tree, (node) => {
-      const field = `body:${node.position?.start.line ?? 1}`;
+      const field = `${prefix}:${node.position?.start.line ?? 1}`;
       if (node.type === 'link' || node.type === 'image' || node.type === 'definition') {
         url(node.url, file, field, { media: node.type === 'image', kind: node.type === 'image' ? 'image' : undefined, base, required: true });
       }
@@ -435,6 +436,95 @@ export function validateSource(root = projectRoot, now = new Date()) {
       });
     }
   }
+  const windows = json('windows');
+  if (windows) {
+    const { file, value } = windows;
+    if (!Array.isArray(value.windows)) report(file, 'windows', 'Use an array of window definitions. Keep the required system windows.');
+    else {
+      const ids = new Set();
+      const selections = {
+        devlog: new Set(posts.filter((post) => isPublishedPost(post.data, now)).map((post) => post.data.permalink)),
+        gallery: new Set(Array.isArray(art?.value.items) ? art.value.items.filter(isObject).map((item) => item.id) : []),
+        music: new Set(Array.isArray(music?.value.tracks) ? music.value.tracks.filter(isObject).map((track) => track.id) : []),
+      };
+      const stringFields = (object, fields, prefix) => {
+        for (const key of fields) {
+          if (typeof object[key] !== 'string') report(file, `${prefix}.${key}`, 'Provide a text string; use an empty string for unused text fields.');
+        }
+      };
+      value.windows.forEach((window, index) => {
+        const field = `windows[${index}]`;
+        if (!isObject(window)) return report(file, field, 'Use a window object.');
+        const builtin = typeof window.id === 'string' && Object.hasOwn(builtinWindowPages, window.id);
+        const system = systemWindowIds.includes(window.id);
+        if (typeof window.id !== 'string' || !permalinkPattern.test(window.id)) {
+          report(file, `${field}.id`, 'Use a unique lowercase ID with letters, digits and single hyphens; new window IDs must start with custom-.');
+        } else {
+          if (ids.has(window.id)) report(file, `${field}.id`, `Duplicate window ID ${JSON.stringify(window.id)}. Give every window a unique ID.`);
+          ids.add(window.id);
+          if (!builtin && !window.id.startsWith('custom-')) report(file, `${field}.id`, 'New window IDs must start with custom-. Do not rename built-in windows.');
+        }
+        if (!windowPages.includes(window.page)) report(file, `${field}.page`, `Choose one of: ${windowPages.join(', ')}.`);
+        if (builtin && window.page !== builtinWindowPages[window.id]) report(file, `${field}.page`, `Built-in window ${window.id} must stay on page ${builtinWindowPages[window.id]}. Add a custom window for another page.`);
+        for (const key of ['enabled', 'floating', 'initiallyClosed']) {
+          if (typeof window[key] !== 'boolean') report(file, `${field}.${key}`, 'Provide the JSON boolean true or false.');
+        }
+        stringFields(window, ['title', 'body'], field);
+        if (window.enabled === true && typeof window.title === 'string') text(window.title, file, `${field}.title`, true);
+        if (!windowTones.includes(window.tone)) report(file, `${field}.tone`, `Choose one of: ${windowTones.join(', ')}.`);
+        for (const key of ['width', 'height', 'limit']) {
+          if (!Number.isSafeInteger(window[key]) || window[key] < 0) report(file, `${field}.${key}`, `Provide a nonnegative whole number; 0 means ${key === 'limit' ? 'all items' : 'automatic size'}.`);
+        }
+        if (!windowContents.includes(window.content)) report(file, `${field}.content`, `Choose one of: ${windowContents.join(', ')}.`);
+        if (!builtin && window.content === 'default') report(file, `${field}.content`, 'Custom windows have no built-in content. Choose text, media, links, devlog, gallery, music or subscribe.');
+        if (system) {
+          if (window.enabled !== true) report(file, `${field}.enabled`, `Keep ${window.id} enabled so site controls remain available.`);
+          if (window.content !== 'default') report(file, `${field}.content`, `Keep default content for ${window.id}; its working controls cannot be replaced.`);
+          if (window.floating !== true) report(file, `${field}.floating`, `Keep ${window.id} floating; system controls cannot be placed in the page layout.`);
+          if (window.id === 'start-menu' && window.initiallyClosed !== true) report(file, `${field}.initiallyClosed`, 'Keep start-menu initially closed; visitors open it with the Start button.');
+        }
+        if (!Array.isArray(window.media)) report(file, `${field}.media`, 'Provide an array of media objects; use [] when unused.');
+        else window.media.forEach((item, mediaIndex) => {
+          const key = `${field}.media[${mediaIndex}]`;
+          if (!isObject(item)) return report(file, key, 'Use a media object with type, src, alt, caption and poster fields.');
+          if (!['image', 'video', 'audio'].includes(item.type)) report(file, `${key}.type`, 'Choose image, video or audio.');
+          stringFields(item, ['src', 'alt', 'caption', 'poster'], key);
+        });
+        if (!Array.isArray(window.links)) report(file, `${field}.links`, 'Provide an array of {label, url} links; use [] when unused.');
+        else window.links.forEach((link, linkIndex) => {
+          const key = `${field}.links[${linkIndex}]`;
+          if (!isObject(link)) return report(file, key, 'Use an object with label and url.');
+          stringFields(link, ['label', 'url'], key);
+        });
+        if (!Array.isArray(window.items)) report(file, `${field}.items`, 'Provide an array of selected IDs; use [] for all available items or for content without item selections.');
+        else {
+          const selected = new Set();
+          const available = typeof window.content === 'string' && Object.hasOwn(selections, window.content) ? selections[window.content] : undefined;
+          window.items.forEach((id, itemIndex) => {
+            const key = `${field}.items[${itemIndex}]`;
+            if (typeof id !== 'string' || !id.trim()) return report(file, key, 'Provide a nonempty item ID.');
+            if (selected.has(id)) report(file, key, `Duplicate selected ID ${JSON.stringify(id)}. Select each item only once.`);
+            selected.add(id);
+            if (window.enabled === true && available && !available.has(id)) {
+              report(file, key, window.content === 'devlog'
+                ? `No published post has permalink ${JSON.stringify(id)}. Draft and future posts cannot appear; choose a published permalink or disable this window while preparing it.`
+                : `No ${window.content === 'gallery' ? 'gallery item' : 'music track'} has ID ${JSON.stringify(id)}. Choose an existing ID or disable this window while preparing it.`);
+            }
+          });
+          if (window.enabled === true && window.items.length && !available) report(file, `${field}.items`, 'Item selections only apply to devlog, gallery or music content. Use [] for other content types.');
+        }
+        if (window.enabled !== true) return;
+        const page = windowPages.includes(window.page) ? window.page : 'home';
+        const base = `${siteOrigin}${page === 'home' || page === 'all' ? '/' : page === 'post' ? '/devlog/post/' : page === 'not-found' ? '/404/' : `/${page}/`}`;
+        if (typeof window.body === 'string') markdown(window.body, file, base, `${field}.body`);
+        if (Array.isArray(window.media)) mediaItems(window.media, file, `${field}.media`, { base });
+        if (Array.isArray(window.links)) links(window.links, file, `${field}.links`);
+      });
+      for (const id of systemWindowIds) {
+        if (!ids.has(id)) report(file, 'windows', `Missing required system window ${id}. Restore it with page all, enabled true, floating true and content default.`);
+      }
+    }
+  }
   return { errors, posts: posts.length, published: posts.filter((post) => isPublishedPost(post.data, now)).length };
 }
 
@@ -443,5 +533,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (result.errors.length) {
     console.error(`Source validation failed (${result.errors.length} issue${result.errors.length === 1 ? '' : 's'}):\n${result.errors.map((error) => `  ${error}`).join('\n')}`);
     process.exitCode = 1;
-  } else console.log(`Source validation passed: ${result.published} published of ${result.posts} posts; site, gallery and music checked.`);
+  } else console.log(`Source validation passed: ${result.published} published of ${result.posts} posts; site, gallery, music and windows checked.`);
 }

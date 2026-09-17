@@ -96,7 +96,11 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
     if (!documents.has(file)) {
       const $ = load(fs.readFileSync(file, 'utf8'), { xmlMode: /\.(?:svg|xml)$/i.test(file) });
       const ids = new Set();
-      $('[id]').each((_, element) => ids.add($(element).attr('id')));
+      $('[id]').each((_, element) => {
+        const id = $(element).attr('id');
+        if (ids.has(id)) report(relativeName(root, file), 'id', `Duplicate element ID ${JSON.stringify(id)}. Give repeated windows and controls distinct identifiers.`);
+        ids.add(id);
+      });
       $('a[name]').each((_, element) => ids.add($(element).attr('name')));
       documents.set(file, { $, ids });
     }
@@ -214,6 +218,26 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
     });
   }
 
+  const searchFile = containedFile(directory, '/search-index.json');
+  if (!searchFile) report('dist/search-index.json', 'search', 'Generate the site search index.');
+  else {
+    const name = relativeName(root, searchFile);
+    try {
+      const { entries } = JSON.parse(fs.readFileSync(searchFile, 'utf8'));
+      if (!Array.isArray(entries)) report(name, 'entries', 'Search entries must be an array.');
+      else {
+        const ids = new Set();
+        entries.forEach((entry, index) => {
+          if (!entry || typeof entry.id !== 'string' || !entry.id || ids.has(entry.id)) report(name, `entries[${index}].id`, 'Every search result needs a unique ID.');
+          ids.add(entry?.id);
+          check(entry?.url, name, `entries[${index}].url`, `${siteOrigin}/`, { required: true });
+        });
+      }
+    } catch (error) {
+      report(name, 'search', `Cannot read search index: ${error.message}`);
+    }
+  }
+
   const rssFile = containedFile(directory, '/rss.xml');
   if (!rssFile) report('dist/rss.xml', 'RSS', 'Generate a valid RSS channel, even when there are no published posts.');
   else {
@@ -226,11 +250,25 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
         if (!channel.children(field).length) report(name, `channel.${field}`, `Include the required RSS ${field} element.`);
       }
       if (channel.children('link').length) check(channel.children('link').first().text().trim(), name, 'channel.link', `${siteOrigin}/`, { required: true });
+      const expectedPosts = new Map(posts.filter((post) => isPublishedPost(post.data, now))
+        .map((post) => [new URL(`/devlog/${post.data.permalink}/`, siteOrigin).href, post]));
       channel.children('item').each((index, element) => {
         const item = $(element);
         const field = `item[${index}]`;
         const itemLink = item.children('link').first().text().trim();
         check(itemLink, name, `${field}.link`, `${siteOrigin}/`, { required: true });
+        if (!expectedPosts.delete(itemLink)) report(name, field, 'Feed entry is duplicated or does not match a published post.');
+        const content = item.children('content\\:encoded').text();
+        if (!item.children('content\\:encoded').length) report(name, field, 'Include full article content, not only an excerpt.');
+        let articleFile;
+        try { articleFile = targetFor(new URL(itemLink).pathname); } catch { /* Reported by check above. */ }
+        if (articleFile) {
+          const article = documentFor(articleFile).$;
+          const normalize = (value) => value.replace(/\s+/g, ' ').trim();
+          const articleText = normalize(article('.entry-body').text());
+          const feedText = normalize(load(content, {}, false).text());
+          if (articleText && !feedText.includes(articleText)) report(name, field, 'RSS content is missing article text.');
+        }
         const guid = item.children('guid').first();
         if (guid.length && guid.attr('isPermaLink') !== 'false') check(guid.text().trim(), name, `${field}.guid`, `${siteOrigin}/`, { required: true });
         item.find('enclosure').each((enclosureIndex, enclosure) => check($(enclosure).attr('url'), name, `${field}.enclosure[${enclosureIndex}].url`, itemLink || `${siteOrigin}/`, { media: true, required: true }));
@@ -243,6 +281,7 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
           checkAttributes(load(content, {}, false), `${name} ${field}.${child.tagName}`, base);
         });
       });
+      for (const link of expectedPosts.keys()) report(name, 'RSS', `Missing published post ${link}.`);
       $('*').each((_, element) => {
         if (element.tagName === 'atom:link') check($(element).attr('href'), name, 'atom:link[href]', `${siteOrigin}/`, { required: true });
       });

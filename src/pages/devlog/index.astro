@@ -3,12 +3,15 @@ import SiteLayout from '../../layouts/SiteLayout.astro';
 import Window from '../../components/Window.astro';
 import Icon from '../../components/Icon.astro';
 import PostCard from '../../components/PostCard.astro';
-import { getPosts, postSearchText } from '../../lib/content';
+import { getPosts, postSearchText, postUrl } from '../../lib/content';
 
 const posts = await getPosts();
 const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort((a, b) => a.localeCompare(b, 'en'));
 const searchIndex = posts.map((post) => ({
   id: post.data.permalink,
+  title: post.data.title,
+  url: postUrl(post),
+  kind: 'post',
   tags: post.data.tags,
   text: postSearchText(post),
 }));
@@ -21,11 +24,11 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
   </header>
 
   <div data-devlog>
-    <Window title="devlog / find an entry">
+    <Window windowId="devlog-search">
       <form class="search-form" role="search" action="/devlog/" method="get" data-search-form>
-        <label for="devlog-search">Search entries</label>
+        <label for="devlog-query">Search entries</label>
         <div class="search-row">
-          <div class="search-input"><Icon name="search" size={17} /><input id="devlog-search" name="q" type="search" autocomplete="off" placeholder="Titles, tags, and article text…" aria-controls="devlog-results" /></div>
+          <div class="search-input"><Icon name="search" size={17} /><input id="devlog-query" name="q" type="search" autocomplete="off" maxlength="2048" placeholder="Titles, tags, and article text…" aria-controls="devlog-results" aria-describedby="devlog-search-help" /></div>
           <button class="button" type="submit">Search</button>
           <button class="button button-secondary" type="button" data-clear hidden>Clear</button>
         </div>
@@ -36,9 +39,10 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
       </nav>}
       <p class="result-count" role="status" aria-live="polite" aria-atomic="true" data-result-count>{posts.length} {posts.length === 1 ? 'entry' : 'entries'}</p>
       <noscript><p class="search-note">Search and tag filtering need JavaScript. All published entries are listed below.</p></noscript>
+      <p class="search-note" id="devlog-search-help">Search by relevance, including typos and partial words. Use quotes for an exact phrase or a minus sign to exclude a word.</p>
     </Window>
 
-    <Window title="devlog / entries">
+    <Window windowId="devlog-entries">
       <div id="devlog-results" class="post-list">
         {posts.map((post) => <div class="post-result" data-post-id={post.data.permalink}><PostCard post={post} /></div>)}
       </div>
@@ -55,42 +59,48 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
 </SiteLayout>
 
 <script>
-  type SearchEntry = { id: string; tags: string[]; text: string };
+  import { createSearchIndex } from '../../lib/search';
+  import type { SearchEntry } from '../../lib/search-types';
   let searchController: AbortController | undefined;
 
   function initializeSearch() {
     searchController?.abort();
     const root = document.querySelector<HTMLElement>('[data-devlog]');
     if (!root) return;
+    const form = root.querySelector<HTMLFormElement>('[data-search-form]');
+    const input = form?.querySelector<HTMLInputElement>('input[name="q"]');
+    const clearSearch = form?.querySelector<HTMLButtonElement>('[data-clear]');
+    const count = root.querySelector<HTMLElement>('[data-result-count]');
+    const empty = root.querySelector<HTMLElement>('[data-no-results]');
+    const resultList = root.querySelector<HTMLElement>('#devlog-results');
+    const searchData = root.querySelector<HTMLScriptElement>('#devlog-search-index');
+    if (!form || !input || !clearSearch || !count || !empty || !resultList || !searchData) return;
     searchController = new AbortController();
     const { signal } = searchController;
-    const form = root.querySelector<HTMLFormElement>('[data-search-form]')!;
-    const input = form.querySelector<HTMLInputElement>('input[name="q"]')!;
-    const count = root.querySelector<HTMLElement>('[data-result-count]')!;
-    const empty = root.querySelector<HTMLElement>('[data-no-results]')!;
     const clears = root.querySelectorAll<HTMLButtonElement>('[data-clear]');
     const filters = root.querySelectorAll<HTMLAnchorElement>('[data-tag]');
-    const results = root.querySelectorAll<HTMLElement>('[data-post-id]');
-    const index: SearchEntry[] = JSON.parse(root.querySelector('#devlog-search-index')!.textContent || '[]');
-    const entries = new Map(index.map((entry) => [entry.id, { ...entry, text: entry.text.normalize('NFKC').toLocaleLowerCase('en') }]));
+    const results = resultList.querySelectorAll<HTMLElement>('[data-post-id]');
+    const index: SearchEntry[] = JSON.parse(searchData.textContent || '[]');
+    const search = createSearchIndex(index);
+    const cards = new Map(Array.from(results, (element) => [element.dataset.postId, element]));
     let editingSearch = false;
 
-    function synchronize() {
+    const synchronize = () => {
       const parameters = new URL(location.href).searchParams;
       const query = parameters.get('q') ?? '';
       const tag = parameters.get('tag') ?? '';
       input.value = query;
-      const terms = query.normalize('NFKC').toLocaleLowerCase('en').trim().split(/\s+/).filter(Boolean);
-      let visible = 0;
-      results.forEach((result) => {
-        const entry = entries.get(result.dataset.postId!);
-        const matches = Boolean(entry && (!tag || entry.tags.includes(tag)) && terms.every((term) => entry.text.includes(term)));
-        result.hidden = !matches;
-        if (matches) visible += 1;
-      });
+      const matches = search.search(query, 'post').filter((entry) => !tag || entry.tags.includes(tag));
+      const matchedIds = new Set(matches.map((entry) => entry.id));
+      results.forEach((result) => { result.hidden = !matchedIds.has(result.dataset.postId!); });
+      for (const match of matches) {
+        const card = cards.get(match.id);
+        if (card) resultList.append(card);
+      }
+      const visible = matches.length;
       count.textContent = `${visible} ${visible === 1 ? 'entry' : 'entries'}${query || tag ? ' found' : ''}${tag ? ` · ${tag}` : ''}`;
       empty.hidden = visible > 0 || index.length === 0;
-      clears[0].hidden = !query && !tag;
+      clearSearch.hidden = !query && !tag;
       filters.forEach((filter) => {
         if (filter.dataset.tag === tag) filter.setAttribute('aria-current', 'true');
         else filter.removeAttribute('aria-current');
@@ -99,7 +109,7 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
         if (filter.dataset.tag) target.searchParams.set('tag', filter.dataset.tag);
         filter.href = `${target.pathname}${target.search}`;
       });
-    }
+    };
 
     function setFilters(query: string, tag: string, replace = false) {
       const url = new URL(location.href);
