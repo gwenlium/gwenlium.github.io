@@ -47,7 +47,7 @@ import { tracks } from '../lib/settings';
 <style>
   .page-heading p { max-width: 43rem; color: var(--muted); font-family: var(--font-reading); line-height: 1.7; }
   .track-list { list-style: none; margin: 0; padding: 0; }
-  .track { display: grid; grid-template-columns: 2ch 68px minmax(0, 1fr); align-items: center; gap: 1rem; padding: 1.2rem .6rem; border-bottom: 1px solid var(--line); }
+  .track { display: grid; grid-template-columns: 2ch 68px minmax(0, 1fr); align-items: center; gap: clamp(.75rem, 2cqi, 1rem); padding: clamp(1rem, 3cqi, 1.2rem) .6rem; border-bottom: 1px solid var(--line); }
   .track:first-child { padding-top: .35rem; }
   .track:last-child { border-bottom: 0; padding-bottom: .35rem; }
   .track:has([aria-current='true']) { background: color-mix(in srgb, var(--sage) 30%, var(--surface)); box-shadow: inset 3px 0 var(--line); }
@@ -57,7 +57,7 @@ import { tracks } from '../lib/settings';
   .track-cover--empty { display: grid; place-items: center; aspect-ratio: 1; color: var(--muted); background: linear-gradient(140deg, var(--sage), var(--lavender)); }
   .track-cover :global(img) { aspect-ratio: 1; object-fit: cover; }
   .track-meta { flex: 1; min-width: 0; }
-  .track-meta h2 { font-size: .9rem; font-weight: 400; margin: 0; overflow-wrap: anywhere; }
+  .track-meta h2 { font-size: clamp(.8rem, .7rem + .5cqi, .9rem); font-weight: 400; margin: 0; overflow-wrap: anywhere; }
   .track-meta p { margin: .5rem 0 0; font-size: .65rem; color: var(--muted); }
   .track-actions { grid-column: 3; display: flex; flex-wrap: wrap; gap: .45rem; }
   .track-actions button { min-height: 44px; border-radius: 0; }
@@ -65,11 +65,10 @@ import { tracks } from '../lib/settings';
   .track-play[aria-pressed='true'], [data-track-reaction][aria-pressed='true'] { background: var(--ink); color: var(--surface); }
   .track-actions button:disabled { opacity: .45; cursor: default; transform: none; }
   .empty-state :global(svg) { margin-inline: auto; }
-  @media (max-width: 560px) {
+  @container window-content (max-width: 560px) {
     .track { grid-template-columns: 48px minmax(0, 1fr); gap: .75rem; padding: 1rem .5rem; }
     .track-cover { width: 48px; }
     .track-number { display: none; }
-    .track-meta h2 { font-size: .8rem; }
     .track-play { min-width: 3.5rem; padding-inline: .6rem; }
     .track-actions { grid-column: 1 / -1; }
   }

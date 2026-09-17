@@ -25,10 +25,10 @@ if (site.newsletterFormAction) {
 ) : <p>Email signup is currently unavailable.</p>}
 
 <style>
-  .newsletter-form { display: grid; gap: .8rem; }
-  h2 { margin: 0 0 .5rem; font-size: clamp(1.05rem, 2.5vw, 1.4rem); line-height: 1.5; }
+  .newsletter-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(.65rem, 2.5cqi, .8rem); min-width: 0; overflow-wrap: anywhere; }
+  h2 { margin: 0 0 .5rem; font-size: clamp(1.05rem, .85rem + 1.5cqi, 1.4rem); line-height: 1.5; }
   label { font-size: .75rem; }
   input { width: 100%; min-height: 44px; font-family: var(--font-reading); font-size: 1rem; }
-  button { width: 100%; min-height: 44px; }
+  button { width: 100%; min-width: 0; min-height: 44px; }
   p { margin: .3rem 0 0; color: var(--muted); font-family: var(--font-reading); font-size: .8rem; line-height: 1.65; }
 </style>

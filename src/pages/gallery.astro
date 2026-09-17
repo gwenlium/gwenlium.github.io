@@ -45,20 +45,20 @@ const videos = gallery.filter((item) => item.type === 'video').length;
 </SiteLayout>
 
 <style>
-  .gallery-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding-bottom: 1.2rem; margin-bottom: 1.7rem; border-bottom: 1px solid var(--line); }
+  .gallery-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding-bottom: clamp(.75rem, 3cqi, 1.2rem); margin-bottom: clamp(1rem, 4cqi, 1.7rem); border-bottom: 1px solid var(--line); }
   .gallery-filters { display: flex; flex-wrap: wrap; gap: .5rem; }
   .gallery-filters button { font: inherit; font-size: .7rem; cursor: pointer; }
   .gallery-filters button[aria-pressed='true'] { background: var(--ink); color: var(--surface); }
   .gallery-filters span { font-size: .6rem; opacity: .75; }
   .gallery-toolbar p { font-size: .65rem; color: var(--muted); margin: 0; }
-  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 265px), 1fr)); gap: 1.5rem; align-items: start; }
+  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 265px), 1fr)); gap: clamp(.75rem, 3cqi, 1.5rem); align-items: start; }
   .gallery-item { min-width: 0; border: 1px solid var(--line); border-top-color: var(--surface-raised); border-left-color: var(--surface-raised); background: var(--surface); box-shadow: var(--shadow); }
   .gallery-item[hidden] { display: none; }
   .gallery-item-heading { display: flex; align-items: center; gap: .55rem; padding: .55rem .7rem; background: var(--sage); border-bottom: 1px solid var(--line); }
   .gallery-item:nth-child(3n + 2) .gallery-item-heading { background: var(--pink); }
   .gallery-item:nth-child(3n) .gallery-item-heading { background: var(--lavender); }
-  .gallery-item h2 { margin: 0; font-size: .7rem; font-weight: 400; overflow-wrap: anywhere; }
-  .gallery-item-body { padding: .65rem; }
+  .gallery-item h2 { margin: 0; font-size: clamp(.7rem, .6rem + .3cqi, .8rem); font-weight: 400; overflow-wrap: anywhere; }
+  .gallery-item-body { padding: clamp(.4rem, 2cqi, .65rem); }
   .gallery-item :global(img) { max-height: 470px; object-fit: contain; }
   .empty-state :global(svg) { margin-inline: auto; }
 </style>

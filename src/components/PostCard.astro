@@ -22,19 +22,20 @@ const { title, date, excerpt, cover, coverAlt, tags } = post.data;
 </article>
 
 <style>
-  .post-card { display: grid; gap: 1.2rem; padding: 1.5rem 0; border-bottom: 1px solid var(--line); }
+  .post-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(.75rem, 3cqi, 1.2rem); padding: clamp(1rem, 4cqi, 1.5rem) 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
   .post-card:first-child { padding-top: 0; }
   .post-card:last-child { padding-bottom: 0; border-bottom: 0; }
   .post-details { min-width: 0; }
   time { color: var(--muted); font-size: .72rem; }
-  h2 { margin: .65rem 0; font-size: clamp(1rem, 2vw, 1.35rem); line-height: 1.45; }
+  h2 { margin: .65rem 0; font-size: clamp(1rem, .8rem + 1.5cqi, 1.35rem); line-height: 1.45; }
   h2 a { text-decoration: none; }
   h2 a:hover { text-decoration: underline; text-underline-offset: .2em; }
   .post-excerpt { font-family: var(--font-reading); margin: 0 0 1rem; line-height: 1.8; color: var(--muted); }
   .post-tags { display: flex; flex-wrap: wrap; gap: .4rem; padding: 0; margin: .8rem 0; list-style: none; }
+  .post-tags li { min-width: 0; max-width: 100%; }
   .read-post { display: inline-flex; align-items: center; gap: .5rem; margin-top: .5rem; font-size: .75rem; text-underline-offset: .25em; }
   .post-cover { min-width: 0; }
   .post-cover :global(figure) { margin: 0; }
   .post-cover :global(img) { width: 100%; max-height: 15rem; object-fit: cover; }
-  @media (min-width: 640px) { .has-cover { grid-template-columns: minmax(10rem, 31%) minmax(0, 1fr); } }
+  @container window-content (min-width: 640px) { .has-cover { grid-template-columns: minmax(10rem, 31%) minmax(0, 1fr); } }
 </style>

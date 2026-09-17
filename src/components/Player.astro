@@ -60,8 +60,9 @@ const definition = getWindowDefinition('music-player')!;
     </div>
     <div class="player-seek">
       <label for="player-progress" class="sr-only">Track position</label>
+      <span class="player-time" data-player-elapsed aria-hidden="true" title="Elapsed time">0:00</span>
       <input id="player-progress" data-player-seek type="range" min="0" max="0" step="0.1" value="0" disabled />
-      <span class="player-time" data-player-time aria-hidden="true">0:00 of 0:00</span>
+      <span class="player-time" data-player-remaining aria-hidden="true" title="Time remaining">−0:00</span>
     </div>
     <div class="player-transport" role="group" aria-label="Playback controls">
       <button type="button" class="player-button player-skip" data-player-previous aria-label="Previous track" disabled={availableTracks.length < 2}>
@@ -151,7 +152,8 @@ const definition = getWindowDefinition('music-player')!;
     private cover!: HTMLImageElement;
     private coverFallback!: HTMLElement;
     private coverColors = new Map<string | undefined, string>();
-    private time!: HTMLElement;
+    private elapsed!: HTMLElement;
+    private remaining!: HTMLElement;
     private queue!: HTMLElement;
     private queueToggle!: HTMLButtonElement;
     private pageEvents?: AbortController;
@@ -257,7 +259,8 @@ const definition = getWindowDefinition('music-player')!;
         cover.style.backgroundColor = this.coverColor(cover.dataset.playerFallbackTrack);
       });
       this.updateCover(this.tracks[this.index]);
-      this.time = this.querySelector('[data-player-time]')!;
+      this.elapsed = this.querySelector('[data-player-elapsed]')!;
+      this.remaining = this.querySelector('[data-player-remaining]')!;
       this.queue = this.querySelector('[data-player-queue]')!;
       this.queueToggle = this.querySelector('[data-player-queue-toggle]')!;
       this.panel = this.querySelector('#music-player')!;
@@ -606,8 +609,11 @@ const definition = getWindowDefinition('music-player')!;
       this.seek.disabled = duration <= 0;
       this.seek.max = String(duration);
       this.seek.value = String(position);
-      this.time.textContent = `${this.formatTime(position)} of ${this.formatTime(duration)}`;
-      this.seek.setAttribute('aria-valuetext', `${this.formatTime(position)} of ${this.formatTime(duration)}`);
+      const elapsed = this.formatTime(position);
+      const remaining = this.formatTime(Math.ceil(Math.max(0, duration - position)));
+      this.elapsed.textContent = elapsed;
+      this.remaining.textContent = `−${remaining}`;
+      this.seek.setAttribute('aria-valuetext', `${elapsed} elapsed, ${remaining} remaining`);
     }
 
     private formatTime(seconds: number) {
@@ -626,8 +632,8 @@ const definition = getWindowDefinition('music-player')!;
   .player-titlebar { display: flex; flex-shrink: 0; align-items: center; gap: .6rem; min-height: 36px; padding: .25rem .4rem; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, var(--surface-raised), var(--player-tone)); }
   .player-window-title { display: flex; align-items: center; gap: .35rem; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 11px; }
   .player-window-controls { display: flex; flex-shrink: 0; gap: 3px; margin-left: auto; }
-  .player-body { flex: 1; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; container: music-player / inline-size; }
-  .player-content { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'track' 'actions' 'seek' 'transport' 'tools'; align-items: center; gap: .75rem; width: min(100%, 28rem); margin-inline: auto; padding: .75rem; }
+  .player-body { flex: 1; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; container: music-player / size; }
+  .player-content { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'track' 'actions' 'seek' 'transport' 'tools'; align-items: center; gap: .75rem; width: min(100%, max(16rem, calc(100cqb - 16rem))); margin-inline: auto; padding: .75rem; }
   .player-track { grid-area: track; display: grid; gap: .75rem; min-width: 0; }
   .player-cover { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--line); background: var(--surface-raised); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
   .player-cover img { position: absolute; inset: 3px; display: block; width: calc(100% - 6px); height: calc(100% - 6px); object-fit: contain; }
@@ -635,7 +641,7 @@ const definition = getWindowDefinition('music-player')!;
   .player-cover > span::after { content: attr(aria-label); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
   .player-meta { min-width: 0; display: grid; gap: .3rem; }
   .player-caption { color: var(--muted); font-size: 9px; line-height: 1.1; }
-  .player-title { display: block; overflow-wrap: anywhere; color: var(--ink); font-size: 14px; line-height: 1.5; }
+  .player-title { display: block; overflow-wrap: anywhere; color: var(--ink); font-size: clamp(12px, 10px + 1cqi, 18px); line-height: 1.5; }
   .player-status { font-size: 10px; line-height: 1.4; color: var(--muted); overflow-wrap: anywhere; }
   .player-status--error { color: var(--ink); background: var(--pink); padding: .2rem .3rem; }
   .player-transport { grid-area: transport; display: flex; justify-content: center; align-items: center; gap: 1rem; }
@@ -650,10 +656,10 @@ const definition = getWindowDefinition('music-player')!;
   .player-toggle { min-width: 60px; min-height: 60px; background: linear-gradient(180deg, var(--surface-raised), var(--sage)); }
   .player-toggle > span { display: grid; place-items: center; }
   .player-toggle :global(svg) { width: 24px; height: 24px; }
-  .player-seek { grid-area: seek; display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: .1rem; min-width: 0; }
+  .player-seek { grid-area: seek; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .5rem; min-width: 0; }
   input[type='range'] { min-width: 0; accent-color: var(--accent-ink); height: 22px; margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; }
   .player-seek input { width: 100%; }
-  .player-time { text-align: right; white-space: nowrap; color: var(--muted); font-size: 10px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+  .player-time { white-space: nowrap; color: var(--muted); font-size: 10px; line-height: 1.4; font-variant-numeric: tabular-nums; }
   .player-tools { grid-area: tools; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .65rem; min-width: 0; padding-top: .5rem; border-top: 1px solid var(--line); }
   .player-tools .player-volume { flex: 1 1 8rem; }
   .player-volume { display: flex; align-items: center; gap: .45rem; min-width: 0; font-size: 10px; color: var(--muted); }

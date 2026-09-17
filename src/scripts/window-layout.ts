@@ -97,39 +97,15 @@ function rememberLayout(entry: Layout): void {
 
 function arrangeWindows(): void {
   finishGesture(true);
-  const visible = [...layouts.values()].filter(entry => entry.root.isConnected && !entry.root.hidden && !entry.root.inert
+  const open = [...layouts.values()].filter(entry => entry.root.isConnected && !entry.root.hidden && !entry.root.inert
     && entry.root.getClientRects().length && getComputedStyle(entry.root).visibility !== 'hidden');
-  if (!visible.length) return;
-  visible.sort((a, b) => (a.root.dataset.windowId || '').localeCompare(b.root.dataset.windowId || ''));
-  for (const entry of visible) if (entry.maximized) command(entry, 'restore');
-  const bounds = workspace();
-  const gap = 8;
-  const maxColumns = Math.max(1, Math.floor((bounds.width + gap) / (240 + gap)));
-  const maxRows = Math.max(1, Math.floor((bounds.height + gap) / (140 + gap)));
-  const tiled = visible.length <= maxColumns * maxRows;
-  const columns = Math.min(maxColumns, visible.length, Math.max(Math.ceil(visible.length / maxRows),
-    Math.ceil(Math.sqrt(visible.length * bounds.width / bounds.height))));
-  const rows = Math.ceil(visible.length / columns);
-  // A small screen cannot fit every window without overlap; keep their titlebars accessible.
-  const cascade = Math.max(0, Math.min(bounds.width - 240, bounds.height - 140, (visible.length - 1) * 24));
-  const steps = Math.floor(cascade / 24) + 1;
-  visible.forEach((entry, index) => {
-    cancelWindowAnimation(entry.root);
-    entry.snap = entry.freeRect = entry.beforeMaximum = undefined;
-    if (tiled) {
-      const row = Math.floor(index / columns);
-      const rowCount = Math.min(columns, visible.length - row * columns);
-      const width = (bounds.width - gap * (rowCount - 1)) / rowCount;
-      const height = (bounds.height - gap * (rows - 1)) / rows;
-      entry.rect = { x: bounds.x + (index % columns) * (width + gap), y: bounds.y + row * (height + gap), width, height };
-    } else {
-      const offset = (index % steps) * 24;
-      entry.rect = { x: bounds.x + offset, y: bounds.y + offset, width: bounds.width - cascade, height: bounds.height - cascade };
-    }
-    apply(entry, bounds);
-    rememberLayout(entry);
-    raise(entry);
-  });
+  // Let the authored responsive layout size and place the open windows. Dividing
+  // the workspace into equal tiles inflated small windows and ignored their content.
+  for (const entry of open) {
+    if (entry.maximized) command(entry, 'restore');
+    resetWindowLayout(entry.root);
+  }
+  document.getElementById('page-scroll')?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   document.dispatchEvent(new CustomEvent('gwenlium:windows-changed'));
 }
 
@@ -182,6 +158,7 @@ function place(entry: Layout): void {
     if (portaled) destination.moveBefore!(entry.host, null);
     else if (typeof entry.root.showPopover === 'function') entry.root.setAttribute('popover', 'manual');
   }
+  if (entry.placement) entry.placement.marker.hidden = entry.root.hidden;
   if (entry.root.hasAttribute('popover')) {
     if (entry.root.hidden && entry.root.matches(':popover-open')) entry.root.hidePopover();
     else if (!entry.root.hidden && !entry.root.matches(':popover-open')) entry.root.showPopover();

@@ -204,7 +204,7 @@ summary { cursor: pointer; }
 }
 .window-titlebar__title { min-width: 0; margin: 0; font-size: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .window-titlebar__mark { width: 9px; height: 10px; flex-shrink: 0; border: 1px solid var(--ink); box-shadow: inset 0 2px 0 var(--ink); opacity: .8; }
-.window-body { min-width: 0; padding: 1.4rem; }
+.window-body { min-width: 0; padding: clamp(.75rem, 3%, 1.4rem); container: window-content / inline-size; }
 .footer-link { display: inline-flex; align-items: center; gap: .4rem; position: relative; min-height: 32px; padding: .3rem .4rem .3rem 1.25rem; border: 0; font-size: 11px; line-height: 1.4; text-decoration: none; white-space: nowrap; }
 .footer-link:hover { color: var(--accent-ink); text-decoration: none; }
 .footer-link[aria-current='page'] { color: var(--accent-ink); }
@@ -246,6 +246,7 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
 .tag { display: inline-flex; align-items: center; max-width: 100%; padding: .2rem .5rem; border: 1px solid color-mix(in srgb, var(--line) 55%, transparent); background: color-mix(in srgb, var(--sage) 25%, var(--surface)); font-family: var(--font-ui); font-size: 10px; text-decoration: none; }
 
 .prose { font-family: var(--font-reading); font-size: 1.03rem; line-height: 1.85; overflow-wrap: anywhere; }
+.window-body .prose { font-size: clamp(.875rem, .8rem + .5cqi, 1.03rem); }
 .prose > :first-child { margin-top: 0; }
 .prose > :last-child { margin-bottom: 0; }
 .prose p, .prose ul, .prose ol { margin-bottom: 1.25em; }

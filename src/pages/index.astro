@@ -119,11 +119,11 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
 <style>
   .home-page { display: grid; gap: 1.55rem; }
   :global(.home-hero > .window-body) { padding: 0; }
-  .hero-inner { position: relative; isolation: isolate; min-height: clamp(180px, 28vh, 300px); overflow: hidden; }
-  .hero-copy { position: relative; max-width: 100%; padding: clamp(1.4rem, 3vw, 2.5rem); }
+  .hero-inner { position: relative; isolation: isolate; min-height: clamp(140px, 25cqi, 300px); overflow: hidden; }
+  .hero-copy { position: relative; max-width: 100%; padding: clamp(.9rem, 3cqi, 2.5rem); }
   .hero-location { display: inline-flex; align-items: center; gap: .6rem; padding: .3rem .55rem; margin-bottom: 1.65rem; border: 1px solid color-mix(in srgb, var(--line) 55%, transparent); background: color-mix(in srgb, var(--surface-raised) 58%, transparent); font-size: 9px; line-height: 1.5; text-transform: uppercase; letter-spacing: .14em; }
   .hero-location > span { display: block; width: 5px; height: 5px; background: var(--accent-ink); }
-  h1 { margin: 0 0 1.4rem; font-size: clamp(2.7rem, 6.8vw, 5.35rem); line-height: 1.1; letter-spacing: -.065em; text-shadow: 2px 3px 0 color-mix(in srgb, var(--surface) 70%, transparent); }
+  h1 { margin: 0 0 1.4rem; font-size: clamp(1.4rem, 6.8cqi, 5.35rem); line-height: 1.1; letter-spacing: -.065em; text-shadow: 2px 3px 0 color-mix(in srgb, var(--surface) 70%, transparent); }
   h1 > span { color: var(--line); }
   .hero-copy h1:last-child { margin-bottom: 0; }
   .hero-intro { max-width: 43ch; margin-bottom: 1.7rem; font-family: var(--font-reading); font-size: 1rem; line-height: 1.75; white-space: pre-line; }
@@ -135,13 +135,14 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
   .game-preview__media { min-width: 0; }
   .game-preview__media :global(figure) { margin: 0; }
   .game-preview__media :global(img), .game-preview__media :global(video) { width: 100%; max-height: 340px; object-fit: contain; }
-  .game-preview h2 { font-size: clamp(1.45rem, 3vw, 2rem); margin-bottom: .75rem; }
+  .game-preview h2 { font-size: clamp(1.1rem, 3cqi, 2rem); margin-bottom: .75rem; }
   .game-status { display: inline-flex; align-items: center; gap: .5rem; color: var(--muted); font-size: 10px; margin-bottom: 1rem; }
   .game-status > span { width: 5px; height: 5px; background: var(--accent-ink); }
   .game-description { font-family: var(--font-reading); font-size: .95rem; line-height: 1.75; white-space: pre-line; }
   .game-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: 1.25rem; }
   .game-trailer { display: inline-flex; align-items: center; gap: .45rem; font-size: 10px; }
   .home-columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.55rem; align-items: start; }
+  :global(.home-columns:not(:has(> .window:not([hidden]), > [data-window-placeholder]:not([hidden])))) { display: none; }
   .devlog-empty { display: flex; align-items: center; gap: 1.4rem; min-height: 174px; padding: .75rem; }
   .empty-book { display: grid; place-items: center; flex-shrink: 0; width: 64px; height: 70px; border: 1px solid var(--line); background: repeating-linear-gradient(0deg, transparent, transparent 11px, color-mix(in srgb, var(--line) 11%, transparent) 11px, color-mix(in srgb, var(--line) 11%, transparent) 12px), var(--surface-raised); box-shadow: 3px 3px 0 var(--sage); color: var(--muted); }
   .devlog-empty h2 { font-size: 1.2rem; margin: 0 0 .6rem; }
@@ -157,7 +158,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
   .recent-posts li svg { grid-row: 1 / 3; grid-column: 2; }
   .section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem; }
   .section-heading h2 { display: flex; align-items: center; gap: .65rem; font-size: 1.25rem; margin: 0; }
-  .gallery-preview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+  .gallery-preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1rem; }
   .gallery-preview__item { min-width: 0; }
   .gallery-preview__item :global(figure) { margin: 0; }
   .gallery-preview__item :global(img), .gallery-preview__item :global(video) { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
@@ -169,26 +170,22 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
   .track-number { color: var(--muted); font-size: 10px; }
   .track-cover { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; background: var(--lavender); border: 1px solid var(--line); }
   .track-cover img { width: 100%; height: 100%; object-fit: cover; }
-  .track-title { font-size: 12px; min-width: 0; }
+  .track-title { font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
   .track-play { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; padding-left: .5rem; font-size: 10px; }
 
-  @media (max-width: 1150px) {
-    .home-columns { gap: 1.1rem; }
-    .devlog-empty { gap: 1rem; padding: .5rem 0; }
+  @media (max-width: 1150px) { .home-columns { gap: 1.1rem; } }
+  @container window-content (max-width: 700px) {
+    .devlog-empty { gap: 1rem; min-height: 140px; padding: .5rem; }
     .empty-book { width: 48px; height: 56px; }
-  }
-  @media (max-width: 950px) {
     .game-preview--with-media { grid-template-columns: minmax(0, 1fr); gap: 1.3rem; }
     .gallery-preview { gap: .75rem; }
-    .devlog-empty { min-height: 140px; padding: .5rem; }
   }
   @media (max-width: 760px) {
     .home-page { gap: 1.15rem; }
-    h1 { font-size: clamp(2.8rem, 8.5vw, 4.5rem); }
   }
-  @media (max-width: 620px) {
+  @container window-content (max-width: 620px) {
     .hero-location { margin-bottom: 1.1rem; }
-    h1 { margin-bottom: 1.25rem; font-size: clamp(2.65rem, 10vw, 4rem); }
+    h1 { margin-bottom: 1.25rem; }
     .hero-intro { font-size: .95rem; }
     .gallery-preview { grid-template-columns: minmax(0, 1fr); gap: 1.2rem; }
     .gallery-preview__item :global(img), .gallery-preview__item :global(video) { max-height: 340px; object-fit: contain; }

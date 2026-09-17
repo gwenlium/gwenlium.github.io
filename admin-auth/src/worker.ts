@@ -281,14 +281,19 @@ async function startAuthorization(request: Request, url: URL, config: Configurat
 }
 
 async function githubJson(url: string, options: RequestInit): Promise<Record<string, unknown>> {
+  const path = new URL(url).pathname;
+  const step = path === '/login/oauth/access_token' ? 'token exchange'
+    : path === '/user' ? 'account verification'
+    : path === '/user/installations' ? 'installation verification' : 'repository verification';
   try {
-    const response = await fetch(url, { ...options, redirect: 'error', signal: AbortSignal.timeout(15000) });
-    if (!response.ok) throw new Error('GitHub request failed');
+    const response = await fetch(url, { ...options, redirect: 'manual', signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw new OAuthError(`GitHub ${step} failed (HTTP ${response.status}). Please try again from the editor.`, 502);
     const body = record(await response.json());
-    if (!body) throw new Error('Invalid GitHub response');
+    if (!body) throw new OAuthError(`GitHub returned an invalid ${step} response. Please try again from the editor.`, 502);
     return body;
-  } catch {
-    throw new OAuthError('GitHub could not complete sign-in. Please try again from the editor.', 502);
+  } catch (error) {
+    if (error instanceof OAuthError) throw error;
+    throw new OAuthError(`GitHub ${step} could not be reached. Please try again from the editor.`, 502);
   }
 }
 

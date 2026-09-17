@@ -34,16 +34,16 @@ const feedUrl = new URL('/rss.xml', Astro.site || 'https://gwenlium.dev').href;
 
 <style>
   .subscribe-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.8rem; align-items: start; }
-  .option-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.6rem; }
-  h2 { font-family: var(--font-reading); font-size: clamp(1.4rem, 2.3vw, 1.85rem); font-weight: 500; line-height: 1.25; margin: 0 0 1rem; }
+  .option-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: clamp(1rem, 4cqi, 1.6rem); }
+  h2 { font-family: var(--font-reading); font-size: clamp(1.4rem, 1.1rem + 2cqi, 1.85rem); font-weight: 500; line-height: 1.25; margin: 0 0 1rem; }
   .option-description, .privacy-note { font-family: var(--font-reading); line-height: 1.75; color: var(--muted); }
-  .option-description { margin: 0 0 1.7rem; }
+  .option-description { margin: 0 0 clamp(1rem, 4cqi, 1.7rem); }
   .privacy-note { font-size: .85rem; margin: 1.3rem 0 0; }
   .feed-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
   .feed-actions button { font: inherit; font-size: .7rem; cursor: pointer; }
   .copy-status { flex-basis: 100%; font-size: .65rem; line-height: 1.6; margin: 0; }
   .copy-status:empty { display: none; }
-  .feed-label { display: block; margin-top: 1.5rem; font-size: .65rem; color: var(--muted); }
+  .feed-label { display: block; margin-top: clamp(1rem, 4cqi, 1.5rem); font-size: .65rem; color: var(--muted); }
   .feed-address { display: block; width: 100%; min-width: 0; box-sizing: border-box; margin-top: .5rem; padding: .75rem; border: 1px solid var(--line); border-top-color: var(--ink); border-left-color: var(--ink); color: var(--ink); background: var(--surface-raised); font-family: var(--font-ui); font-size: .68rem; }
   .feed-address:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
   @media (max-width: 820px) { .subscribe-grid { grid-template-columns: 1fr; } }

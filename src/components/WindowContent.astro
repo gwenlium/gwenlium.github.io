@@ -115,15 +115,15 @@ const musicTracks = definition.content === 'music' ? selectItems(tracks, (track)
 
 <style>
   .window-text, .window-posts { min-width: 0; }
-  .window-media-list { display: grid; gap: 1.5rem; min-width: 0; }
+  .window-media-list { display: grid; gap: clamp(1rem, 3cqi, 1.5rem); min-width: 0; }
   .window-links { display: grid; gap: .65rem; margin: 0; padding: 0; list-style: none; }
   .window-links a { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--font-reading); line-height: 1.6; overflow-wrap: anywhere; text-underline-offset: .2em; }
-  .window-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 1.5rem; align-items: start; }
+  .window-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: clamp(1rem, 3cqi, 1.5rem); align-items: start; }
   .window-gallery-item { min-width: 0; }
   .window-gallery-item h2 { margin: 0 0 .8rem; font-size: .9rem; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
   .window-gallery-item :global(img) { max-height: 470px; object-fit: contain; }
   .window-tracks { margin: 0; padding: 0; list-style: none; }
-  .window-track { display: flex; flex-wrap: wrap; align-items: center; gap: .8rem; padding: 1rem 0; border-bottom: 1px solid var(--line); }
+  .window-track { display: flex; flex-wrap: wrap; align-items: center; gap: clamp(.5rem, 2.5cqi, .8rem); padding: clamp(.75rem, 3cqi, 1rem) 0; border-bottom: 1px solid var(--line); }
   .window-track:first-child { padding-top: 0; }
   .window-track:last-child { padding-bottom: 0; border-bottom: 0; }
   .window-track-number { flex-shrink: 0; width: 2ch; color: var(--muted); font-size: .7rem; }
@@ -137,7 +137,9 @@ const musicTracks = definition.content === 'music' ? selectItems(tracks, (track)
   .window-track-play[aria-pressed='true'] { background: var(--ink); color: var(--surface); }
   .window-track-play:disabled { opacity: .45; cursor: default; transform: none; }
   .empty-state { margin: 0; }
-  @media (max-width: 640px) {
-    .window-media-list, .window-gallery { gap: 1rem; }
+  @container window-content (max-width: 360px) {
+    .window-track { display: grid; grid-template-columns: 2ch 44px minmax(0, 1fr); }
+    .window-track-cover { width: 44px; }
+    .window-track-play { grid-column: 2 / -1; }
   }
 </style>
