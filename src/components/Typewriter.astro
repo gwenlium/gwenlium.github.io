@@ -1,0 +1,39 @@
+---
+interface Props {
+  text: string;
+  caretClass?: string;
+}
+
+const { text, caretClass } = Astro.props;
+---
+
+<span class="typewriter" data-typewriter><span class="sr-only" data-typewriter-source>{text}</span><span class="typewriter-reserve" aria-hidden="true">{text}<span class:list={['text-caret', caretClass]}>|</span></span><span class="typewriter-visible" aria-hidden="true"><span data-typewriter-text>{text}</span><span class:list={['text-caret', caretClass]}>|</span></span></span>
+
+<script>
+  import '../scripts/typewriter';
+</script>
+
+<style>
+  .typewriter {
+    position: relative;
+    display: inline-block;
+    max-inline-size: 100%;
+    vertical-align: baseline;
+  }
+
+  .typewriter-reserve {
+    visibility: hidden;
+    user-select: none;
+  }
+
+  .typewriter-reserve .text-caret {
+    animation: none;
+  }
+
+  .typewriter-visible {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    inline-size: 100%;
+  }
+</style>

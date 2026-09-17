@@ -6,6 +6,7 @@ import Player from '../components/Player.astro';
 import Footer from '../components/Footer.astro';
 import PixelTransition from '../components/PixelTransition.astro';
 import Window from '../components/Window.astro';
+import Typewriter from '../components/Typewriter.astro';
 import { site } from '../lib/settings';
 import CustomWindows from '../components/CustomWindows.astro';
 import { getWindowDefinition, type WindowPage } from '../lib/windows';
@@ -105,7 +106,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
       <header class="site-header">
         <div class="site-brand">
           <span class="brand-icon"><img class="brand-avatar" src="/avatar.webp" alt="" width="43" height="43" /></span>
-          <span>{site.name}<span class="brand-caret text-caret" aria-hidden="true">|</span></span>
+          <Typewriter text={site.name} caretClass="brand-caret" />
         </div>
         {site.status && <span class="site-status"><i aria-hidden="true"></i>{site.status}</span>}
       </header>
@@ -155,7 +156,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
             <label><input type="radio" name="motion" value="reduced" data-preference="motion" />Reduced</label>
             <label><input type="radio" name="motion" value="system" data-preference="motion" checked />System</label>
           </div>
-          <p>System follows your device’s accessibility preference.</p>
+          <p>System follows your device’s accessibility preference. Reduced motion skips text typing.</p>
         </fieldset>
         <fieldset class="preference-group" aria-describedby="background-preference-help">
           <legend>Background</legend>

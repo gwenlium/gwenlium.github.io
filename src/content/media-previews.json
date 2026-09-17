@@ -1,3 +1,19 @@
 {
-  "files": {}
+  "files": {
+    "/media/ui-confirm-preview-1bff1150661fda803fda6a4aa90e5d10.mp3": {
+      "sha256": "d21bcde115a19c99afda428057bf2125969384f3a038f9bd94d03e7b9e6c8c28",
+      "kind": "audio",
+      "duration": 1.045964
+    },
+    "/media/ui-move-preview-04b4a0067da6cbf8dcbeab2cdc8b8f64.mp3": {
+      "sha256": "54236ef0a734e96c392bc8d8c0e8afc76a7ff95cd2590fe2da3fb2561b9d1531",
+      "kind": "audio",
+      "duration": 0.915351
+    },
+    "/media/ui-type-preview-e6f898635cd9d3cd27a585878e1230ee.mp3": {
+      "sha256": "85b19ee6c086c84aeb1025d132d675461f47b6d5640b4834f404e820b6c03bfc",
+      "kind": "audio",
+      "duration": 0.053311
+    }
+  }
 }

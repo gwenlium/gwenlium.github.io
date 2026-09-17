@@ -1,3 +1,5 @@
+import { playInterfaceSound } from './interface-audio';
+
 type Direction = 'left' | 'right' | 'up' | 'down';
 
 const lifetime = new AbortController();
@@ -74,6 +76,7 @@ function setTarget(element: HTMLElement | null, mode = inputMode): void {
       resizeObserver.observe(anchorFor(element));
       const root = element.closest<HTMLElement>('[data-desktop-window]');
       if (root) resizeObserver.observe(root);
+      if (activePage()) playInterfaceSound('move');
     }
   }
   target = element;
@@ -289,11 +292,7 @@ function padDirection(direction: Direction): void {
 function activate(): void {
   const current = currentControl() ?? candidates(navigationScope(null))[0];
   if (!current || !focusControl(current)) return;
-  if (current.hasAttribute('data-window-drag')) {
-    const body = current.closest('[data-desktop-window]')?.querySelector('.window-body, .player-body');
-    const first = body && candidates(body)[0];
-    if (first) focusControl(first);
-  } else if (!(current instanceof HTMLSelectElement) && !(current instanceof HTMLInputElement && current.type === 'range')) {
+  if (!(current instanceof HTMLSelectElement) && !(current instanceof HTMLInputElement && current.type === 'range')) {
     current.click();
   }
 }
@@ -430,6 +429,15 @@ document.addEventListener('pointerdown', (event) => {
   pointerPosition = event.pointerType === 'touch' ? null : { x: event.clientX, y: event.clientY };
   setTarget(controlFrom(event.target), 'pointer');
 }, listenerOptions);
+document.addEventListener('click', (event) => {
+  if (event.button !== 0 || !activePage() || !(event.target instanceof Element)) return;
+  const element = controlFrom(event.target);
+  if (!element) return;
+  const label = event.target.closest('label');
+  // A label forwards activation to its input; sound only that forwarded click.
+  if (label?.control === element && !element.contains(event.target)) return;
+  playInterfaceSound('confirm');
+}, { ...listenerOptions, capture: true });
 document.addEventListener('pointerout', (event) => {
   if (!event.relatedTarget) pointerPosition = null;
   if (inputMode === 'pointer') setTarget(controlFrom(event.relatedTarget), 'pointer');
