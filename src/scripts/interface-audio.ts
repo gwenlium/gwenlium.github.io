@@ -124,7 +124,11 @@ function unlock(event: Event): void {
 }
 
 export function playInterfaceSound(kind: InterfaceSound): void {
-  if (!foreground() || !context) return;
+  if (!foreground()) return;
+  // Full page loads (including 404s) lose the previous audio context, not necessarily
+  // the browser's playback permission. A blocked context still waits for unlock().
+  initializeAudio();
+  if (!context) return;
   if (context.state !== 'running' || !sounds[kind].buffer) {
     // Only the latest click may wait briefly for decode/resume, never old hover or typing events.
     if (kind === 'confirm') pendingConfirmUntil = performance.now() + 300;
@@ -134,7 +138,7 @@ export function playInterfaceSound(kind: InterfaceSound): void {
   startVoice(kind);
 }
 
-// Fetch small assets early, but open the audio device only inside a user gesture.
+// Fetch small assets early; the browser's autoplay policy governs playback.
 for (const kind of kinds) sounds[kind].data = fetchRecording(kind);
 for (const event of ['pointerdown', 'pointerup', 'keydown', 'click']) {
   document.addEventListener(event, unlock, { ...listenerOptions, capture: true });
