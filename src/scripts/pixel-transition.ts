@@ -52,6 +52,8 @@ function beforeSwap(event: Event) {
   clearTransition();
   const swap = event as BeforeSwapEvent;
   if (swap.signal.aborted || !motionAllowed()) {
+    // Skipping intentionally rejects ready, before the animation handlers below are attached.
+    void swap.viewTransition.ready.catch(() => {});
     swap.viewTransition.skipTransition();
     return;
   }

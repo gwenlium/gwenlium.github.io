@@ -7,33 +7,18 @@ interface Props {
 const { text, caretClass } = Astro.props;
 ---
 
-<span class="typewriter" data-typewriter><span class="sr-only" data-typewriter-source>{text}</span><span class="typewriter-reserve" aria-hidden="true">{text}<span class:list={['text-caret', caretClass]}>|</span></span><span class="typewriter-visible" aria-hidden="true"><span data-typewriter-text>{text}</span><span class:list={['text-caret', caretClass]}>|</span></span></span>
+<span data-typewriter>{text}<span class:list={['text-caret', caretClass]} aria-hidden="true">|</span></span>
 
 <script>
   import '../scripts/typewriter';
 </script>
 
-<style>
-  .typewriter {
-    position: relative;
-    display: inline-block;
-    max-inline-size: 100%;
-    vertical-align: baseline;
-  }
-
-  .typewriter-reserve {
-    visibility: hidden;
-    user-select: none;
-  }
-
-  .typewriter-reserve .text-caret {
-    animation: none;
-  }
-
-  .typewriter-visible {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: 0;
-    inline-size: 100%;
-  }
+<style is:global>
+  ::highlight(gwenlium-untyped) { color: transparent; background-color: transparent; text-shadow: none; text-decoration-color: transparent; }
+  [data-typing] .text-caret { visibility: hidden; }
+  .typing-cursor { position: fixed; inset: auto; z-index: 2147483646; width: 2px; margin: 0; padding: 0; border: 0; background: currentColor; pointer-events: none; user-select: none; animation: text-caret-blink 1s step-end infinite; }
+  .typing-cursor[hidden] { display: none !important; }
+  .typing-cursor::backdrop { background: transparent; pointer-events: none; }
+  @media print { .typing-cursor { display: none !important; } }
 </style>
+

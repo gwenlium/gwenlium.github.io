@@ -104,7 +104,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
     <div transition:persist="site-background"><BackgroundVfx /></div>
     <div class="site-shell application-shell">
       <header class="site-header">
-        <div class="site-brand">
+        <div class="site-brand" transition:persist="site-brand">
           <span class="brand-icon"><img class="brand-avatar" src="/avatar.webp" alt="" width="43" height="43" /></span>
           <Typewriter text={site.name} caretClass="brand-caret" />
         </div>

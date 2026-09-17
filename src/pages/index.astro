@@ -4,7 +4,6 @@ import Window from '../components/Window.astro';
 import Icon from '../components/Icon.astro';
 import Media from '../components/Media.astro';
 import PostCard from '../components/PostCard.astro';
-import Typewriter from '../components/Typewriter.astro';
 import { site, gallery, tracks } from '../lib/settings';
 import { getPosts, postUrl, formatDate } from '../lib/content';
 import { hasWindowOverride } from '../lib/windows';
@@ -27,7 +26,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
       <div class="hero-inner">
         <div class="hero-copy">
           <span class="hero-location"><span aria-hidden="true"></span>Home</span>
-          <h1><Typewriter text={site.name} /></h1>
+          <h1>{site.name}<span class="text-caret" aria-hidden="true">|</span></h1>
           {site.intro && <p class="hero-intro">{site.intro}</p>}
         </div>
       </div>

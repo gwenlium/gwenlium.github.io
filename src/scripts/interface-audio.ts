@@ -1,4 +1,5 @@
-type InterfaceSound = 'confirm' | 'move' | 'type';
+type RecordedSound = 'confirm' | 'move' | 'type';
+type InterfaceSound = RecordedSound | 'close' | 'minimize';
 type Sound = {
   src: string;
   buffer?: AudioBuffer;
@@ -11,8 +12,8 @@ type Sound = {
 
 const lifetime = new AbortController();
 const listenerOptions = { signal: lifetime.signal };
-const kinds: InterfaceSound[] = ['confirm', 'move', 'type'];
-const sounds: Record<InterfaceSound, Sound> = {
+const kinds: RecordedSound[] = ['confirm', 'move', 'type'];
+const sounds: Record<RecordedSound, Sound> = {
   confirm: { src: 'media/ui-confirm-preview-1bff1150661fda803fda6a4aa90e5d10.mp3', lastStarted: -Infinity, volume: 0.5, interval: 0 },
   move: { src: 'media/ui-move-preview-04b4a0067da6cbf8dcbeab2cdc8b8f64.mp3', lastStarted: -Infinity, volume: 0.35, interval: 45 },
   // The typing preview contains only the first recorded click of the source's click train.
@@ -23,6 +24,7 @@ let resuming: Promise<void> | undefined;
 let unlocked = false;
 let swapping = false;
 let pendingConfirmUntil = 0;
+let pendingConfirmation: InterfaceSound = 'confirm';
 
 function foreground(): boolean {
   return !lifetime.signal.aborted && document.visibilityState === 'visible' && document.hasFocus();
@@ -43,7 +45,7 @@ function silence(): void {
 }
 
 function startVoice(kind: InterfaceSound): void {
-  const sound = sounds[kind];
+  const sound = sounds[kind === 'close' || kind === 'minimize' ? 'confirm' : kind];
   if (!context || context.state !== 'running' || !sound.buffer || !sound.output) return;
   const now = performance.now();
   if (now - sound.lastStarted < sound.interval) return;
@@ -51,11 +53,21 @@ function startVoice(kind: InterfaceSound): void {
   const voice = context.createBufferSource();
   voice.buffer = sound.buffer;
   voice.connect(sound.output);
+  sound.output.gain.cancelScheduledValues(context.currentTime);
+  sound.output.gain.setValueAtTime(sound.volume, context.currentTime);
+  if (kind === 'close' || kind === 'minimize') {
+    const duration = kind === 'close' ? .32 : .16;
+    voice.playbackRate.setValueAtTime(kind === 'close' ? .85 : 1.4, context.currentTime);
+    voice.playbackRate.exponentialRampToValueAtTime(kind === 'close' ? .45 : .8, context.currentTime + duration * .7);
+    sound.output.gain.setValueAtTime(sound.volume, context.currentTime + duration - .025);
+    sound.output.gain.linearRampToValueAtTime(0, context.currentTime + duration);
+  }
   voice.onended = () => {
     if (sound.voice === voice) sound.voice = undefined;
     voice.disconnect();
   };
   voice.start();
+  if (kind === 'close' || kind === 'minimize') voice.stop(context.currentTime + (kind === 'close' ? .32 : .16));
   sound.voice = voice;
   sound.lastStarted = now;
 }
@@ -68,10 +80,10 @@ function flushConfirmation(): void {
   }
   if (context?.state !== 'running' || !sounds.confirm.buffer) return;
   pendingConfirmUntil = 0;
-  startVoice('confirm');
+  startVoice(pendingConfirmation);
 }
 
-async function preload(audio: AudioContext, kind: InterfaceSound): Promise<void> {
+async function preload(audio: AudioContext, kind: RecordedSound): Promise<void> {
   try {
     const response = await fetch(`${import.meta.env.BASE_URL}${sounds[kind].src}`, listenerOptions);
     if (!response.ok) return;
@@ -137,13 +149,16 @@ function unlock(event: Event): void {
 
 export function playInterfaceSound(kind: InterfaceSound): void {
   if (!foreground() || swapping || !unlocked || !context) return;
-  if (context.state !== 'running' || !sounds[kind].buffer) {
-    // Only the current confirmation may wait briefly for unlock/preload. Hover
-    // and typing events are never replayed after their original moment passes.
-    if (kind === 'confirm' && (resuming || context.state === 'running')) pendingConfirmUntil = performance.now() + 300;
+  const source = kind === 'close' || kind === 'minimize' ? 'confirm' : kind;
+  if (context.state !== 'running' || !sounds[source].buffer) {
+    // Only the current action may wait for unlock/preload; never replay old movement or typing.
+    if (source === 'confirm' && (resuming || context.state === 'running')) {
+      pendingConfirmation = kind;
+      pendingConfirmUntil = performance.now() + 300;
+    }
     return;
   }
-  if (kind === 'confirm') pendingConfirmUntil = 0;
+  if (source === 'confirm') pendingConfirmUntil = 0;
   startVoice(kind);
 }
 

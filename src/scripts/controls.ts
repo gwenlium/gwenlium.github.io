@@ -9,7 +9,7 @@ const regions = '[data-desktop-window], .taskbar, .footer-navigation, #page-scro
 const nativeArrows = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [role="slider"], [role="spinbutton"], video, audio, [data-window-drag]';
 const rememberedFocus = new WeakMap<HTMLElement, HTMLElement>();
 const caret = document.createElement('span');
-caret.className = 'control-caret';
+caret.className = 'control-caret pixel-caret';
 caret.setAttribute('aria-hidden', 'true');
 caret.hidden = true;
 const hasPopover = typeof caret.showPopover === 'function';
@@ -136,7 +136,7 @@ function positionCaret(): void {
   // A manual popover stays above floating windows, and inside the modal's inert boundary.
   caret.hidden = false;
   if (hasPopover && !caret.matches(':popover-open')) caret.showPopover();
-  let x = rect.left - 17;
+  let x = anchor.matches('.footer-link') ? rect.left + 3 : rect.left - 17;
   let y = (visibleTop + visibleBottom) / 2 - 7;
   let side = 'left';
   if (x < left + 2) {
@@ -433,6 +433,7 @@ document.addEventListener('click', (event) => {
   if (event.button !== 0 || !activePage() || !(event.target instanceof Element)) return;
   const element = controlFrom(event.target);
   if (!element) return;
+  if (element.matches('[data-window-action="close"], [data-window-action="minimize"], [data-player-close], [data-player-minimize], [data-close-settings], [data-close-start], .media-dialog__close')) return;
   const label = event.target.closest('label');
   // A label forwards activation to its input; sound only that forwarded click.
   if (label?.control === element && !element.contains(event.target)) return;

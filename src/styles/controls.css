@@ -2,6 +2,9 @@
   position: fixed;
   inset: auto;
   z-index: 2147483647;
+  animation: jrpg-caret 1.1s ease-in-out infinite;
+}
+.pixel-caret {
   box-sizing: border-box;
   width: 12px;
   height: 14px;
@@ -14,19 +17,18 @@
   pointer-events: none;
   user-select: none;
   filter: drop-shadow(1px 2px 0 rgb(0 0 0 / .25));
-  animation: jrpg-caret 1.1s ease-in-out infinite;
 }
 .control-caret[hidden] { display: none !important; }
 .control-caret::backdrop { background: transparent; pointer-events: none; }
-.control-caret::before,
-.control-caret::after {
+.pixel-caret::before,
+.pixel-caret::after {
   content: '';
   position: absolute;
   inset: 0;
   background: currentColor;
   clip-path: polygon(0 0, 4px 0, 4px 2px, 7px 2px, 7px 4px, 10px 4px, 10px 6px, 12px 6px, 12px 8px, 10px 8px, 10px 10px, 7px 10px, 7px 12px, 4px 12px, 4px 14px, 0 14px);
 }
-.control-caret::after {
+.pixel-caret::after {
   background: var(--surface-raised, #fff9ef);
   transform: scale(.65);
   transform-origin: 40% 50%;
@@ -35,11 +37,11 @@
 .control-caret[data-side='above'] { rotate: 90deg; }
 .control-caret[data-side='below'] { rotate: -90deg; }
 @media (prefers-reduced-motion: reduce) {
-  html:not([data-motion='full']) .control-caret { animation: none; transition: none; }
+  html:not([data-motion='full']) .pixel-caret { animation: none !important; transition: none; }
 }
-html[data-motion='reduced'] .control-caret { animation: none; transition: none; }
+html[data-motion='reduced'] .pixel-caret { animation: none !important; transition: none; }
 @media (forced-colors: active) {
-  .control-caret { color: CanvasText; filter: none; forced-color-adjust: none; }
-  .control-caret::after { background: Canvas; }
+  .pixel-caret { color: CanvasText; filter: none; forced-color-adjust: none; }
+  .pixel-caret::after { background: Canvas; }
 }
-@media print { .control-caret { display: none !important; } }
+@media print { .pixel-caret { display: none !important; } }

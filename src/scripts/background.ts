@@ -96,15 +96,21 @@ class BackgroundViewport {
         ctx.globalAlpha = .2;
         ctx.fillRect(0, 0, 24, 24);
         ctx.fillRect(24, 24, 24, 24);
-        ctx.strokeStyle = line;
-        ctx.globalAlpha = .2;
+        // Bake the glow into the repeated tile, including neighboring edges so it stays seamless.
+        ctx.strokeStyle = accent;
+        ctx.shadowColor = accent;
+        ctx.shadowBlur = 8;
+        ctx.globalAlpha = .6;
         ctx.beginPath();
-        for (let offset = .5; offset < 48; offset += 24) {
-          ctx.moveTo(offset, 0);
-          ctx.lineTo(offset, 48);
-          ctx.moveTo(0, offset);
-          ctx.lineTo(48, offset);
+        for (let offset = -23.5; offset <= 72.5; offset += 24) {
+          ctx.moveTo(offset, -24);
+          ctx.lineTo(offset, 72);
+          ctx.moveTo(-24, offset);
+          ctx.lineTo(72, offset);
         }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = .35;
         ctx.stroke();
         this.checker = this.context.createPattern(tile, 'repeat');
       }

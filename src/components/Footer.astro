@@ -19,7 +19,7 @@ const navigation = [
   <nav class="footer-navigation" aria-label="Site navigation">
     {navigation.map((item) => (
       <a class="footer-link" href={item.href} aria-current={(item.href === '/' ? path === '/' : path.startsWith(item.href)) ? 'page' : undefined}>
-        <span class="nav-cursor" aria-hidden="true">▸</span>
+        <span class="nav-cursor pixel-caret" aria-hidden="true"></span>
         {item.label}
       </a>
     ))}
