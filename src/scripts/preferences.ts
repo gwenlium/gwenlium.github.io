@@ -1,10 +1,10 @@
 type ThemePreference = 'light' | 'dark' | 'system';
 type MotionPreference = 'full' | 'reduced' | 'system';
 type ReadingPreference = 'pixel' | 'readable';
-type BackgroundPreference = 'auto' | 'dots' | 'polygons' | 'circuits' | 'checker' | 'wave' | 'off';
+type BackgroundPreference = 'auto' | 'dots' | 'polygons' | 'circuits' | 'checker' | 'wave' | 'stars' | 'rain' | 'off';
 
 const backgroundOptions: Record<string, BackgroundPreference | undefined> = {
-  auto: 'auto', dots: 'dots', polygons: 'polygons', circuits: 'circuits', checker: 'checker', wave: 'wave', off: 'off',
+  auto: 'auto', dots: 'dots', polygons: 'polygons', circuits: 'circuits', checker: 'checker', wave: 'wave', stars: 'stars', rain: 'rain', off: 'off',
 };
 
 type Preferences = {

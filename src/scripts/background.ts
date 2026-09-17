@@ -1,8 +1,8 @@
-type BackgroundMode = 'dots' | 'polygons' | 'circuits' | 'checker' | 'wave' | 'off';
+type BackgroundMode = 'dots' | 'polygons' | 'circuits' | 'checker' | 'wave' | 'stars' | 'rain' | 'off';
 type Circuit = { points: Float32Array; distances: Float32Array; length: number };
 
 const modes: Record<string, BackgroundMode | undefined> = {
-  dots: 'dots', polygons: 'polygons', circuits: 'circuits', checker: 'checker', wave: 'wave', off: 'off',
+  dots: 'dots', polygons: 'polygons', circuits: 'circuits', checker: 'checker', wave: 'wave', stars: 'stars', rain: 'rain', off: 'off',
 };
 const root = document.documentElement;
 const lifetime = new AbortController();
@@ -117,6 +117,18 @@ class BackgroundViewport {
       return;
     }
 
+    if (mode === 'stars' || mode === 'rain') {
+      const count = mode === 'stars'
+        ? Math.min(260, Math.max(40, Math.round(width * height / 8000)))
+        : Math.min(120, Math.max(16, Math.round(width / 28)));
+      for (let index = 0; index < count; index++) {
+        if (mode === 'stars') values.push(Math.random() * width, Math.random() * (height + 128), 1 + Math.random() * 2, Math.random() * tau);
+        else values.push((index + Math.random()) * width / count, Math.random() * (height + 192), 18 + Math.random() * 24, 4 + Math.floor(Math.random() * 6));
+      }
+      this.geometry = new Float32Array(values);
+      return;
+    }
+
     if (mode === 'dots') {
       const spacing = Math.max(37, Math.sqrt(width * (height + 128) / 1250), Math.max(width, height + 128) / 40);
       const columns = Math.ceil(width / spacing);
@@ -214,6 +226,8 @@ class BackgroundViewport {
     else if (mode === 'polygons') this.drawPolygons(time);
     else if (mode === 'circuits') this.drawCircuits(time);
     else if (mode === 'wave') this.drawWave(time);
+    else if (mode === 'stars') this.drawStars(time);
+    else if (mode === 'rain') this.drawRain(time);
     else if (this.checker) {
       ctx.fillStyle = this.checker;
       ctx.fillRect(0, -64, this.width, this.height + 128);
@@ -233,6 +247,45 @@ class BackgroundViewport {
       ctx.beginPath();
       ctx.arc(points[index], points[index + 1], radius, 0, tau);
       ctx.fill();
+    }
+  }
+
+  private drawStars(time: number): void {
+    const ctx = this.context;
+    const points = this.geometry;
+    const span = this.height + 128;
+    for (let index = 0; index < points.length; index += 4) {
+      const depth = points[index + 2];
+      const x = Math.round((points[index] + time * depth * 2) % this.width);
+      const y = Math.round((points[index + 1] + span - time * depth % span) % span - 64);
+      const glow = .5 + .5 * Math.sin(points[index + 3] + time * .7);
+      const size = depth > 2 ? 2 : 1;
+      ctx.fillStyle = index % 12 === 0 ? accent : ink;
+      ctx.globalAlpha = .18 + glow * .4;
+      ctx.fillRect(x, y, size, size);
+      if (depth > 2.4) {
+        ctx.globalAlpha *= .65;
+        ctx.fillRect(x - size, y, size, size);
+        ctx.fillRect(x + size, y, size, size);
+        ctx.fillRect(x, y - size, size, size);
+        ctx.fillRect(x, y + size, size, size);
+      }
+    }
+  }
+
+  private drawRain(time: number): void {
+    const ctx = this.context;
+    const drops = this.geometry;
+    const span = this.height + 192;
+    for (let index = 0; index < drops.length; index += 4) {
+      const x = Math.round(drops[index]);
+      const y = Math.round((drops[index + 1] + time * drops[index + 2]) % span - 64);
+      const length = drops[index + 3];
+      ctx.fillStyle = index % 12 === 0 ? accent : ink;
+      for (let segment = 0; segment < length; segment++) {
+        ctx.globalAlpha = .42 * (1 - segment / length);
+        ctx.fillRect(x, y - segment * 8, 2, 4);
+      }
     }
   }
 

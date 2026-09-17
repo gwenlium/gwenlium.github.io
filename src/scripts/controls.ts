@@ -94,8 +94,8 @@ function positionCaret(): void {
     setTarget(null);
     return;
   }
-  // The current page already has a persistent footer marker.
-  if (target.matches('.footer-link[aria-current="page"]')) {
+  // Controls with a persistent caret do not need a second marker.
+  if (target.matches('.footer-link[aria-current="page"], [data-dialogue-next]')) {
     hideCaret();
     return;
   }

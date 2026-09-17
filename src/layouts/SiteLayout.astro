@@ -54,10 +54,10 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
         const motion = ['full', 'reduced', 'system'].includes(saved.motion) ? saved.motion : 'system';
         const reading = saved.reading === 'readable' ? 'readable' : 'pixel';
         const root = document.documentElement;
-        const backgrounds = { auto: true, dots: true, polygons: true, circuits: true, checker: true, wave: true, off: true };
+        const backgrounds = { auto: true, dots: true, polygons: true, circuits: true, checker: true, wave: true, stars: true, rain: true, off: true };
         const background = typeof saved.background === 'string' && Object.hasOwn(backgrounds, saved.background) ? saved.background : 'auto';
         if (!root.dataset.backgroundAuto) {
-          const presets = ['dots', 'polygons', 'circuits', 'checker', 'wave'];
+          const presets = ['dots', 'polygons', 'circuits', 'checker', 'wave', 'stars', 'rain'];
           let previous = -1;
           try { previous = presets.indexOf(localStorage.getItem('gwenlium:background:last-auto')); } catch {}
           const choice = previous < 0 ? Math.floor(Math.random() * presets.length) : (previous + 1 + Math.floor(Math.random() * (presets.length - 1))) % presets.length;
@@ -170,6 +170,8 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
             <label><input type="radio" name="background" value="circuits" data-preference="background" />Circuits</label>
             <label><input type="radio" name="background" value="checker" data-preference="background" />Checker</label>
             <label><input type="radio" name="background" value="wave" data-preference="background" />Wave mesh</label>
+            <label><input type="radio" name="background" value="stars" data-preference="background" />Pixel stars</label>
+            <label><input type="radio" name="background" value="rain" data-preference="background" />Pixel rain</label>
             <label><input type="radio" name="background" value="off" data-preference="background" />Off</label>
           </div>
           <p id="background-preference-help">Auto changes the pattern on each new visit. Reduced motion keeps it still.</p>
