@@ -100,9 +100,7 @@ collections:
         widget: markdown
         required: false
         default: ""
-        hint: Write Markdown or use the rich-text editor. Image uploads are processed on
-          this device before publication. Add video in the media fields below.
-          Saved content is public on GitHub, including drafts.
+        hint: Write Markdown or use the rich-text editor. Pictures and GIFs are processed locally. Add audio or video in the media fields below. Saved content is public on GitHub, including drafts.
         editor_components:
           - image
       - name: media
@@ -121,11 +119,10 @@ collections:
               - video
               - audio
           - name: src
-            label: Media preview
+            label: Media file
             widget: file
             required: true
-            hint: Upload an image or video, or choose an existing preview. Choose the
-              matching media type above. Originals stay on your device.
+            hint: Upload a picture, GIF, audio or video, or reuse registered media. Choose the matching media type above (GIFs are images). Timed media defaults to a short preview; full length is an explicit choice. Originals stay on your device.
           - name: alt
             label: Description or alternative text
             widget: string
@@ -353,11 +350,13 @@ collections:
                   - image
                   - video
               - name: src
-                label: Media preview
+                label: Media file
                 widget: file
                 required: true
-                hint: Upload an image or video, or choose an existing preview. Choose the
-                  matching media type above. Originals stay on your device.
+                hint: Upload a picture, GIF or video, or reuse registered media. Choose the matching type above (GIFs are images). Full-length videos and animations require an explicit choice. Originals stay on your device.
+                media_library:
+                  config:
+                    kinds: [image, video]
               - name: alt
                 label: Description / alternative text
                 widget: string
@@ -399,11 +398,14 @@ collections:
                 widget: string
                 required: true
               - name: src
-                label: Prepared audio preview URL
-                widget: string
+                label: Audio file
+                widget: file
                 required: true
-                hint: Import the original audio outside this repository, then paste the
-                  generated /media/... MP3 preview URL.
+                hint: Choose or upload audio, or use Insert from URL to reuse a registered /media/... MP3 copy. Short previews are the default; full tracks require an explicit choice. Only the processed listening copy is uploaded.
+                media_library:
+                  allow_multiple: false
+                  config:
+                    kinds: [audio]
               - name: cover
                 label: Cover image
                 widget: image
@@ -557,9 +559,7 @@ collections:
                 widget: markdown
                 required: false
                 default: ""
-                hint: Write Markdown or use the rich-text editor. Image uploads are processed on
-                  this device before publication. Add video in the media fields
-                  below. Saved content is public on GitHub, including drafts.
+                hint: Write Markdown or use the rich-text editor. Pictures and GIFs are processed locally. Add audio or video in the media fields below. Saved content is public on GitHub, including drafts.
                 editor_components:
                   - image
               - name: media
@@ -576,11 +576,10 @@ collections:
                     default: image
                     options: *a1
                   - name: src
-                    label: Media preview
+                    label: Media file
                     widget: file
                     required: true
-                    hint: Upload an image or video, or choose an existing preview. Choose the
-                      matching media type above. Originals stay on your device.
+                    hint: Upload a picture, GIF, audio or video, or reuse registered media. Choose the matching media type above (GIFs are images). Timed media defaults to a short preview; full length is an explicit choice. Originals stay on your device.
                   - name: alt
                     label: Description or alternative text
                     widget: string

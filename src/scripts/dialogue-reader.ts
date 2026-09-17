@@ -38,8 +38,8 @@ function collectChunks(sources: HTMLElement[]): HTMLElement[][] {
 }
 
 function createReader(root: HTMLElement): Reader | undefined {
-  const article = root.closest('article');
-  const option = article?.querySelector<HTMLElement>('[data-dialogue-option]');
+  const window = root.closest('[data-desktop-window]');
+  const option = window?.querySelector<HTMLElement>('[data-dialogue-option]');
   const enter = option?.querySelector<HTMLButtonElement>('[data-dialogue-enter]');
   const heading = root.querySelector<HTMLElement>('[data-dialogue-heading]');
   const exit = root.querySelector<HTMLButtonElement>('[data-dialogue-exit]');
@@ -47,8 +47,9 @@ function createReader(root: HTMLElement): Reader | undefined {
   const controls = root.querySelector<HTMLElement>('[data-dialogue-controls]');
   const back = root.querySelector<HTMLButtonElement>('[data-dialogue-back]');
   const next = root.querySelector<HTMLButtonElement>('[data-dialogue-next]');
+  const nextLabel = next?.querySelector<HTMLElement>('[data-dialogue-next-label]');
   const progress = root.querySelector<HTMLElement>('[data-dialogue-progress]');
-  if (!option || !enter || !heading || !exit || !content || !controls || !back || !next || !progress) return;
+  if (!option || !enter || !heading || !exit || !content || !controls || !back || !next || !nextLabel || !progress) return;
   const sources = Array.from(content.querySelectorAll<HTMLElement>('[data-dialogue-blocks]'));
   const chunks = collectChunks(sources);
   if (!chunks.length) return;
@@ -93,7 +94,7 @@ function createReader(root: HTMLElement): Reader | undefined {
     });
     const last = index === chunks.length - 1;
     back!.disabled = index === 0;
-    next!.textContent = last ? 'Finish' : 'Continue';
+    nextLabel!.textContent = last ? 'Finish' : 'Continue';
     progress!.textContent = `${index + 1} of ${chunks.length}`;
     if (focusNext || (document.activeElement === back && back!.disabled)) next!.focus({ preventScroll: true });
     heading!.scrollIntoView({ block: 'start', behavior: 'instant' });

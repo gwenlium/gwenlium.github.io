@@ -1,18 +1,18 @@
 import classWorkerURL from '@ffmpeg/ffmpeg/worker?worker&url';
 import coreURL from '@ffmpeg/core?url';
 import wasmURL from '@ffmpeg/core/wasm?url';
-import type { FFmpeg } from '@ffmpeg/ffmpeg';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+
+type PreviewMetadata =
+  | { kind: 'image'; width: number; height: number; duration?: number }
+  | { kind: 'video'; width: number; height: number; duration: number }
+  | { kind: 'audio'; duration: number };
+export type PreviewInputKind = 'image' | 'animation' | 'audio' | 'video';
 
 export type PreparedPreview = {
   file: File;
   url: string;
-  entry: {
-    sha256: string;
-    kind: 'image' | 'video';
-    width: number;
-    height: number;
-    duration?: number;
-  };
+  entry: PreviewMetadata & { sha256: string };
 };
 
 type PreviewOptions = {
@@ -20,6 +20,7 @@ type PreviewOptions = {
   name?: string;
   start?: number;
   duration?: number;
+  fullLength?: boolean;
   signal?: AbortSignal;
   onProgress?: (progress: number | undefined) => void;
 };
@@ -27,7 +28,7 @@ type Settings = PreviewOptions & { start: number; duration: number };
 type Dimensions = { width: number; height: number };
 type CanvasSurface = { element: HTMLCanvasElement; context: CanvasRenderingContext2D };
 type Raster = Dimensions & { mime: string; delays?: number[] };
-type Generated = { blob: Blob; extension: 'webp' | 'gif' | 'mp4'; entry: Omit<PreparedPreview['entry'], 'sha256'> };
+type Generated = { blob: Blob; extension: 'webp' | 'gif' | 'mp4' | 'mp3'; entry: PreviewMetadata };
 type ImageFrame = CanvasImageSource & { displayWidth: number; displayHeight: number; close(): void };
 type AnimationDecoder = {
   tracks: { ready: Promise<void>; selectedTrack?: { frameCount: number } };
@@ -57,10 +58,13 @@ const maxEdge = 8192;
 const maxPixels = 40_000_000;
 const maxFrames = 1800;
 const maxAnimationPixels = 512_000_000;
-const mediaDemuxers = 'mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,avi,ogg,asf,mpeg,mpegts';
+const mediaDemuxers = 'mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,avi,ogg,mp3,wav,flac,aac,aiff,asf,mpeg,mpegts';
 const stripMetadata = ['-map_metadata', '-1', '-map_metadata:s', '-1', '-map_chapters', '-1', '-metadata', 'encoder='];
 const conversionError = 'This media could not be converted safely. It may be corrupt, use an unsupported codec, or exceed browser memory. Export a smaller supported copy locally; the original was not uploaded.';
 let queue: Promise<unknown> = Promise.resolve();
+const audioExtensions = new Set(['mp3', 'wav', 'flac', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'aif', 'aiff', 'wma']);
+const videoExtensions = new Set(['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi', 'ogv', 'mpg', 'mpeg', 'mts', 'm2ts']);
+const imageMetadata = new WeakMap<File, Raster>();
 
 class PreviewError extends Error {}
 
@@ -273,6 +277,30 @@ function inspectRaster(data: Uint8Array): Raster {
   return fail('Supported still images are JPEG, PNG, WebP and GIF. SVG, APNG, AVIF and TIFF need a supported local export.');
 }
 
+/** Classify local input for the picker without uploading or decoding its media. */
+export async function previewInputKind(file: File, signal?: AbortSignal): Promise<PreviewInputKind> {
+  checkAbort(signal);
+  if (!(file instanceof File) || !file.size) fail('Choose a nonempty local media file.');
+  if (file.size > videoBytes) fail('Originals must be at most 128 MiB (32 MiB for images). Trim or resize the original locally first.');
+  const mime = rasterMime(new Uint8Array(await bytes(file.slice(0, 64), signal)));
+  if (mime) {
+    if (file.size > imageBytes) fail('Image originals must be at most 32 MiB. Resize the original locally first.');
+    if (mime === 'image/gif' || mime === 'image/webp') {
+      let raster = imageMetadata.get(file);
+      if (!raster) {
+        raster = inspectRaster(new Uint8Array(await bytes(file, signal)));
+        imageMetadata.set(file, raster);
+      }
+      if (raster.delays && (raster.mime === 'image/webp' || raster.delays.length > 1)) return 'animation';
+    }
+    return 'image';
+  }
+  const extension = file.name.split('.').at(-1)?.toLowerCase() || '';
+  if (audioExtensions.has(extension)) return 'audio';
+  if (videoExtensions.has(extension)) return 'video';
+  return fail('Choose JPEG, PNG, WebP, GIF, a supported audio file, or a supported video file. SVG, APNG, AVIF and TIFF need a supported local export.');
+}
+
 function canvas(size: Dimensions): CanvasSurface {
   const element = document.createElement('canvas');
   element.width = size.width;
@@ -338,10 +366,9 @@ async function still(blob: Blob, options: Settings): Promise<Generated> {
 }
 
 async function withTranscoder<T>(options: Settings, convert: (ffmpeg: FFmpeg) => Promise<T>): Promise<T> {
-  if (typeof Worker === 'undefined' || typeof WebAssembly === 'undefined') fail('This browser needs Web Workers and WebAssembly for animated or video previews.');
-  const { FFmpeg: Transcoder } = await abortable(import('@ffmpeg/ffmpeg'), options.signal);
+  if (typeof Worker === 'undefined' || typeof WebAssembly === 'undefined') fail('This browser needs Web Workers and WebAssembly for audio, animated images and video.');
   checkAbort(options.signal);
-  const ffmpeg = new Transcoder();
+  const ffmpeg = new FFmpeg();
   const stop = () => ffmpeg.terminate();
   options.signal?.addEventListener('abort', stop, { once: true });
   // A terminated worker also destroys its in-memory filesystem, including all originals.
@@ -409,13 +436,13 @@ async function probe(ffmpeg: FFmpeg, filename: string): Promise<Probe> {
   return { streams, format };
 }
 
-async function viewableVideo(blob: Blob, signal?: AbortSignal): Promise<Dimensions & { duration: number }> {
+async function viewableMedia(blob: Blob, signal?: AbortSignal): Promise<{ width?: number; height?: number; duration: number }> {
   checkAbort(signal);
-  const element = document.createElement('video');
+  const element = document.createElement(blob.type.startsWith('video/') ? 'video' : 'audio');
   const url = URL.createObjectURL(blob);
   element.preload = 'auto';
   element.muted = true;
-  element.playsInline = true;
+  if (element instanceof HTMLVideoElement) element.playsInline = true;
   try {
     const { promise, resolve, reject } = Promise.withResolvers<void>();
     const cleanup = () => {
@@ -425,7 +452,7 @@ async function viewableVideo(blob: Blob, signal?: AbortSignal): Promise<Dimensio
       element.removeEventListener('error', error);
     };
     const loaded = () => { cleanup(); resolve(); };
-    const error = () => { cleanup(); reject(new PreviewError('The generated MP4 cannot be decoded by this browser. Nothing was prepared.')); };
+    const error = () => { cleanup(); reject(new PreviewError('The generated media cannot be decoded by this browser. Nothing was prepared.')); };
     const abort = () => { cleanup(); reject(new DOMException('Preview preparation was cancelled.', 'AbortError')); };
     const timer = setTimeout(error, 30_000);
     signal?.addEventListener('abort', abort, { once: true });
@@ -434,13 +461,55 @@ async function viewableVideo(blob: Blob, signal?: AbortSignal): Promise<Dimensio
     element.src = url;
     element.load();
     await promise;
-    return { ...dimensions(element.videoWidth, element.videoHeight), duration: element.duration };
+    return { ...(element instanceof HTMLVideoElement ? dimensions(element.videoWidth, element.videoHeight) : {}), duration: element.duration };
   } finally {
     element.pause();
     element.removeAttribute('src');
     element.load();
     URL.revokeObjectURL(url);
   }
+}
+
+function mediaDuration(sourceDuration: number, options: Settings): number {
+  if (options.fullLength) {
+    if (!Number.isFinite(sourceDuration) || sourceDuration <= 0) fail('Full-length publishing needs readable duration metadata. Export a supported local copy first.');
+    return sourceDuration;
+  }
+  if (Number.isFinite(sourceDuration) && sourceDuration > 0 && options.start >= sourceDuration) fail('The excerpt must start before the end of the media.');
+  return Math.min(options.duration, 59.9);
+}
+
+function verifyMediaDuration(actual: number, expected: number, fullLength = false): void {
+  if (!Number.isFinite(actual) || actual <= 0 || (fullLength
+    ? Math.abs(actual - expected) > 0.25
+    : actual > 60 || actual > expected + 0.1)) {
+    fail('The generated media did not preserve the selected duration. Nothing was prepared.');
+  }
+}
+
+async function audio(file: File, options: Settings): Promise<Generated> {
+  return withTranscoder(options, async ffmpeg => {
+    await ffmpeg.writeFile('source', new Uint8Array(await bytes(file, options.signal)));
+    const source = await probe(ffmpeg, 'source');
+    const stream = source.streams?.find(item => item.codec_type === 'audio');
+    if (!stream || source.streams?.some(item => item.codec_type === 'video' && !item.disposition?.attached_pic)) fail('Choose an audio file, not a video or a file without an audio stream.');
+    const duration = mediaDuration(Number(source.format?.duration), options);
+    const update = ({ time }: { time: number }) => progress(options, Math.min(0.9, Math.max(0, time / (duration * 1_000_000)) * 0.9));
+    ffmpeg.on('progress', update);
+    try {
+      await execute(ffmpeg, ['-ss', String(options.start), ...input('source'),
+        '-map', `0:${stream.index}`, ...(options.fullLength ? [] : ['-t', String(duration)]),
+        '-vn', '-sn', '-dn', '-c:a', 'libmp3lame', '-b:a', options.fullLength ? '192k' : '96k', '-ar', '44100', '-ac', '2',
+        ...stripMetadata, '-id3v2_version', '0', '-write_id3v1', '0', '-fs', String(outputBytes + 1), 'preview.mp3']);
+    } finally { ffmpeg.off('progress', update); }
+    await ffmpeg.deleteFile('source');
+    const output = await binary(ffmpeg, 'preview.mp3');
+    if (!output.length || output.length > outputBytes) fail('The prepared audio exceeds the 32 MiB limit or is empty. Choose a shorter excerpt.');
+    const blob = new Blob([output], { type: 'audio/mpeg' });
+    const playable = await viewableMedia(blob, options.signal);
+    verifyMediaDuration(playable.duration, duration, options.fullLength);
+    return { blob, extension: 'mp3', entry: { kind: 'audio', duration: playable.duration } };
+  });
 }
 
 async function video(file: File, options: Settings): Promise<Generated> {
@@ -451,9 +520,7 @@ async function video(file: File, options: Settings): Promise<Generated> {
     if (!stream || !Number.isSafeInteger(stream.index)) fail('Select a file with a moving-video stream. Audio-only files and cover artwork are not video previews.');
     const rawSize = dimensions(stream.width ?? 0, stream.height ?? 0);
     if (rawSize.width < 2 || rawSize.height < 2) fail('H.264 previews require source frames at least 2 by 2 pixels.');
-    const sourceDuration = Number(source.format?.duration);
-    if (Number.isFinite(sourceDuration) && sourceDuration > 0 && options.start >= sourceDuration) fail('The excerpt must start before the end of the video.');
-    const duration = Math.min(options.duration, 59.9);
+    const duration = mediaDuration(Number(source.format?.duration), options);
     const seek = ['-ss', String(options.start)];
     const displayWidth = 'iw*if(gt(sar,0),sar,1)';
     const scale = `scale=w='max(2,trunc(min(1280,${displayWidth})/2)*2)':h='max(2,trunc(ih*min(1,1280/(${displayWidth}))/2)*2)',setsar=1`;
@@ -472,8 +539,8 @@ async function video(file: File, options: Settings): Promise<Generated> {
     try {
       await execute(ffmpeg, [...seek, ...input('source'), ...input('watermark.png', 'png_pipe'),
         '-filter_complex', filter, '-map', '[preview]', '-map', '0:a:0?', '-c:a', 'aac', '-b:a', '96k', '-ac', '2',
-        '-t', String(duration), '-sn', '-dn', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p',
-        ...stripMetadata, '-metadata:s:v:0', 'rotate=0', '-movflags', '+faststart', 'preview.mp4']);
+        ...(options.fullLength ? [] : ['-t', String(duration)]), '-sn', '-dn', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p',
+        ...stripMetadata, '-metadata:s:v:0', 'rotate=0', '-fs', String(outputBytes + 1), '-movflags', '+faststart', 'preview.mp4']);
     } finally { ffmpeg.off('progress', update); }
     await ffmpeg.deleteFile('source');
     const output = await binary(ffmpeg, 'preview.mp4');
@@ -481,12 +548,12 @@ async function video(file: File, options: Settings): Promise<Generated> {
     const result = await probe(ffmpeg, 'preview.mp4');
     const resultStream = result.streams?.find((item) => item.codec_type === 'video');
     const blob = new Blob([output], { type: 'video/mp4' });
-    const visible = await viewableVideo(blob, options.signal);
-    if (resultStream?.width !== size.width || resultStream.height !== size.height || visible.width !== size.width || visible.height !== size.height ||
-        !Number.isFinite(visible.duration) || visible.duration <= 0 || visible.duration > 60 || visible.duration > duration + 0.1) {
-      fail('The generated video failed its dimension or duration bounds. Nothing was prepared.');
+    const visible = await viewableMedia(blob, options.signal);
+    verifyMediaDuration(visible.duration, duration, options.fullLength);
+    if (resultStream?.width !== size.width || resultStream.height !== size.height || visible.width !== size.width || visible.height !== size.height) {
+      fail('The generated video failed its dimension bounds. Nothing was prepared.');
     }
-    return { blob, extension: 'mp4', entry: { kind: 'video', width: visible.width, height: visible.height, duration: visible.duration } };
+    return { blob, extension: 'mp4', entry: { kind: 'video', width: size.width, height: size.height, duration: visible.duration } };
   });
 }
 
@@ -501,7 +568,7 @@ async function animation(data: ArrayBuffer, raster: Raster, options: Settings): 
     fail('Animated GIF/WebP previews need ImageDecoder support (current Chromium browsers). Use a supported browser or the local media importer; animations are never flattened.');
   }
   const start = options.start * 1000;
-  const end = start + options.duration * 1000;
+  const end = options.fullLength ? Infinity : start + options.duration * 1000;
   let elapsed = 0;
   const excerpt: Array<{ index: number; delay: number }> = [];
   for (const [index, delay] of delays.entries()) {
@@ -559,13 +626,13 @@ async function animation(data: ArrayBuffer, raster: Raster, options: Settings): 
         await execute(ffmpeg, [...sequence, ...input('palette.png', 'png_pipe'),
           '-filter_complex', '[0:v][1:v]paletteuse=dither=sierra2_4a[preview]',
           '-map', '[preview]', '-vsync', 'vfr', '-enc_time_base', '1:100', '-an', '-sn', '-dn', ...stripMetadata,
-          '-loop', '0', '-final_delay', String(excerpt.at(-1)!.delay / 10), 'preview.gif']);
+          '-loop', '0', '-final_delay', String(excerpt.at(-1)!.delay / 10), '-fs', String(outputBytes + 1), 'preview.gif']);
       } finally { ffmpeg.off('progress', update); }
       const output = await binary(ffmpeg, 'preview.gif');
       if (!output.length || output.length > outputBytes) fail('The generated GIF exceeds the 32 MiB limit or is empty. Choose a shorter excerpt.');
       const verified = inspectRaster(output);
       const actualDuration = (verified.delays ?? []).reduce((sum, delay) => sum + delay, 0) / 1000;
-      if (!size || verified.width !== size.width || verified.height !== size.height || actualDuration <= 0 || actualDuration > 60 || Math.abs(actualDuration - duration) > 0.011) {
+      if (!size || verified.width !== size.width || verified.height !== size.height || actualDuration <= 0 || (!options.fullLength && actualDuration > 60) || Math.abs(actualDuration - duration) > 0.011) {
         fail('The generated GIF failed its dimension or timing bounds. Nothing was prepared.');
       }
       const blob = new Blob([output], { type: 'image/gif' });
@@ -592,18 +659,17 @@ async function prepare(file: File, options: Settings, hasTiming: boolean): Promi
   if (mime) {
     if (file.size > imageBytes) fail('Image originals must be at most 32 MiB. Resize the original locally first.');
     const data = await bytes(file, options.signal);
-    const raster = inspectRaster(new Uint8Array(data));
+    const raster = imageMetadata.get(file) || inspectRaster(new Uint8Array(data));
     if (raster.delays && (raster.mime === 'image/webp' || raster.delays.length > 1)) generated = await animation(data, raster, options);
     else {
-      if (hasTiming) fail('Trim settings apply only to videos and animated images, not still images.');
+      if (hasTiming || options.fullLength) fail('Length and trim settings apply only to audio, video and animated images, not still images.');
       generated = await still(new Blob([data], { type: mime }), options);
     }
   } else {
-    const extension = file.name.split('.').at(-1)?.toLowerCase();
-    if (!extension || !['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi', 'ogv', 'mpg', 'mpeg', 'mts', 'm2ts'].includes(extension)) {
-      fail('Supported inputs are JPEG, PNG, WebP, GIF and MP4/MOV/M4V, WebM/MKV, AVI, OGV or MPEG/TS video. SVG, APNG, AVIF, TIFF and audio-only files need a supported local export.');
-    }
-    generated = await video(file, options);
+    const extension = file.name.split('.').at(-1)?.toLowerCase() || '';
+    if (audioExtensions.has(extension)) generated = await audio(file, options);
+    else if (videoExtensions.has(extension)) generated = await video(file, options);
+    else fail('Choose JPEG, PNG, WebP, GIF, a supported audio file, or a supported video file. SVG, APNG, AVIF and TIFF need a supported local export.');
   }
   checkAbort(options.signal);
   if (!generated.blob.size || generated.blob.size > outputBytes) fail('The generated preview must be nonempty and at most 32 MiB. Resize or trim the source locally first.');
@@ -616,7 +682,7 @@ async function prepare(file: File, options: Settings, hasTiming: boolean): Promi
   return { file: output, url: `/media/${name}`, entry: { sha256, ...generated.entry } };
 }
 
-/** Only generated, watermarked bytes are returned; this module never uploads media. */
+/** Only re-encoded listening/viewing copies are returned; this module never uploads media. */
 export async function preparePreview(file: File, options: PreviewOptions): Promise<PreparedPreview> {
   checkAbort(options.signal);
   if (!globalThis.isSecureContext || !globalThis.crypto?.subtle || typeof document === 'undefined' || typeof FileReader === 'undefined' || typeof Promise.withResolvers !== 'function') fail('Safe preview preparation needs a current HTTPS browser with Canvas, FileReader, Web Crypto and Promise.withResolvers support.');
@@ -624,6 +690,8 @@ export async function preparePreview(file: File, options: PreviewOptions): Promi
   if (file.size > videoBytes) fail('Originals must be at most 128 MiB (32 MiB for images). Trim or resize the original locally first.');
   if (typeof options.creator !== 'string' || !options.creator.trim() || options.creator.length > 200 || /[\u0000-\u001f\u007f]/.test(options.creator)) fail('Set a creator name of 1–200 characters without control characters before preparing previews.');
   if (options.name !== undefined && options.name !== '' && (typeof options.name !== 'string' || options.name.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(options.name))) fail('The public name must be 1–64 lowercase letters or numbers separated by single hyphens, without an extension.');
+  if (options.fullLength !== undefined && typeof options.fullLength !== 'boolean') fail('Choose short preview or full length.');
+  if (options.fullLength && (options.start !== undefined || options.duration !== undefined)) fail('Full-length publishing cannot also specify excerpt settings.');
   const start = options.start ?? 0;
   const duration = options.duration ?? 30;
   if (!Number.isFinite(start) || start < 0 || start > Number.MAX_SAFE_INTEGER / 1000) fail('The excerpt offset must be a finite, nonnegative number of seconds.');

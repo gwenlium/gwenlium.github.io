@@ -96,12 +96,12 @@ export class PreparedGitHubBackend extends GitHubBackend {
   override persistEntry(entry: Entry, options: PersistOptions): Promise<unknown> {
     // Drag-and-drop native editor uploads can bypass external media pickers. Never let
     // original AssetProxy bytes reach the stock GitHub upload path.
-    if (entry.assets.length) return Promise.reject(new Error('Use the media picker to prepare and upload images or video before saving. Direct file drops are not published.'));
+    if (entry.assets.length) return Promise.reject(new Error('Use the media picker to prepare and upload pictures, GIFs, audio or video before saving. Direct file drops are not published.'));
     return super.persistEntry(entry, options);
   }
 
   override persistMedia(): Promise<never> {
-    return Promise.reject(new Error('Use the media picker to prepare your preview before uploading. Originals are never uploaded.'));
+    return Promise.reject(new Error('Use the media picker to prepare a listening or viewing copy before uploading. Originals are never uploaded.'));
   }
 
   override deleteFiles(paths: string[], message: string): Promise<unknown> {

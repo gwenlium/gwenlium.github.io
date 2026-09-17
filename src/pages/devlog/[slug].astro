@@ -32,6 +32,9 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
   <a class="back-link" href="/devlog/"><span aria-hidden="true">←</span> All entries</a>
   <div class="article-layout">
     <Window windowId="post-entry">
+      <div slot="titlebar-actions" class="dialogue-option" data-dialogue-option hidden>
+        <button class="button button-secondary" type="button" data-dialogue-enter aria-controls="entry-content" title="Read one block at a time">Dialogue mode</button>
+      </div>
       <article class="entry">
         <header class="entry-header">
           <p class="eyebrow"><time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time></p>
@@ -44,10 +47,6 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
           <h2>On this page</h2>
           <ol>{contents.map((heading) => <li class:list={{ nested: heading.depth === 3 }}><a href={`#${heading.slug}`}>{heading.text}</a></li>)}</ol>
         </nav>}
-        <div class="dialogue-option" data-dialogue-option hidden>
-          <button class="button button-secondary" type="button" data-dialogue-enter aria-controls="entry-content">Dialogue mode</button>
-          <span>Read one block at a time.</span>
-        </div>
         <div class="dialogue-reader" data-dialogue-reader>
           <div class="dialogue-heading" data-dialogue-heading hidden>
             <span class="eyebrow">Dialogue mode</span>
@@ -60,7 +59,7 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
           <nav class="dialogue-controls" aria-label="Dialogue reading" data-dialogue-controls hidden>
             <button class="button button-secondary" type="button" data-dialogue-back disabled>Back</button>
             <span class="dialogue-progress" role="status" aria-live="polite" aria-atomic="true" data-dialogue-progress></span>
-            <button class="button" type="button" data-dialogue-next>Continue</button>
+            <button class="button" type="button" data-dialogue-next><span data-dialogue-next-label>Continue</span><span class="dialogue-caret pixel-caret" aria-hidden="true"></span></button>
           </nav>
         </div>
         <footer class="entry-footer" data-share-entry>
@@ -133,8 +132,7 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
   .contents a { overflow-wrap: anywhere; text-underline-offset: .2em; }
   .entry-body :global(h2), .entry-body :global(h3) { scroll-margin-top: 2rem; }
   .entry-media { display: grid; gap: clamp(.75rem, 3cqi, 1.5rem); margin-top: clamp(1.25rem, 4cqi, 2rem); }
-  .dialogue-option { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-block: 1.5rem; }
-  .dialogue-option > span { color: var(--muted); font-family: var(--font-reading); font-size: .9rem; }
+  .dialogue-option button { min-height: 24px; padding: .25rem .4rem; font-size: .6rem; white-space: nowrap; }
   .dialogue-option[hidden], .dialogue-heading[hidden], .dialogue-controls[hidden], .dialogue-reader :global([data-dialogue-hidden]) { display: none !important; }
   .dialogue-reader[data-dialogue-active] { border: 2px solid var(--line); background: var(--surface); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
   .dialogue-heading { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: .75rem; border-bottom: 1px solid var(--line); background: var(--surface-raised); }
@@ -146,6 +144,8 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
   .dialogue-controls { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: .75rem; border-top: 1px solid var(--line); background: var(--surface-raised); }
   .dialogue-progress { flex: 1; text-align: center; font-family: var(--font-reading); font-size: .9rem; color: var(--muted); }
   .dialogue-controls button:disabled { cursor: default; opacity: .5; }
+  .dialogue-caret { position: relative; display: inline-block; flex-shrink: 0; rotate: 90deg; animation: jrpg-caret 1.1s ease-in-out infinite; }
+  @media (pointer: coarse) { .dialogue-option button { min-height: 28px; } }
   @container window-content (max-width: 360px) {
     .dialogue-heading, .dialogue-controls { padding: .5rem; }
     .dialogue-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -16,6 +16,7 @@ const title = definition?.title ?? '';
   <div class="window-titlebar">
     <span class="window-titlebar__mark" aria-hidden="true"></span>
     <span class="window-titlebar__title" title={title}>{title}</span>
+    {definition.content === 'default' && Astro.slots.has('titlebar-actions') && <div class="window-titlebar__actions"><slot name="titlebar-actions" /></div>}
     <div class="window-controls" data-window-controls hidden>
       <button type="button" class="window-control" data-window-action="minimize" aria-label={`Minimize ${title}`} title={`Minimize ${title}`}>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12h10" /></svg>
@@ -39,6 +40,8 @@ const title = definition?.title ?? '';
 <style>
   .window[hidden], .window-controls[hidden] { display: none !important; }
   .window-controls { display: flex; flex-shrink: 0; align-items: center; gap: 3px; margin-left: auto; }
+  .window-titlebar__actions { display: flex; flex-shrink: 0; align-items: center; margin-left: auto; }
+  .window-titlebar__actions + .window-controls { margin-left: 0; }
   .window-control { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; padding: 0; border: 1px solid var(--line); border-radius: 0; color: var(--ink); background: linear-gradient(var(--surface-raised), var(--surface)); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
   .window-control:hover { background: var(--sage); }
   .window-control:active { box-shadow: inset 1px 1px var(--bevel-dark), inset -1px -1px var(--bevel-light); }
