@@ -1,6 +1,5 @@
 import { registerWindow, resetWindowLayout, setWindowMaximized, unregisterWindow } from './window-layout';
 import { animateWindow, cancelWindowAnimation } from './window-motion';
-import { playInterfaceSound } from './interface-audio';
 
 type DesktopWindowState = 'normal' | 'minimized' | 'maximized' | 'closed';
 type WindowCommand = { id?: string; action?: 'restore' | 'maximize' | 'minimize' | 'close' | 'restore-all' };
@@ -125,7 +124,6 @@ async function hideWindow(entry: DesktopWindow, action: 'minimize' | 'close') {
   if (entry.root.hidden || entry.pending === action) return;
   const request = ++entry.request;
   entry.pending = action;
-  playInterfaceSound(action);
   if (action === 'minimize') entry.taskbarButton.focus({ preventScroll: true });
   else focusStart();
   entry.root.inert = true;

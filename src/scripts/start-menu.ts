@@ -2,7 +2,6 @@ import { navigate } from 'astro:transitions/client';
 import { handleControlKeydown } from './controls';
 import { createSearchIndex } from '../lib/search';
 import { searchKindLabels, type SearchEntry, type SearchIndex, type SearchKind } from '../lib/search-types';
-import { playInterfaceSound } from './interface-audio';
 
 type WindowCommand = { id: string; action: 'restore' } | { action: 'restore-all' };
 type StartMenu = {
@@ -241,10 +240,6 @@ function showShortcuts(): void {
   summary?.scrollIntoView({ block: 'nearest' });
 }
 
-document.addEventListener('cancel', (event) => {
-  if (event.target === menu?.dialog && !event.defaultPrevented) playInterfaceSound('close');
-}, { ...listenerOptions, capture: true });
-
 // Astro runs bundled scripts once; delegated listeners cover each new dialog.
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
@@ -258,7 +253,6 @@ document.addEventListener('click', (event) => {
   if (event.target === dialog) {
     const bounds = dialog.getBoundingClientRect();
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) {
-      playInterfaceSound('close');
       dialog.close();
     }
     return;
@@ -280,7 +274,6 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (event.target.closest('[data-close-start]')) {
-    playInterfaceSound('close');
     dialog.close();
     return;
   }

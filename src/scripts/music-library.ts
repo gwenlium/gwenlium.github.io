@@ -258,7 +258,7 @@ function renderLibrary(): void {
 
   library.querySelector<HTMLElement>('[data-shared-preview]')!.hidden = !shared;
   if (shared) {
-    setText('[data-shared-label]', shared.savedId ? 'Shared preview · personal copy added' : 'Shared preview · not saved');
+    setText('[data-shared-label]', shared.savedId ? 'Shared preview (personal copy added)' : 'Shared preview (not saved)');
     setText('[data-shared-name]', shared.name);
     const playable = shared.ids.filter((id) => catalogue.get(id)?.src).length;
     setText('[data-shared-note]', [

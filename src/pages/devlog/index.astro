@@ -98,7 +98,7 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
         if (card) resultList.append(card);
       }
       const visible = matches.length;
-      count.textContent = `${visible} ${visible === 1 ? 'entry' : 'entries'}${query || tag ? ' found' : ''}${tag ? ` · ${tag}` : ''}`;
+      count.textContent = `${visible} ${visible === 1 ? 'entry' : 'entries'}${query || tag ? ' found' : ''}${tag ? ` tagged ${tag}` : ''}`;
       empty.hidden = visible > 0 || index.length === 0;
       clearSearch.hidden = !query && !tag;
       filters.forEach((filter) => {

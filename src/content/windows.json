@@ -3,7 +3,7 @@
     {
       "id": "home-intro",
       "page": "home",
-      "title": "Gwenlium · home",
+      "title": "Gwenlium home",
       "enabled": true,
       "tone": "sage",
       "floating": false,
@@ -88,7 +88,7 @@
     {
       "id": "devlog-search",
       "page": "devlog",
-      "title": "devlog · find an entry",
+      "title": "devlog find an entry",
       "enabled": true,
       "tone": "sage",
       "floating": false,
@@ -105,7 +105,7 @@
     {
       "id": "devlog-entries",
       "page": "devlog",
-      "title": "devlog · entries",
+      "title": "devlog entries",
       "enabled": true,
       "tone": "sage",
       "floating": false,
@@ -122,7 +122,7 @@
     {
       "id": "post-entry",
       "page": "post",
-      "title": "devlog · entry",
+      "title": "devlog entry",
       "enabled": true,
       "tone": "sage",
       "floating": false,
@@ -139,7 +139,7 @@
     {
       "id": "post-related",
       "page": "post",
-      "title": "devlog · related entries",
+      "title": "devlog related entries",
       "enabled": true,
       "tone": "lavender",
       "floating": false,

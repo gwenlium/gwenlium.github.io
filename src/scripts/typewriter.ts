@@ -1,12 +1,11 @@
 import { playInterfaceSound } from './interface-audio';
 
-type TextRun = { node: Text; text: string; ends: number[]; hidden: Range };
+type TextRun = { node: Text; text: string; ends: number[]; hidden: Range; position: number };
 type Writer = {
   root: HTMLElement;
   owner: HTMLElement;
   runs: TextRun[];
   run: number;
-  character: number;
   perTick: number;
   point: Range;
   cursor: HTMLElement;
@@ -24,10 +23,13 @@ const segmenter = typeof Intl.Segmenter === 'function'
   ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
 const hiddenText = typeof Highlight !== 'undefined' && 'highlights' in CSS ? new Highlight() : null;
 const writers = new Map<HTMLElement, Writer>();
+const seenText = new WeakMap<Text, string>();
+const queuedRoots = new Set<HTMLElement>();
 const roots = '[data-typewriter], #main-content [data-desktop-window]:not([data-persistent-window]) > .window-body';
 const ignored = 'script, style, noscript, svg, math, input, textarea, select, [contenteditable], [hidden], [aria-hidden="true"], .sr-only, .text-caret';
 let timer = 0;
 let cursorFrame = 0;
+let contentFrame = 0;
 let suspended = false;
 
 if (hiddenText) CSS.highlights.set('gwenlium-untyped', hiddenText);
@@ -55,6 +57,9 @@ function finishAll(): void {
   cancelAnimationFrame(cursorFrame);
   cursorFrame = 0;
   for (const writer of writers.values()) finish(writer);
+  cancelAnimationFrame(contentFrame);
+  contentFrame = 0;
+  queuedRoots.clear();
 }
 
 function updateVisibility(): void {
@@ -122,18 +127,17 @@ function tick(): void {
     while (remaining > 0 && writers.has(writer.root)) {
       const run = writer.runs[writer.run];
       if (!run.node.isConnected || run.node.data !== run.text) { finish(writer); break; }
-      const start = writer.character ? run.ends[writer.character - 1] : 0;
-      const count = Math.min(remaining, run.ends.length - writer.character);
-      writer.character += count;
+      const start = run.position ? run.ends[run.position - 1] : 0;
+      const count = Math.min(remaining, run.ends.length - run.position);
+      run.position += count;
       remaining -= count;
-      const end = run.ends[writer.character - 1];
+      const end = run.ends[run.position - 1];
       audible ||= /\S/u.test(run.text.slice(start, end));
       run.hidden.setStart(run.node, end);
       writer.point.setStart(run.node, end);
       writer.point.collapse(true);
-      if (writer.character === run.ends.length) {
+      if (run.position === run.ends.length) {
         hiddenText!.delete(run.hidden);
-        writer.character = 0;
         if (++writer.run === writer.runs.length) finish(writer);
       }
     }
@@ -152,7 +156,7 @@ const intersectionObserver = new IntersectionObserver(entries => {
   refresh();
 });
 
-function collectText(root: HTMLElement): TextRun[] {
+function collectText(root: HTMLElement, pending: Map<Text, TextRun>): TextRun[] {
   const runs: TextRun[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
@@ -164,52 +168,81 @@ function collectText(root: HTMLElement): TextRun[] {
   let node: Node | null;
   while ((node = walker.nextNode())) {
     const text = (node as Text).data;
+    const previous = pending.get(node as Text);
+    if (previous?.text === text) { runs.push(previous); continue; }
+    if (seenText.get(node as Text) === text) continue;
     const hidden = document.createRange();
     hidden.selectNodeContents(node);
     if (!hidden.getClientRects().length || getComputedStyle(node.parentElement!).visibility === 'hidden') continue;
     let offset = 0;
     const ends = segmenter ? Array.from(segmenter.segment(text), part => part.index + part.segment.length)
       : Array.from(text, character => offset += character.length);
-    runs.push({ node: node as Text, text, ends, hidden });
+    runs.push({ node: node as Text, text, ends, hidden, position: 0 });
+    seenText.set(node as Text, text);
   }
   return runs;
 }
 
-function bindPage(): void {
-  suspended = false;
-  contentObserver.disconnect();
-  for (const root of document.querySelectorAll<HTMLElement>(roots)) {
-    // The persisted header is already marked; destination window bodies are fresh.
-    if (root.hasAttribute('data-typewriter-started')) continue;
-    root.setAttribute('data-typewriter-started', '');
-    if (motionReduced()) continue;
-    const runs = collectText(root);
-    if (!runs.length) continue;
-    const total = runs.reduce((count, run) => count + run.ends.length, 0);
-    const cursor = document.createElement('span');
+function reconcileText(root: HTMLElement): void {
+  const current = writers.get(root);
+  if (!root.isConnected) { if (current) finish(current); return; }
+  const pending = new Map(current?.runs.slice(current.run).map(run => [run.node, run]) ?? []);
+  const runs = collectText(root, pending);
+  const retained = new Set(runs.map(run => run.node));
+  for (const run of pending.values()) {
+    hiddenText?.delete(run.hidden);
+    if (!retained.has(run.node) && seenText.get(run.node) === run.text) seenText.delete(run.node);
+  }
+  root.setAttribute('data-typewriter-started', '');
+  if (!runs.length || motionReduced()) { if (current) finish(current); return; }
+  const total = runs.reduce((count, run) => count + run.ends.length - run.position, 0);
+  const cursor = current?.cursor ?? document.createElement('span');
+  if (!current) {
     cursor.className = 'typing-cursor';
     cursor.setAttribute('aria-hidden', 'true');
     cursor.hidden = true;
     if (typeof cursor.showPopover === 'function') cursor.setAttribute('popover', 'manual');
     document.body.append(cursor);
-    const point = document.createRange();
-    point.setStart(runs[0].node, 0);
-    point.collapse(true);
-    for (const run of runs) hiddenText!.add(run.hidden);
-    root.dataset.typing = '';
-    writers.set(root, { root, owner: root.closest<HTMLElement>('[data-desktop-window]') ?? root,
-      runs, run: 0, character: 0, perTick: Math.max(1, Math.ceil(total / maxTicks)), point, cursor, inView: false, visible: false });
-    intersectionObserver.observe(root);
   }
-  // Live widget updates must remain authoritative, never replaced with stale text.
+  const point = current?.point ?? document.createRange();
+  point.setStart(runs[0].node, runs[0].hidden.startOffset);
+  point.collapse(true);
+  for (const run of runs) hiddenText!.add(run.hidden);
+  root.dataset.typing = '';
+  writers.set(root, { root, owner: root.closest<HTMLElement>('[data-desktop-window]') ?? root,
+    runs, run: 0, perTick: Math.max(1, Math.ceil(total / maxTicks)), point, cursor,
+    inView: current?.inView ?? false, visible: current?.visible ?? false });
+  if (!current) intersectionObserver.observe(root);
+}
+
+function queueRoot(root: HTMLElement): void {
+  queuedRoots.add(root);
+  if (contentFrame || suspended) return;
+  contentFrame = requestAnimationFrame(() => {
+    contentFrame = 0;
+    for (const root of queuedRoots) reconcileText(root);
+    queuedRoots.clear();
+    refresh();
+  });
+}
+
+function bindPage(): void {
+  suspended = false;
+  contentObserver.disconnect();
+  // Wait for the page's widget initialization before taking text snapshots.
+  document.querySelectorAll<HTMLElement>(roots).forEach(queueRoot);
   const content = document.querySelector('#main-content');
-  if (content) contentObserver.observe(content, { subtree: true, childList: true, characterData: true });
-  refresh();
+  if (content) contentObserver.observe(content, {
+    subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'open'],
+  });
 }
 
 const contentObserver = new MutationObserver(records => {
-  for (const writer of writers.values()) {
-    if (records.some(record => writer.root.contains(record.target))) finish(writer);
+  for (const record of records) {
+    const element = record.target instanceof Element ? record.target : record.target.parentElement;
+    const root = element?.closest<HTMLElement>(roots);
+    if (root) queueRoot(root);
+    else element?.querySelectorAll<HTMLElement>(roots).forEach(queueRoot);
   }
 });
 const motionObserver = new MutationObserver(refresh);
@@ -217,7 +250,9 @@ motionObserver.observe(document.documentElement, { attributes: true, attributeFi
 reducedMotion.addEventListener('change', refresh, listenerOptions);
 forcedColors.addEventListener('change', refresh, listenerOptions);
 document.addEventListener('visibilitychange', refresh, listenerOptions);
-document.addEventListener('gwenlium:windows-changed', refresh, listenerOptions);
+document.addEventListener('gwenlium:windows-changed', () => {
+  document.querySelectorAll<HTMLElement>(roots).forEach(queueRoot);
+}, listenerOptions);
 document.addEventListener('scroll', queueCursors, { ...listenerOptions, capture: true, passive: true });
 document.addEventListener('toggle', event => {
   if (!(event.target instanceof Element) || !event.target.matches('.typing-cursor, .control-caret')) refresh();

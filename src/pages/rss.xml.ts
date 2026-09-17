@@ -48,8 +48,8 @@ export async function GET(context: APIContext): Promise<Response> {
   const base = context.site ?? new URL('https://gwenlium.dev');
   const posts = await getPosts();
   return rss({
-    title: `${site.name} · Devlog`,
-    description: site.description || `${site.name} · Devlog`,
+    title: `${site.name} Devlog`,
+    description: site.description || `${site.name} Devlog`,
     site: base,
     trailingSlash: true,
     customData: '<language>en</language>',

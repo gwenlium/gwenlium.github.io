@@ -15,7 +15,7 @@ import Window from './Window.astro';
       <legend class="sr-only">Playlist management</legend>
 
       <section class="library-panel" data-shared-preview aria-labelledby="shared-playlist-heading" hidden>
-        <span class="eyebrow" data-shared-label>Shared preview · not saved</span>
+        <span class="eyebrow" data-shared-label>Shared preview (not saved)</span>
         <h3 id="shared-playlist-heading" data-shared-name></h3>
         <p class="library-note" data-shared-note></p>
         <ol class="playlist-tracks" data-shared-tracks></ol>
@@ -50,7 +50,7 @@ import Window from './Window.astro';
             <span class="eyebrow">Personal playlist</span>
             <strong class="playlist-summary__name" data-selected-name></strong>
             <span class="playlist-summary__count" data-selected-count></span>
-            <span class="playlist-summary__limit">Up to 100 tracks · ordered by you</span>
+            <span class="playlist-summary__limit">Up to 100 tracks, ordered by you</span>
           </div>
           <div class="playlist-editor">
             <form class="library-form" data-rename-playlist data-astro-reload>

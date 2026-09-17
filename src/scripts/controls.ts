@@ -433,7 +433,6 @@ document.addEventListener('click', (event) => {
   if (event.button !== 0 || !activePage() || !(event.target instanceof Element)) return;
   const element = controlFrom(event.target);
   if (!element) return;
-  if (element.matches('[data-window-action="close"], [data-window-action="minimize"], [data-player-close], [data-player-minimize], [data-close-settings], [data-close-start], .media-dialog__close')) return;
   const label = event.target.closest('label');
   // A label forwards activation to its input; sound only that forwarded click.
   if (label?.control === element && !element.contains(event.target)) return;

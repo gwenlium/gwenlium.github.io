@@ -124,7 +124,6 @@ const definition = getWindowDefinition('music-player')!;
 <script>
   import { animateWindow, cancelWindowAnimation } from '../scripts/window-motion';
   import { registerWindow, resetWindowLayout, setWindowMaximized } from '../scripts/window-layout';
-  import { playInterfaceSound } from '../scripts/interface-audio';
   import '../scripts/music-library';
 
   type PlayerVisibility = 'open' | 'collapsed' | 'closed';
@@ -391,9 +390,6 @@ const definition = getWindowDefinition('music-player')!;
 
     private async setVisibility(visibility: PlayerVisibility, focus = true, changedSize = false) {
       const previous = this.dataset.playerState as PlayerVisibility;
-      if (visibility !== 'open' && !this.panel.hidden && this.visibility !== visibility) {
-        playInterfaceSound(visibility === 'closed' ? 'close' : 'minimize');
-      }
       const request = ++this.viewRequest;
       this.visibility = visibility;
       const anchor = document.querySelector<HTMLElement>('.taskbar [data-open-player]') || undefined;
