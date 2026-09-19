@@ -7,7 +7,6 @@ interface Env {
   GITHUB_CLIENT_SECRET?: string;
   OAUTH_STATE_SECRET?: string;
   CF_ANALYTICS_ACCOUNT_ID?: string;
-  CF_ANALYTICS_SITE_TAG?: string;
   CF_ANALYTICS_API_TOKEN?: string;
 }
 
@@ -420,16 +419,16 @@ async function analytics(request: Request, url: URL, env: Env, config: Configura
     const user = await githubJson(`${GITHUB_API}/user`, { headers: githubHeaders(token) });
     if (user.id !== config.userId) return analyticsJson({ error: 'This account cannot view site analytics.' }, 403, config);
     await verifyRepository(token, config);
-    if (!env.CF_ANALYTICS_API_TOKEN || !/^[a-f0-9]{32}$/i.test(env.CF_ANALYTICS_ACCOUNT_ID ?? '') || !/^[a-f0-9]{32}$/i.test(env.CF_ANALYTICS_SITE_TAG ?? '')) {
+    if (!env.CF_ANALYTICS_API_TOKEN || !/^[a-f0-9]{32}$/i.test(env.CF_ANALYTICS_ACCOUNT_ID ?? '')) {
       return analyticsJson({ error: 'Analytics is not connected yet.' }, 503, config);
     }
     const end = new Date();
     const start = new Date(end);
     start.setUTCHours(0, 0, 0, 0);
     start.setUTCDate(start.getUTCDate() - Number(daysText) + 1);
-    // Account, host and site are server-owned; callers cannot query another property.
-    const filter = 'filter: { siteTag: $site, requestHost: $host, datetime_geq: $start, datetime_lt: $end }';
-    const query = `query SiteAnalytics($account: String!, $site: String!, $host: String!, $start: Time!, $end: Time!) {
+    // Account and exact hostname are server-owned; callers cannot query another website.
+    const filter = 'filter: { requestHost: $host, datetime_geq: $start, datetime_lt: $end }';
+    const query = `query SiteAnalytics($account: String!, $host: String!, $start: Time!, $end: Time!) {
       viewer { accounts(filter: { accountTag: $account }) {
         totals: rumPageloadEventsAdaptiveGroups(limit: 1, ${filter}) { count sum { visits } }
         daily: rumPageloadEventsAdaptiveGroups(limit: 31, orderBy: [date_ASC], ${filter}) { count dimensions { date } }
@@ -441,7 +440,7 @@ async function analytics(request: Request, url: URL, env: Env, config: Configura
       method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(15000),
       headers: { Authorization: `Bearer ${env.CF_ANALYTICS_API_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, variables: {
-        account: env.CF_ANALYTICS_ACCOUNT_ID, site: env.CF_ANALYTICS_SITE_TAG,
+        account: env.CF_ANALYTICS_ACCOUNT_ID,
         host: config.siteId, start: start.toISOString(), end: end.toISOString(),
       } }),
     });

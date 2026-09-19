@@ -87,7 +87,7 @@ function analyticsUpstream(request) {
   throw new Error('Unexpected upstream request');
 }
 const analyticsSettings = {
-  CF_ANALYTICS_ACCOUNT_ID: 'a'.repeat(32), CF_ANALYTICS_SITE_TAG: 'b'.repeat(32),
+  CF_ANALYTICS_ACCOUNT_ID: 'a'.repeat(32),
   CF_ANALYTICS_API_TOKEN: 'server-only-test-secret',
 };
 const analyticsHeaders = { Origin: 'https://site.test', Authorization: `Bearer ${token}` };
@@ -147,7 +147,7 @@ test('analytics authenticates ownership, scopes the provider query and returns o
       assert.equal(request.headers.get('authorization'), 'Bearer server-only-test-secret');
       const query = await request.json();
       assert.equal(query.variables.account, analyticsSettings.CF_ANALYTICS_ACCOUNT_ID);
-      assert.equal(query.variables.site, analyticsSettings.CF_ANALYTICS_SITE_TAG);
+      assert.equal(query.variables.site, undefined);
       assert.equal(query.variables.host, 'site.test');
       assert.match(query.query, /requestHost: \$host/);
     } else assert.equal(request.headers.get('authorization'), `Bearer ${token}`);

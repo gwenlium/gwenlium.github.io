@@ -13,6 +13,7 @@
     "SITE_ORIGIN": "https://gwenlium.dev",
     "AUTH_ORIGIN": "https://gwenlium-cms-auth.gwenlium.workers.dev",
     "ALLOWED_USER_ID": "47855927",
-    "GITHUB_REPOSITORY_ID": "1373528386"
+    "GITHUB_REPOSITORY_ID": "1373528386",
+    "CF_ANALYTICS_ACCOUNT_ID": "b7bc6541cb1fc226d1d2bb3c4ba2a8bd"
   }
 }
