@@ -1,0 +1,185 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import Window from '../components/Window.astro';
+import Icon from '../components/Icon.astro';
+import GameOverview from './GameOverview.astro';
+import PostCard from '../components/PostCard.astro';
+import { getPosts, postSearchText, postUrl } from '../lib/content';
+
+interface Props { section: 'devlog' | 'life' }
+const { section } = Astro.props;
+const title = section === 'life' ? 'Life' : 'Devlog';
+const archiveUrl = `/${section}/`;
+const posts = await getPosts(section);
+const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort((a, b) => a.localeCompare(b, 'en'));
+const searchIndex = posts.map((post) => ({
+  id: post.data.permalink,
+  title: post.data.title,
+  url: postUrl(post),
+  kind: 'post',
+  tags: post.data.tags,
+  text: postSearchText(post),
+}));
+const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
+---
+
+<SiteLayout title={title}>
+  <header class="page-heading archive-heading">
+    <div><p class="eyebrow">{section === 'life' ? 'Everyday life' : 'Games, code & creative projects'}</p><h1>{title}</h1></div>
+  </header>
+
+  <div data-devlog data-archive-url={archiveUrl}>
+    {section === 'devlog' && <GameOverview />}
+    <Window windowId={`${section}-search`}>
+      <form class="search-form" role="search" action={archiveUrl} method="get" data-search-form>
+        <label for="devlog-query">Search entries</label>
+        <div class="search-row">
+          <div class="search-input"><Icon name="search" size={17} /><input id="devlog-query" name="q" type="search" autocomplete="off" maxlength="2048" placeholder="Titles, tags, and article text…" aria-controls="devlog-results" aria-describedby="devlog-search-help" /></div>
+          <button class="button" type="submit">Search</button>
+          <button class="button button-secondary" type="button" data-clear hidden>Clear</button>
+        </div>
+      </form>
+      {tags.length > 0 && <nav class="tag-filters" aria-label="Filter entries by tag">
+        <a href={archiveUrl} class="tag" data-tag="" aria-current="true">All entries</a>
+        {tags.map((tag) => <a class="tag" href={`${archiveUrl}?tag=${encodeURIComponent(tag)}`} data-tag={tag}>{tag}</a>)}
+      </nav>}
+      <p class="result-count" role="status" aria-live="polite" aria-atomic="true" data-result-count>{posts.length} {posts.length === 1 ? 'entry' : 'entries'}</p>
+      <noscript><p class="search-note">Search and tag filtering need JavaScript. All published entries are listed below.</p></noscript>
+      <p class="search-note" id="devlog-search-help">Search by relevance, including typos and partial words. Use quotes for an exact phrase or a minus sign to exclude a word.</p>
+    </Window>
+
+    <Window windowId={`${section}-entries`}>
+      <div id="devlog-results" class="post-list">
+        {posts.map((post) => <div class="post-result" data-post-id={post.data.permalink}><PostCard post={post} /></div>)}
+      </div>
+      {posts.length === 0 && <div class="empty-state archive-empty">
+        <Icon name="book" size={36} /><h2>No entries published yet.</h2>
+      </div>}
+      <div class="empty-state archive-empty" data-no-results hidden>
+        <Icon name="search" size={32} /><h2>No matching entries.</h2><p>Try another search or clear the filters.</p>
+        <button class="button button-secondary" type="button" data-clear>Clear filters</button>
+      </div>
+    </Window>
+    <script id="devlog-search-index" type="application/json" is:inline set:html={indexJson} />
+  </div>
+</SiteLayout>
+
+<script>
+  import { createSearchIndex } from '../lib/search';
+  import type { SearchEntry } from '../lib/search-types';
+  let searchController: AbortController | undefined;
+
+  function initializeSearch() {
+    searchController?.abort();
+    const root = document.querySelector<HTMLElement>('[data-devlog]');
+    if (!root) return;
+    const form = root.querySelector<HTMLFormElement>('[data-search-form]');
+    const input = form?.querySelector<HTMLInputElement>('input[name="q"]');
+    const clearSearch = form?.querySelector<HTMLButtonElement>('[data-clear]');
+    const count = root.querySelector<HTMLElement>('[data-result-count]');
+    const empty = root.querySelector<HTMLElement>('[data-no-results]');
+    const resultList = root.querySelector<HTMLElement>('#devlog-results');
+    const searchData = root.querySelector<HTMLScriptElement>('#devlog-search-index');
+    if (!form || !input || !clearSearch || !count || !empty || !resultList || !searchData) return;
+    searchController = new AbortController();
+    const { signal } = searchController;
+    const clears = root.querySelectorAll<HTMLButtonElement>('[data-clear]');
+    const filters = root.querySelectorAll<HTMLAnchorElement>('[data-tag]');
+    const results = resultList.querySelectorAll<HTMLElement>('[data-post-id]');
+    const index: SearchEntry[] = JSON.parse(searchData.textContent || '[]');
+    const search = createSearchIndex(index);
+    const cards = new Map(Array.from(results, (element) => [element.dataset.postId, element]));
+    let editingSearch = false;
+
+    const synchronize = () => {
+      const parameters = new URL(location.href).searchParams;
+      const query = parameters.get('q') ?? '';
+      const tag = parameters.get('tag') ?? '';
+      input.value = query;
+      const matches = search.search(query, 'post').filter((entry) => !tag || entry.tags.includes(tag));
+      const matchedIds = new Set(matches.map((entry) => entry.id));
+      results.forEach((result) => { result.hidden = !matchedIds.has(result.dataset.postId!); });
+      for (const match of matches) {
+        const card = cards.get(match.id);
+        if (card) resultList.append(card);
+      }
+      const visible = matches.length;
+      count.textContent = `${visible} ${visible === 1 ? 'entry' : 'entries'}${query || tag ? ' found' : ''}${tag ? ` tagged ${tag}` : ''}`;
+      empty.hidden = visible > 0 || index.length === 0;
+      clearSearch.hidden = !query && !tag;
+      filters.forEach((filter) => {
+        if (filter.dataset.tag === tag) filter.setAttribute('aria-current', 'true');
+        else filter.removeAttribute('aria-current');
+        const target = new URL(root!.dataset.archiveUrl!, location.origin);
+        if (query) target.searchParams.set('q', query);
+        if (filter.dataset.tag) target.searchParams.set('tag', filter.dataset.tag);
+        filter.href = `${target.pathname}${target.search}`;
+      });
+    };
+
+    function setFilters(query: string, tag: string, replace = false) {
+      const url = new URL(location.href);
+      query ? url.searchParams.set('q', query) : url.searchParams.delete('q');
+      tag ? url.searchParams.set('tag', tag) : url.searchParams.delete('tag');
+      if (url.href !== location.href) {
+        // Keep Astro's router state, so browser Back also works across page transitions.
+        if (replace) history.replaceState(history.state, '', url);
+        else history.pushState(history.state, '', url);
+      }
+      synchronize();
+    }
+
+    input.addEventListener('input', () => {
+      setFilters(input.value, new URL(location.href).searchParams.get('tag') ?? '', editingSearch);
+      editingSearch = true;
+    }, { signal });
+    input.addEventListener('blur', () => { editingSearch = false; }, { signal });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      setFilters(input.value, new URL(location.href).searchParams.get('tag') ?? '');
+      editingSearch = false;
+    }, { signal });
+    filters.forEach((filter) => filter.addEventListener('click', (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+      event.preventDefault();
+      setFilters(input.value, filter.dataset.tag ?? '');
+      editingSearch = false;
+    }, { signal }));
+    clears.forEach((clear) => clear.addEventListener('click', () => {
+      setFilters('', '');
+      editingSearch = false;
+      input.focus();
+    }, { signal }));
+    window.addEventListener('popstate', () => {
+      editingSearch = false;
+      if (location.pathname === root.dataset.archiveUrl) synchronize();
+    }, { signal });
+    synchronize();
+  }
+
+  document.addEventListener('astro:page-load', initializeSearch);
+  document.addEventListener('astro:before-swap', () => searchController?.abort());
+  initializeSearch();
+</script>
+
+<style>
+  .archive-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  [data-devlog] { display: grid; gap: 1.5rem; }
+  .search-form label { display: block; margin-bottom: .65rem; font-size: .75rem; }
+  .search-row { display: flex; align-items: stretch; flex-wrap: wrap; gap: .65rem; }
+  .search-input { display: flex; flex: 1 1 16rem; gap: .65rem; align-items: center; background: var(--page-bg); border: 1px solid var(--line); box-shadow: inset 1px 1px 2px rgb(0 0 0 / .08); padding: 0 .8rem; }
+  .search-input input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: .8rem; padding: .85rem 0; }
+  .search-input:focus-within { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .search-input input:focus { outline: none; }
+  .tag-filters { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1.1rem; }
+  .tag-filters [aria-current] { background: var(--sage); color: var(--ink); box-shadow: inset 1px 1px 2px rgb(0 0 0 / .15); }
+  .result-count { font-size: .7rem; color: var(--muted); margin: 1rem 0 0; }
+  .post-result { border-bottom: 1px solid var(--line); padding: 1.6rem 0; }
+  .post-result:first-child { padding-top: 0; }
+  .post-result:last-child { padding-bottom: 0; border-bottom: 0; }
+  .post-result[hidden], [data-no-results][hidden], [data-clear][hidden] { display: none; }
+  .archive-empty { text-align: center; padding: 3rem 1rem; }
+  .archive-empty :global(svg) { margin: 0 auto 1rem; opacity: .65; }
+  .archive-empty h2 { font-size: 1rem; }
+  .archive-empty p, .search-note { font-family: var(--font-reading); color: var(--muted); }
+</style>

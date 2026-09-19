@@ -14,15 +14,23 @@ media_library:
   name: gwenlium-previews
 collections:
   - name: posts
-    label: Devlog
+    label: Journal posts
     folder: src/content/posts
     create: true
     extension: md
     format: frontmatter
     slug: "{{fields.permalink}}"
     identifier_field: title
-    preview_path: devlog/{{fields.permalink}}
+    preview_path: "{{fields.section}}/{{fields.permalink}}"
     fields:
+      - name: section
+        label: Journal
+        widget: select
+        default: devlog
+        options:
+          - { label: Devlog, value: devlog }
+          - { label: Life, value: life }
+        hint: Devlog is for games, code and creative projects. Life is for personal posts. Choose before publishing; changing it changes the address.
       - name: draft
         label: Draft — excluded from the website, NOT private
         widget: boolean
@@ -43,7 +51,7 @@ collections:
         label: Permanent URL slug
         widget: string
         required: true
-        hint: Must be unique. The address is /devlog/your-slug/. Keep this unchanged
+        hint: Must be unique. The address is /devlog/your-slug/ or /life/your-slug/. Keep this unchanged
           after publication so shared links continue to work.
         pattern:
           - ^[a-z0-9]+(?:-[a-z0-9]+)*$
@@ -66,7 +74,7 @@ collections:
         hint: Write the summary used in cards, metadata and RSS. Leave empty to omit it;
           no summary is generated.
       - name: tags
-        label: Tags
+        label: Project & topic tags
         widget: list
         required: false
         default: []
@@ -145,10 +153,10 @@ collections:
               device.
         collapsed: true
   - name: site
-    label: Site, game & about
+    label: Site, featured game & about
     files:
       - name: site
-        label: Site, game & about
+        label: Site, featured game & about
         file: src/content/site.json
         fields:
           - name: name
@@ -457,15 +465,15 @@ collections:
                 widget: select
                 required: true
                 default: home
-                hint: "Choose where a custom window appears: post means every devlog article;
+                hint: "Choose where a custom window appears: post means every journal article;
                   all means every page. Do not change a built-in window's
                   assigned page. Reorder custom windows in this list to change
                   their order on the page."
                 options:
                   - home
                   - devlog
+                  - life
                   - post
-                  - game
                   - gallery
                   - music
                   - about
@@ -543,7 +551,7 @@ collections:
                 hint: default preserves the built-in content and is forbidden for custom
                   windows. Other choices replace a built-in window's content.
                   site-settings, music-player and start-menu must use default.
-                  Edit original default content in Site, Devlog, Gallery or
+                  Edit original default content in Site, Journal posts, Gallery or
                   Music.
                 options:
                   - default
@@ -551,6 +559,7 @@ collections:
                   - media
                   - links
                   - devlog
+                  - life
                   - gallery
                   - music
                   - subscribe
@@ -623,7 +632,7 @@ collections:
                 widget: list
                 required: false
                 default: []
-                hint: For devlog, enter published permanent URL slugs; for gallery, gallery IDs;
+                hint: For devlog or life, enter published permanent URL slugs; for gallery, gallery IDs;
                   for music, track IDs. The order here is the display order.
                   Leave empty to use all available items. Draft and future posts
                   cannot appear. Leave empty for other content types. Disabled

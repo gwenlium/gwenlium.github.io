@@ -23,6 +23,7 @@ const posts = defineCollection({
     date: z.union([z.string(), z.date()]).optional().transform(calendarDate),
     excerpt: z.string().default(''),
     draft: z.boolean().default(true),
+    section: z.enum(['devlog', 'life']).default('devlog'),
     tags: z.array(z.string()).default([]),
     cover: z.string().default(''),
     coverAlt: z.string().default(''),

@@ -1,0 +1,170 @@
+---
+import { render } from 'astro:content';
+import SiteLayout from '../layouts/SiteLayout.astro';
+import Window from '../components/Window.astro';
+import Icon from '../components/Icon.astro';
+import Media from '../components/Media.astro';
+import { getPosts, postUrl, formatDate, type Post } from '../lib/content';
+import { hasWindowOverride } from '../lib/windows';
+
+interface Props { post: Post; newer?: Post; older?: Post }
+const { post, newer, older } = Astro.props;
+const { Content, headings } = await render(post);
+const contents = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+const related = (await getPosts(post.data.section))
+  .filter((candidate) => candidate.id !== post.id)
+  .map((candidate) => ({ candidate, sharedTags: candidate.data.tags.filter((tag) => post.data.tags.includes(tag)).length }))
+  .filter(({ sharedTags }) => sharedTags > 0)
+  .sort((a, b) => b.sharedTags - a.sharedTags)
+  .slice(0, 3);
+const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').href;
+---
+
+<SiteLayout title={post.data.title} description={post.data.excerpt} image={post.data.cover} imageAlt={post.data.coverAlt} article>
+  <a class="back-link" href={`/${post.data.section}/`}><span aria-hidden="true">←</span> All entries</a>
+  <div class="article-layout">
+    <Window windowId="post-entry">
+      <div slot="titlebar-actions" class="dialogue-option" data-dialogue-option hidden>
+        <button class="button button-secondary" type="button" data-dialogue-enter aria-controls="entry-content" title="Read one block at a time">Dialogue mode</button>
+      </div>
+      <article class="entry">
+        <header class="entry-header">
+          <p class="eyebrow"><time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time></p>
+          <h1>{post.data.title}</h1>
+          {post.data.excerpt && <p class="entry-excerpt">{post.data.excerpt}</p>}
+          {post.data.tags.length > 0 && <ul class="entry-tags" aria-label="Tags">{post.data.tags.map((tag) => <li><a class="tag" href={`/${post.data.section}/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>)}</ul>}
+        </header>
+        {post.data.cover && <div class="entry-cover"><Media src={post.data.cover} alt={post.data.coverAlt} eager /></div>}
+        {contents.length >= 2 && <nav class="contents" aria-label="On this page">
+          <h2>On this page</h2>
+          <ol>{contents.map((heading) => <li class:list={{ nested: heading.depth === 3 }}><a href={`#${heading.slug}`}>{heading.text}</a></li>)}</ol>
+        </nav>}
+        <div class="dialogue-reader" data-dialogue-reader>
+          <div class="dialogue-heading" data-dialogue-heading hidden>
+            <span class="eyebrow">Dialogue mode</span>
+            <button class="button button-secondary" type="button" data-dialogue-exit>Read full post</button>
+          </div>
+          <div id="entry-content" data-dialogue-content>
+            <div class="prose entry-body" data-dialogue-blocks><Content /></div>
+            {post.data.media.length > 0 && <div class="entry-media" data-dialogue-blocks>{post.data.media.map((media) => <Media {...media} />)}</div>}
+          </div>
+          <nav class="dialogue-controls" aria-label="Dialogue reading" data-dialogue-controls hidden>
+            <button class="button button-secondary" type="button" data-dialogue-back disabled>Back</button>
+            <span class="dialogue-progress" role="status" aria-live="polite" aria-atomic="true" data-dialogue-progress></span>
+            <button class="button" type="button" data-dialogue-next><span data-dialogue-next-label>Continue</span><span class="dialogue-caret pixel-caret" aria-hidden="true"></span></button>
+          </nav>
+        </div>
+        <footer class="entry-footer" data-share-entry>
+          <button class="button button-secondary" type="button" data-copy-link={shareUrl}><Icon name="external" size={15} /> Copy link</button>
+          <span class="copy-feedback" role="status" aria-live="polite" data-copy-feedback></span>
+          <label class="copy-fallback" hidden data-copy-fallback>Entry link<input type="text" readonly value={shareUrl} aria-label="Entry link to copy" /></label>
+        </footer>
+      </article>
+    </Window>
+
+    {(older || newer) && <nav class="entry-pagination" aria-label="Other journal entries">
+      {older ? <a href={postUrl(older)} rel="prev"><span class="eyebrow">← Older entry</span><span>{older.data.title}</span></a> : <span />}
+      {newer && <a href={postUrl(newer)} rel="next"><span class="eyebrow">Newer entry →</span><span>{newer.data.title}</span></a>}
+    </nav>}
+
+    {(related.length > 0 || hasWindowOverride('post-related')) && <Window windowId="post-related">
+      <nav aria-label="Related entries"><ul class="related-list">{related.map(({ candidate }) => <li><a href={postUrl(candidate)}>{candidate.data.title}</a><time datetime={candidate.data.date.toISOString().slice(0, 10)}>{formatDate(candidate.data.date)}</time></li>)}</ul></nav>
+    </Window>}
+  </div>
+</SiteLayout>
+
+<script>
+  import '../scripts/dialogue-reader';
+
+  let shareController: AbortController | undefined;
+  function initializeSharing() {
+    shareController?.abort();
+    const root = document.querySelector<HTMLElement>('[data-share-entry]');
+    if (!root) return;
+    shareController = new AbortController();
+    const { signal } = shareController;
+    const button = root.querySelector<HTMLButtonElement>('[data-copy-link]')!;
+    const feedback = root.querySelector<HTMLElement>('[data-copy-feedback]')!;
+    const fallback = root.querySelector<HTMLElement>('[data-copy-fallback]')!;
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copyLink!);
+        if (signal.aborted) return;
+        feedback.textContent = 'Link copied.';
+        fallback.hidden = true;
+      } catch {
+        if (signal.aborted) return;
+        feedback.textContent = 'Select and copy the link below.';
+        fallback.hidden = false;
+        const input = fallback.querySelector('input')!;
+        input.focus();
+        input.select();
+      }
+    }, { signal });
+  }
+  document.addEventListener('astro:page-load', initializeSharing);
+  document.addEventListener('astro:before-swap', () => shareController?.abort());
+  initializeSharing();
+</script>
+
+<style>
+  .back-link { display: inline-flex; align-items: center; gap: .65rem; font-size: .75rem; margin: 0 0 1.5rem; text-underline-offset: .25em; }
+  .article-layout { display: grid; gap: 1.5rem; max-width: 60rem; margin-inline: auto; }
+  .entry { max-width: 48rem; margin: 0 auto; padding: clamp(.25rem, 2cqi, 1.5rem); }
+  .entry-header { margin-bottom: clamp(1.25rem, 4cqi, 2rem); }
+  .entry-header h1 { font-size: clamp(1.5rem, 1.1rem + 2.5cqi, 2.4rem); line-height: 1.4; overflow-wrap: anywhere; margin: .8rem 0 1.2rem; }
+  .entry-excerpt { font-family: var(--font-reading); font-size: clamp(1rem, .9rem + .5cqi, 1.15rem); line-height: 1.8; color: var(--muted); }
+  .entry-tags { display: flex; flex-wrap: wrap; gap: .5rem; padding: 0; margin: 1.5rem 0 0; list-style: none; }
+  .entry-cover { margin: 0 0 clamp(1.25rem, 4cqi, 2rem); }
+  .entry-cover :global(figure) { margin: 0; }
+  .contents { padding: clamp(.75rem, 3cqi, 1.25rem) clamp(.75rem, 3cqi, 1.5rem); margin: clamp(1.25rem, 4cqi, 2rem) 0; background: var(--page-bg); border: 1px solid var(--line); box-shadow: inset 1px 1px 2px rgb(0 0 0 / .05); }
+  .contents h2 { font-size: .8rem; margin: 0 0 .8rem; }
+  .contents ol { padding-left: 1.2rem; margin: 0; font-family: var(--font-reading); font-size: .95rem; line-height: 1.9; }
+  .contents .nested { margin-left: 1rem; }
+  .contents a { overflow-wrap: anywhere; text-underline-offset: .2em; }
+  .entry-body :global(h2), .entry-body :global(h3) { scroll-margin-top: 2rem; }
+  .entry-media { display: grid; gap: clamp(.75rem, 3cqi, 1.5rem); margin-top: clamp(1.25rem, 4cqi, 2rem); }
+  .dialogue-option button { min-height: 24px; padding: .25rem .4rem; font-size: .6rem; white-space: nowrap; }
+  .dialogue-option[hidden], .dialogue-heading[hidden], .dialogue-controls[hidden], .dialogue-reader :global([data-dialogue-hidden]) { display: none !important; }
+  .dialogue-reader[data-dialogue-active] { border: 2px solid var(--line); background: var(--surface); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
+  .dialogue-heading { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: .75rem; border-bottom: 1px solid var(--line); background: var(--surface-raised); }
+  .dialogue-heading .eyebrow { font-size: .65rem; }
+  .dialogue-heading button, .dialogue-controls button { min-height: 2.5rem; font-size: .7rem; }
+  .dialogue-reader[data-dialogue-active] [data-dialogue-content] { padding: clamp(.5rem, 3cqi, 1.5rem); min-height: 8rem; }
+  .dialogue-reader[data-dialogue-active] .entry-body > :global(:first-child) { margin-top: 0; }
+  .dialogue-reader[data-dialogue-active] .entry-media { margin-top: 0; }
+  .dialogue-controls { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: .75rem; border-top: 1px solid var(--line); background: var(--surface-raised); }
+  .dialogue-progress { flex: 1; text-align: center; font-family: var(--font-reading); font-size: .9rem; color: var(--muted); }
+  .dialogue-controls button:disabled { cursor: default; opacity: .5; }
+  .dialogue-caret { position: relative; display: inline-block; flex-shrink: 0; rotate: 90deg; animation: jrpg-caret 1.1s ease-in-out infinite; }
+  @media (pointer: coarse) { .dialogue-option button { min-height: 28px; } }
+  @container window-content (max-width: 360px) {
+    .dialogue-heading, .dialogue-controls { padding: .5rem; }
+    .dialogue-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dialogue-controls button { min-width: 0; padding-inline: .5rem; }
+    .dialogue-progress { grid-column: 1 / -1; grid-row: 1; }
+  }
+  @media print {
+    :global(#post-entry) { display: block !important; position: static !important; width: auto !important; height: auto !important; max-height: none !important; overflow: visible !important; transform: none !important; break-inside: auto; }
+    :global(#post-entry > .window-body) { display: block !important; height: auto !important; max-height: none !important; overflow: visible !important; }
+    .dialogue-option, .dialogue-heading, .dialogue-controls { display: none !important; }
+    .dialogue-reader[data-dialogue-active] { border: 0; box-shadow: none; background: none; }
+    .dialogue-reader[data-dialogue-active] [data-dialogue-content] { padding: 0; min-height: 0; }
+    .dialogue-reader :global([data-dialogue-hidden]) { display: revert !important; }
+  }
+  .entry-footer { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; padding-top: clamp(1rem, 3cqi, 1.5rem); margin-top: clamp(1.5rem, 5cqi, 2.5rem); border-top: 1px solid var(--line); }
+  .copy-feedback { color: var(--muted); font-size: .7rem; }
+  .copy-fallback { flex-basis: 100%; min-width: 0; font-size: .75rem; }
+  .copy-fallback input { display: block; width: 100%; min-width: 0; padding: .7rem; color: var(--ink); background: var(--page-bg); border: 1px solid var(--line); margin-top: .6rem; font-family: var(--font-reading); }
+  .copy-fallback[hidden] { display: none; }
+  .entry-pagination { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .entry-pagination a { padding: 1rem; border: 1px solid var(--line); background: var(--surface); text-decoration: none; font-size: .9rem; line-height: 1.6; overflow-wrap: anywhere; }
+  .entry-pagination a:hover { background: var(--surface-raised); }
+  .entry-pagination .eyebrow { display: block; margin-bottom: .7rem; font-size: .6rem; }
+  .entry-pagination > :last-child { text-align: right; }
+  .related-list { list-style: none; display: grid; gap: 1rem; padding: 0; margin: 0; }
+  .related-list li { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; justify-content: space-between; }
+  .related-list a { min-width: 0; font-size: .85rem; overflow-wrap: anywhere; text-underline-offset: .25em; }
+  .related-list time { color: var(--muted); font-size: .65rem; }
+  @media (max-width: 480px) { .entry-pagination { grid-template-columns: 1fr; } .entry-pagination > :last-child { text-align: left; } }
+</style>

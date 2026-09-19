@@ -132,7 +132,7 @@ export function readPosts(root, report) {
     .flatMap((file) => {
       const name = relativeName(root, file);
       try {
-        const source = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
+        const source = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
         const language = matter.test(source) ? matter.language(source).name : '';
         if (language && language !== 'yaml') throw new Error('Use YAML frontmatter delimited by ---. Executable or alternate frontmatter engines are not supported.');
         const parsed = matter(source, {
@@ -343,6 +343,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
       else slugs.set(key, file);
     }
     if (data.draft !== undefined && typeof data.draft !== 'boolean') report(file, 'draft', 'Use the YAML boolean true or false, not quoted text. Omitted draft defaults to true.');
+    if (data.section !== undefined && !['devlog', 'life'].includes(data.section)) report(file, 'section', 'Choose devlog or life.');
     const date = isoDate(data.date);
     if (data.draft !== false || (date && date.getTime() > now.getTime())) continue;
     text(data.title, file, 'title', true);
@@ -351,7 +352,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
     if (data.excerpt !== undefined && typeof data.excerpt !== 'string') report(file, 'excerpt', 'Provide a text string, or leave the excerpt empty.');
     if (data.tags !== undefined && (!Array.isArray(data.tags) || data.tags.some((tag) => typeof tag !== 'string'))) report(file, 'tags', 'Use an array of text strings.');
     if (data.featured !== undefined && typeof data.featured !== 'boolean') report(file, 'featured', 'Use the YAML boolean true or false.');
-    const base = `${siteOrigin}/devlog/${permalinkPattern.test(data.permalink ?? '') ? data.permalink : 'post'}/`;
+    const base = `${siteOrigin}/${data.section ?? 'devlog'}/${permalinkPattern.test(data.permalink ?? '') ? data.permalink : 'post'}/`;
     image(data.cover, data.coverAlt, file, 'cover', base);
     mediaItems(data.media, file, 'media', { base });
     markdown(post.body, file, base);
@@ -443,7 +444,8 @@ export function validateSource(root = projectRoot, now = new Date()) {
     else {
       const ids = new Set();
       const selections = {
-        devlog: new Set(posts.filter((post) => isPublishedPost(post.data, now)).map((post) => post.data.permalink)),
+        life: new Set(posts.filter((post) => post.data.section === 'life' && isPublishedPost(post.data, now)).map((post) => post.data.permalink)),
+        devlog: new Set(posts.filter((post) => (post.data.section ?? 'devlog') === 'devlog' && isPublishedPost(post.data, now)).map((post) => post.data.permalink)),
         gallery: new Set(Array.isArray(art?.value.items) ? art.value.items.filter(isObject).map((item) => item.id) : []),
         music: new Set(Array.isArray(music?.value.tracks) ? music.value.tracks.filter(isObject).map((track) => track.id) : []),
       };
@@ -476,7 +478,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
           if (!Number.isSafeInteger(window[key]) || window[key] < 0) report(file, `${field}.${key}`, `Provide a nonnegative whole number; 0 means ${key === 'limit' ? 'all items' : 'automatic size'}.`);
         }
         if (!windowContents.includes(window.content)) report(file, `${field}.content`, `Choose one of: ${windowContents.join(', ')}.`);
-        if (!builtin && window.content === 'default') report(file, `${field}.content`, 'Custom windows have no built-in content. Choose text, media, links, devlog, gallery, music or subscribe.');
+        if (!builtin && window.content === 'default') report(file, `${field}.content`, 'Custom windows have no built-in content. Choose text, media, links, devlog, life, gallery, music or subscribe.');
         if (system) {
           if (window.enabled !== true) report(file, `${field}.enabled`, `Keep ${window.id} enabled so site controls remain available.`);
           if (window.content !== 'default') report(file, `${field}.content`, `Keep default content for ${window.id}; its working controls cannot be replaced.`);
@@ -506,12 +508,12 @@ export function validateSource(root = projectRoot, now = new Date()) {
             if (selected.has(id)) report(file, key, `Duplicate selected ID ${JSON.stringify(id)}. Select each item only once.`);
             selected.add(id);
             if (window.enabled === true && available && !available.has(id)) {
-              report(file, key, window.content === 'devlog'
+              report(file, key, ['devlog', 'life'].includes(window.content)
                 ? `No published post has permalink ${JSON.stringify(id)}. Draft and future posts cannot appear; choose a published permalink or disable this window while preparing it.`
                 : `No ${window.content === 'gallery' ? 'gallery item' : 'music track'} has ID ${JSON.stringify(id)}. Choose an existing ID or disable this window while preparing it.`);
             }
           });
-          if (window.enabled === true && window.items.length && !available) report(file, `${field}.items`, 'Item selections only apply to devlog, gallery or music content. Use [] for other content types.');
+          if (window.enabled === true && window.items.length && !available) report(file, `${field}.items`, 'Item selections only apply to devlog, life, gallery or music content. Use [] for other content types.');
         }
         if (window.enabled !== true) return;
         const page = windowPages.includes(window.page) ? window.page : 'home';

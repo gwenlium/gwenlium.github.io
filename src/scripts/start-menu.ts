@@ -31,7 +31,7 @@ let searchState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
 let searchIndex: SearchIndex | undefined;
 let resultLimit = 10;
 const navigationShortcuts: Record<string, string | undefined> = {
-  h: '/', d: '/devlog/', g: '/game/', i: '/gallery/', m: '/music/', a: '/about/', s: '/subscribe/',
+  h: '/', d: '/devlog/', l: '/life/', i: '/gallery/', m: '/music/', a: '/about/', s: '/subscribe/',
 };
 
 

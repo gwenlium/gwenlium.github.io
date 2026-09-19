@@ -11,11 +11,12 @@ const { title, date, excerpt, cover, coverAlt, tags } = post.data;
 <article class:list={['post-card', { 'has-cover': cover }]}>
   {cover && <div class="post-cover"><Media src={cover} alt={coverAlt} /></div>}
   <div class="post-details">
+    <a class="tag" href={`/${post.data.section}/`}>{post.data.section === 'life' ? 'Life' : 'Devlog'}</a>
     <time datetime={date.toISOString().slice(0, 10)}>{formatDate(date)}</time>
     <h2><a href={postUrl(post)}>{title}</a></h2>
     {excerpt && <p class="post-excerpt">{excerpt}</p>}
     {tags.length > 0 && <ul class="post-tags" aria-label="Tags">{tags.map((tag) => (
-      <li><a class="tag" href={`/devlog/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>
+      <li><a class="tag" href={`/${post.data.section}/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>
     ))}</ul>}
     <a class="read-post" href={postUrl(post)} aria-label={`Read ${title}`}>Read entry <Icon name="arrow" size={14} /></a>
   </div>

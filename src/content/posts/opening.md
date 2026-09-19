@@ -1,5 +1,6 @@
 ---
 draft: false
+section: devlog
 title: Grand opening
 permalink: opening
 date: 2026-09-17

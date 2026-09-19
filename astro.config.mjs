@@ -7,7 +7,7 @@ export default defineConfig({
   site: 'https://gwenlium.dev',
   output: 'static',
   trailingSlash: 'always',
-  integrations: [sitemap({ filter: (page) => !page.endsWith('/404/') && !page.endsWith('/admin/') })],
+  integrations: [sitemap({ filter: (page) => !page.endsWith('/game/') && !page.endsWith('/404/') && !page.endsWith('/admin/') })],
   markdown: { processor: unified({ rehypePlugins: [rehypeMedia] }) },
   vite: { server: { fs: { strict: true } } },
 });

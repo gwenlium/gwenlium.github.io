@@ -2,8 +2,8 @@ import data from '../content/windows.json';
 import { builtinWindowPages } from './window-catalogue.mjs';
 import type { Link } from './settings';
 
-export type WindowPage = 'home' | 'devlog' | 'post' | 'game' | 'gallery' | 'music' | 'about' | 'subscribe' | 'not-found' | 'all';
-export type WindowContent = 'default' | 'text' | 'media' | 'links' | 'devlog' | 'gallery' | 'music' | 'subscribe';
+export type WindowPage = 'home' | 'devlog' | 'life' | 'post' | 'gallery' | 'music' | 'about' | 'subscribe' | 'not-found' | 'all';
+export type WindowContent = 'default' | 'text' | 'media' | 'links' | 'devlog' | 'life' | 'gallery' | 'music' | 'subscribe';
 export type WindowTone = 'sage' | 'pink' | 'lavender';
 export interface WindowMedia {
   type: 'image' | 'video' | 'audio';

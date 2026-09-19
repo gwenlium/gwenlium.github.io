@@ -1,5 +1,5 @@
-export const windowPages = ['home', 'devlog', 'post', 'game', 'gallery', 'music', 'about', 'subscribe', 'not-found', 'all'];
-export const windowContents = ['default', 'text', 'media', 'links', 'devlog', 'gallery', 'music', 'subscribe'];
+export const windowPages = ['home', 'devlog', 'life', 'post', 'gallery', 'music', 'about', 'subscribe', 'not-found', 'all'];
+export const windowContents = ['default', 'text', 'media', 'links', 'devlog', 'life', 'gallery', 'music', 'subscribe'];
 export const windowTones = ['sage', 'pink', 'lavender'];
 export const builtinWindowPages = {
   'home-intro': 'home',
@@ -9,10 +9,12 @@ export const builtinWindowPages = {
   'home-music': 'home',
   'devlog-search': 'devlog',
   'devlog-entries': 'devlog',
+  'life-search': 'life',
+  'life-entries': 'life',
   'post-entry': 'post',
   'post-related': 'post',
-  'game-details': 'game',
-  'game-trailer': 'game',
+  'game-details': 'devlog',
+  'game-trailer': 'devlog',
   'gallery-content': 'gallery',
   'music-library': 'music',
   'music-catalogue': 'music',

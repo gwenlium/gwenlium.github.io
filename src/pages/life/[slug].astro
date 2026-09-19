@@ -2,7 +2,7 @@
 import JournalPost from '../../components/JournalPost.astro';
 import { getPosts } from '../../lib/content';
 export async function getStaticPaths() {
-  const posts = await getPosts('devlog');
+  const posts = await getPosts('life');
   return posts.map((post, index) => ({
     params: { slug: post.data.permalink },
     props: { post, newer: posts[index - 1], older: posts[index + 1] },

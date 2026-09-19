@@ -16,9 +16,10 @@ const feedUrl = new URL('/rss.xml', Astro.site || 'https://gwenlium.dev').href;
     <Window windowId="subscribe-rss">
       <div class="option-heading"><Icon name="rss" size={30} /><span class="tag">No account needed</span></div>
       <h2>RSS</h2>
-      <p class="option-description">Full devlog posts in your RSS reader.</p>
+      <p class="option-description">Full Devlog and Life posts in your RSS reader. Copy this address and add it to your reader to subscribe.</p>
       <div class="feed-actions">
         <button type="button" class="button-secondary" data-copy-feed={feedUrl}>Copy feed address</button>
+        <a class="button-secondary" href={feedUrl} data-astro-reload>Open RSS XML</a>
         <p class="copy-status" role="status" aria-live="polite" data-copy-status></p>
       </div>
       <label class="feed-label" for="feed-address">Feed address</label>

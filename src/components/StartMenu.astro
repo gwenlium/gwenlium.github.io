@@ -7,7 +7,7 @@ const definition = getWindowDefinition('start-menu')!;
 const navigation = [
   { title: 'Home', href: '/', icon: 'home' },
   { title: 'Devlog', href: '/devlog/', icon: 'book' },
-  { title: 'Game', href: '/game/', icon: 'game' },
+  { title: 'Life', href: '/life/', icon: 'user' },
   { title: 'Gallery', href: '/gallery/', icon: 'image' },
   { title: 'Music', href: '/music/', icon: 'music' },
   { title: 'About', href: '/about/', icon: 'user' },
@@ -43,7 +43,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
         <h3 id="start-pages-title">Pages</h3>
         <ul>
           {navigation.map((item) => (
-            <li><a href={item.href} aria-current={path === (item.href.replace(/\/$/, '') || '/') || (item.href === '/devlog/' && path.startsWith('/devlog/')) ? 'page' : undefined}>
+            <li><a href={item.href} aria-current={path === (item.href.replace(/\/$/, '') || '/') || (['/devlog/', '/life/'].includes(item.href) && path.startsWith(item.href)) ? 'page' : undefined}>
               <Icon name={item.icon} size={17} /><span>{item.title}</span><Icon name="chevron" size={12} />
             </a></li>
           ))}
@@ -69,7 +69,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
         <dt><kbd>?</kbd></dt><dd>Keyboard shortcuts</dd>
         <dt><kbd>H</kbd></dt><dd>Home</dd>
         <dt><kbd>D</kbd></dt><dd>Devlog</dd>
-        <dt><kbd>G</kbd></dt><dd>Game</dd>
+        <dt><kbd>L</kbd></dt><dd>Life</dd>
         <dt><kbd>I</kbd></dt><dd>Gallery</dd>
         <dt><kbd>M</kbd></dt><dd>Music</dd>
         <dt><kbd>A</kbd></dt><dd>About</dd>

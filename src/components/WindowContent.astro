@@ -61,7 +61,7 @@ if (definition.content === 'text' && definition.body.trim()) {
   body = $.html();
 }
 
-const posts = definition.content === 'devlog' ? selectItems(await getPosts(), (post) => post.data.permalink) : [];
+const posts = (definition.content === 'devlog' || definition.content === 'life') ? selectItems(await getPosts(definition.content), (post) => post.data.permalink) : [];
 const galleryItems = definition.content === 'gallery' ? selectItems(gallery, (item) => item.id) : [];
 const musicTracks = definition.content === 'music' ? selectItems(tracks, (track) => track.id) : [];
 ---
@@ -79,7 +79,7 @@ const musicTracks = definition.content === 'music' ? selectItems(tracks, (track)
   ))}</ul> : <p class="empty-state">No links published yet.</p>
 )}
 
-{definition.content === 'devlog' && (
+{(definition.content === 'devlog' || definition.content === 'life') && (
   posts.length ? <div class="window-posts">{posts.map((post) => <PostCard post={post} />)}</div>
     : <p class="empty-state">No entries published yet.</p>
 )}

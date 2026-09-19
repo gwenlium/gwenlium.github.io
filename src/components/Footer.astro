@@ -7,7 +7,7 @@ const path = Astro.url.pathname;
 const navigation = [
   { href: '/', label: 'Home' },
   { href: '/devlog/', label: 'Devlog' },
-  { href: '/game/', label: 'Game' },
+  { href: '/life/', label: 'Life' },
   { href: '/gallery/', label: 'Gallery' },
   { href: '/music/', label: 'Music' },
   { href: '/about/', label: 'About' },
@@ -23,7 +23,7 @@ const navigation = [
         {item.label}
       </a>
     ))}
-    <a class="footer-link" href="/rss.xml" data-astro-reload>RSS feed<Icon name="rss" size={12} /></a>
+    <a class="footer-link" href="/subscribe/#subscribe-rss">RSS feed<Icon name="rss" size={12} /></a>
     <a class="footer-link" href={site.githubUrl}>GitHub<Icon name="external" size={12} /></a>
     {site.about.links.map((link) => (
       <a class="footer-link" href={link.url}>{link.label}<Icon name="external" size={12} /></a>

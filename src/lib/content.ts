@@ -3,7 +3,7 @@ import { load } from 'cheerio';
 
 export type Post = CollectionEntry<'posts'>;
 
-export async function getPosts(): Promise<Post[]> {
+export async function getPosts(section?: 'devlog' | 'life'): Promise<Post[]> {
   const posts = await getCollection('posts');
   const permalinks = new Map<string, string>();
   const now = Date.now();
@@ -19,13 +19,13 @@ export async function getPosts(): Promise<Post[]> {
   }
 
   return posts
-    .filter(({ data }) => !data.draft && Number.isFinite(data.date.getTime()) && data.date.getTime() <= now)
+    .filter(({ data }) => (!section || data.section === section) && !data.draft && Number.isFinite(data.date.getTime()) && data.date.getTime() <= now)
     .sort((a, b) => b.data.date.getTime() - a.data.date.getTime()
       || (a.data.permalink < b.data.permalink ? -1 : a.data.permalink > b.data.permalink ? 1 : 0));
 }
 
 export function postUrl(post: Post): string {
-  return `/devlog/${post.data.permalink}/`;
+  return `/${post.data.section}/${post.data.permalink}/`;
 }
 
 export function postSearchText(post: Post): string {

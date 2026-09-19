@@ -80,7 +80,7 @@
 }
 
 /* Blue */
-:root[data-page-theme='game'] {
+:root[data-page-theme='life'] {
   --page-bg: #dce8f1;
   --surface: #edf5fa;
   --surface-raised: #f8fcff;
@@ -99,7 +99,7 @@
   --shadow: 3px 4px 0 #28496224, 0 10px 30px #2849620a;
 }
 
-:root[data-page-theme='game'][data-theme='dark'] {
+:root[data-page-theme='life'][data-theme='dark'] {
   --page-bg: #192b39;
   --surface: #233a4b;
   --surface-raised: #2c485b;
@@ -353,7 +353,7 @@
     --shadow: 3px 4px 0 #100a1c70, 0 10px 30px #100a1c20;
   }
 
-  :root[data-page-theme='game']:not([data-theme]) {
+  :root[data-page-theme='life']:not([data-theme]) {
     --page-bg: #192b39;
     --surface: #233a4b;
     --surface-raised: #2c485b;

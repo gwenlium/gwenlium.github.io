@@ -44,11 +44,12 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
             </div>
           )}
           <div class="game-preview__copy">
-            <p class="eyebrow"><Icon name="game" size={15} />Game</p>
+            <p class="eyebrow"><Icon name="game" size={15} />Game development</p>
             <h2>{game.title || 'Game'}</h2>
             {game.status && <p class="game-status"><span aria-hidden="true"></span>{game.status}</p>}
             {game.description && <p class="game-description">{game.description}</p>}
             <div class="game-actions">
+              <a href="/devlog/">Devlog <Icon name="arrow" size={14} /></a>
               {game.trailerUrl && <a class="game-trailer" href={game.trailerUrl}><Icon name="play" size={14} />Watch trailer</a>}
             </div>
           </div>
@@ -75,7 +76,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
         ) : (
           <div class="devlog-empty">
             <span class="empty-book"><Icon name="book" size={30} /></span>
-            <div><h2>Devlog</h2><p>No published posts yet.</p></div>
+            <div><h2>Journal</h2><p>No published posts yet.</p></div>
           </div>
         )}
       </Window>

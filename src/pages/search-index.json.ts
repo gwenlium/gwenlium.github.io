@@ -9,7 +9,7 @@ import { getWindowDefinition, hasWindowOverride, windowDefinitions, type WindowD
 export const prerender = true;
 
 const pageRoutes: Record<Exclude<WindowPage, 'post'>, string> = {
-  home: '/', devlog: '/devlog/', game: '/game/', gallery: '/gallery/', music: '/music/',
+  home: '/', devlog: '/devlog/', life: '/life/', gallery: '/gallery/', music: '/music/',
   about: '/about/', subscribe: '/subscribe/', 'not-found': '/404.html', all: '/',
 };
 
@@ -91,11 +91,11 @@ export async function GET(): Promise<Response> {
 
   const tagCounts = new Map<string, number>();
   for (const post of posts) {
-    for (const tag of new Set(post.data.tags)) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+    for (const tag of new Set(post.data.tags)) tagCounts.set(`${post.data.section}:${tag}`, (tagCounts.get(`${post.data.section}:${tag}`) ?? 0) + 1);
   }
-  const relatedPost = posts.find((post) => post.data.tags.some((tag) => (tagCounts.get(tag) ?? 0) > 1));
+  const relatedPost = posts.find((post) => post.data.tags.some((tag) => (tagCounts.get(`${post.data.section}:${tag}`) ?? 0) > 1));
   const relatedPosts = relatedPost ? posts
-    .filter((post) => post.id !== relatedPost.id)
+    .filter((post) => post.id !== relatedPost.id && post.data.section === relatedPost.data.section)
     .map((post) => ({ post, sharedTags: post.data.tags.filter((tag) => relatedPost.data.tags.includes(tag)).length }))
     .filter(({ sharedTags }) => sharedTags > 0)
     .sort((a, b) => b.sharedTags - a.sharedTags)
@@ -112,6 +112,7 @@ export async function GET(): Promise<Response> {
         case 'about-portrait': if (!site.about.avatar) return undefined; break;
         case 'game-trailer': if (!hasTrailer) return undefined; break;
         case 'game-details':
+          if (!hasGameContent && !hasWindowOverride('game-trailer')) return undefined;
           if ((hasGameContent || hasWindowOverride('game-trailer')) && !game.description && !gameLinks.length) return undefined;
           break;
         case 'post-related': if (!relatedPost) return undefined; break;
@@ -134,7 +135,8 @@ export async function GET(): Promise<Response> {
       case 'home-devlog': return text(featuredPost && postCardText(featuredPost), ...recentPosts.map((post) => post.data.title));
       case 'home-gallery': return text(...galleryPreview.map((item) => text(item.title, item.alt)));
       case 'home-music': return text(...musicPreview.map(trackText));
-      case 'devlog-entries': return text(...posts.map(postCardText));
+      case 'devlog-entries': return text(...posts.filter((post) => post.data.section === 'devlog').map(postCardText));
+      case 'life-entries': return text(...posts.filter((post) => post.data.section === 'life').map(postCardText));
       case 'post-entry': return posts[0] ? postTexts.get(posts[0].data.permalink) ?? '' : '';
       case 'post-related': return text(...relatedPosts.map((post) => post.data.title));
       case 'game-details': return text(game.description, ...gameLinks.map((link) => link.label));
@@ -154,8 +156,8 @@ export async function GET(): Promise<Response> {
   }
   const pages = [
     { id: 'home', title: 'Home', url: '/', text: text(site.name, site.description, hasDefaultContent('home-intro') ? site.intro : '') },
-    { id: 'devlog', title: 'Devlog', url: '/devlog/', text: 'Journal' },
-    { id: 'game', title: 'Game', url: '/game/', text: text(game.title, game.status, game.cover ? game.coverAlt : '', hasDefaultContent('game-details') ? game.description : '') },
+    { id: 'devlog', title: 'Devlog', url: '/devlog/', text: 'Games, code and creative projects' },
+    { id: 'life', title: 'Life', url: '/life/', text: 'Personal journal, everyday life, photos and videos' },
     { id: 'gallery', title: 'Gallery', url: '/gallery/', text: 'Images and videos' },
     { id: 'music', title: 'Music', url: '/music/', text: 'Music and tracks' },
     { id: 'about', title: 'About', url: '/about/', text: text(site.name, hasDefaultContent('about-bio') ? site.about.body : '', hasDefaultContent('about-portrait') && site.about.avatar ? site.about.avatarAlt : '') },
@@ -181,8 +183,9 @@ export async function GET(): Promise<Response> {
         body = text(...limitItems(definition.media, definition).filter((media) => media.src).flatMap((media) => [media.alt, media.caption]));
         break;
       case 'links': body = text(...limitItems(definition.links, definition).map((link) => link.label)); break;
-      case 'devlog': {
-        const selected = selectItems(posts, (post) => post.data.permalink, definition);
+      case 'devlog':
+      case 'life': {
+        const selected = selectItems(posts.filter((post) => post.data.section === definition.content), (post) => post.data.permalink, definition);
         body = text(...selected.map(postCardText));
         tags = [...new Set(selected.flatMap((post) => post.data.tags))];
         break;

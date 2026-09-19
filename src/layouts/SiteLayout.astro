@@ -33,7 +33,7 @@ const section = Astro.url.pathname.split('/').filter(Boolean)[0] || 'home';
 const startWindow = getWindowDefinition('start-menu')!;
 const preferencesWindow = getWindowDefinition('site-settings')!;
 const playerWindow = getWindowDefinition('music-player')!;
-const pageTheme = ['home', 'devlog', 'game', 'gallery', 'music', 'about', 'subscribe'].includes(section) ? section : 'not-found';
+const pageTheme = ['home', 'devlog', 'life', 'gallery', 'music', 'about', 'subscribe'].includes(section) ? section : 'not-found';
 const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
 ---
 
@@ -82,7 +82,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
     {noindex && <meta name="robots" content="noindex, nofollow" />}
     {!noindex && <link rel="canonical" href={canonical} />}
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="alternate" type="application/rss+xml" title={`${site.name} Devlog`} href="/rss.xml" />
+    <link rel="alternate" type="application/rss+xml" title={`${site.name} Journal`} href="/rss.xml" />
     <link rel="sitemap" href="/sitemap-index.xml" />
     <link rel="preload" href="/fonts/DepartureMono-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <meta property="og:site_name" content={site.name} />

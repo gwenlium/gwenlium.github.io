@@ -48,11 +48,12 @@ export async function GET(context: APIContext): Promise<Response> {
   const base = context.site ?? new URL('https://gwenlium.dev');
   const posts = await getPosts();
   return rss({
-    title: `${site.name} Devlog`,
-    description: site.description || `${site.name} Devlog`,
+    title: `${site.name} Journal`,
+    description: site.description || `${site.name} Journal`,
     site: base,
     trailingSlash: true,
-    customData: '<language>en</language>',
+    xmlns: { atom: 'http://www.w3.org/2005/Atom' },
+    customData: `<language>en</language><atom:link href="${new URL('/rss.xml', base).href}" rel="self" type="application/rss+xml" />`,
     items: posts.map((post) => {
       const { title, date, excerpt, tags } = post.data;
       return {
@@ -60,7 +61,7 @@ export async function GET(context: APIContext): Promise<Response> {
         link: new URL(postUrl(post), base).href,
         pubDate: date,
         description: excerpt,
-        categories: tags,
+        categories: [post.data.section === 'life' ? 'Life' : 'Devlog', ...tags],
         content: articleContent(post, base),
       };
     }),
