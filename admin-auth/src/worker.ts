@@ -6,6 +6,9 @@ interface Env {
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
   OAUTH_STATE_SECRET?: string;
+  CF_ANALYTICS_ACCOUNT_ID?: string;
+  CF_ANALYTICS_SITE_TAG?: string;
+  CF_ANALYTICS_API_TOKEN?: string;
 }
 
 interface Configuration {
@@ -378,9 +381,110 @@ async function completeAuthorization(request: Request, url: URL, config: Configu
   }
 }
 
+interface AnalyticsGroup {
+  count: number;
+  sum?: { visits: number };
+  dimensions?: Record<string, string>;
+}
+
+function analyticsJson(value: unknown, status: number, config: Configuration): Response {
+  const responseHeaders = headers();
+  responseHeaders.set('Content-Type', 'application/json; charset=utf-8');
+  responseHeaders.set('Access-Control-Allow-Origin', config.siteOrigin);
+  responseHeaders.set('Vary', 'Origin');
+  return new Response(JSON.stringify(value), { status, headers: responseHeaders });
+}
+
+async function analytics(request: Request, url: URL, env: Env, config: Configuration): Promise<Response> {
+  // Never expose a private report or CORS permission to another origin.
+  if (request.headers.get('Origin') !== config.siteOrigin) return textResponse('Origin not allowed.', 403);
+  if (request.method === 'OPTIONS') {
+    const requestedHeaders = (request.headers.get('Access-Control-Request-Headers') ?? '').toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
+    if (request.headers.get('Access-Control-Request-Method') !== 'GET' || requestedHeaders.some(value => value !== 'authorization')) {
+      return analyticsJson({ error: 'Invalid preflight.' }, 403, config);
+    }
+    const responseHeaders = headers();
+    responseHeaders.set('Access-Control-Allow-Origin', config.siteOrigin);
+    responseHeaders.set('Access-Control-Allow-Methods', 'GET');
+    responseHeaders.set('Access-Control-Allow-Headers', 'Authorization');
+    responseHeaders.set('Vary', 'Origin');
+    return new Response(null, { status: 204, headers: responseHeaders });
+  }
+  if (request.method !== 'GET') return analyticsJson({ error: 'Method not allowed.' }, 405, config);
+  const authorization = request.headers.get('Authorization') ?? '';
+  if (!/^Bearer ghu_[A-Za-z0-9]{1,508}$/.test(authorization)) return analyticsJson({ error: 'Sign in to the editor.' }, 401, config);
+  const daysText = singleParameter(url, 'days') ?? (url.searchParams.has('days') ? '' : '30');
+  if (!['1', '7', '30'].includes(daysText)) return analyticsJson({ error: 'Choose 1, 7 or 30 days.' }, 400, config);
+  try {
+    const token = authorization.slice(7);
+    const user = await githubJson(`${GITHUB_API}/user`, { headers: githubHeaders(token) });
+    if (user.id !== config.userId) return analyticsJson({ error: 'This account cannot view site analytics.' }, 403, config);
+    await verifyRepository(token, config);
+    if (!env.CF_ANALYTICS_API_TOKEN || !/^[a-f0-9]{32}$/i.test(env.CF_ANALYTICS_ACCOUNT_ID ?? '') || !/^[a-f0-9]{32}$/i.test(env.CF_ANALYTICS_SITE_TAG ?? '')) {
+      return analyticsJson({ error: 'Analytics is not connected yet.' }, 503, config);
+    }
+    const end = new Date();
+    const start = new Date(end);
+    start.setUTCHours(0, 0, 0, 0);
+    start.setUTCDate(start.getUTCDate() - Number(daysText) + 1);
+    // Account, host and site are server-owned; callers cannot query another property.
+    const filter = 'filter: { siteTag: $site, requestHost: $host, datetime_geq: $start, datetime_lt: $end }';
+    const query = `query SiteAnalytics($account: String!, $site: String!, $host: String!, $start: Time!, $end: Time!) {
+      viewer { accounts(filter: { accountTag: $account }) {
+        totals: rumPageloadEventsAdaptiveGroups(limit: 1, ${filter}) { count sum { visits } }
+        daily: rumPageloadEventsAdaptiveGroups(limit: 31, orderBy: [date_ASC], ${filter}) { count dimensions { date } }
+        pages: rumPageloadEventsAdaptiveGroups(limit: 10, orderBy: [count_DESC], ${filter}) { count dimensions { requestPath } }
+        referrers: rumPageloadEventsAdaptiveGroups(limit: 10, orderBy: [count_DESC], ${filter}) { count dimensions { refererHost } }
+      } }
+    }`;
+    const response = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+      method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(15000),
+      headers: { Authorization: `Bearer ${env.CF_ANALYTICS_API_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables: {
+        account: env.CF_ANALYTICS_ACCOUNT_ID, site: env.CF_ANALYTICS_SITE_TAG,
+        host: config.siteId, start: start.toISOString(), end: end.toISOString(),
+      } }),
+    });
+    if (!response.ok) return analyticsJson({ error: 'The analytics provider is unavailable.' }, 502, config);
+    const body = record(await response.json());
+    const accounts = record(record(body?.data)?.viewer)?.accounts;
+    const account = Array.isArray(accounts) && accounts.length === 1 ? record(accounts[0]) : undefined;
+    if ((Array.isArray(body?.errors) && body.errors.length) || !account) return analyticsJson({ error: 'The analytics query could not be completed.' }, 502, config);
+    function groups(name: string, dimension?: string): AnalyticsGroup[] {
+      const values = account![name];
+      if (!Array.isArray(values) || values.some(value => !record(value) || typeof value.count !== 'number' || !Number.isFinite(value.count) || value.count < 0 ||
+        (dimension && typeof record(value.dimensions)?.[dimension] !== 'string'))) throw new Error('Invalid analytics response');
+      return values as AnalyticsGroup[];
+    }
+    const totals = groups('totals');
+    if (totals.length > 1 || (totals.length && (typeof totals[0].sum?.visits !== 'number' || !Number.isFinite(totals[0].sum.visits) || totals[0].sum.visits < 0))) throw new Error('Invalid totals');
+    const dailyCounts = new Map(groups('daily', 'date').map(row => [row.dimensions!.date, row.count]));
+    const daily = Array.from({ length: Number(daysText) }, (_, index) => {
+      const date = new Date(start);
+      date.setUTCDate(date.getUTCDate() + index);
+      const label = date.toISOString().slice(0, 10);
+      return { label, views: dailyCounts.get(label) ?? 0 };
+    });
+    return analyticsJson({
+      start: start.toISOString(), end: end.toISOString(),
+      pageViews: totals[0]?.count ?? 0, visits: totals[0]?.sum?.visits ?? 0, daily,
+      pages: groups('pages', 'requestPath').map(row => ({ label: row.dimensions!.requestPath || '/', views: row.count })),
+      referrers: groups('referrers', 'refererHost').map(row => ({ label: row.dimensions!.refererHost || 'Direct / unknown', views: row.count })),
+    }, 200, config);
+  } catch (error) {
+    return analyticsJson({ error: error instanceof OAuthError ? error.message : 'Analytics is temporarily unavailable.' }, error instanceof OAuthError ? error.status : 502, config);
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === '/analytics') {
+      const config = configuration(env);
+      if (!config) return textResponse('Editor configuration is unavailable.', 503);
+      if (url.protocol !== 'https:' || url.origin !== config.authOrigin) return textResponse('Invalid analytics origin.', 400);
+      return analytics(request, url, env, config);
+    }
     const callback = url.pathname === '/callback';
     if (!['/auth', '/callback', '/health'].includes(url.pathname)) return textResponse('Not found.', 404);
     if (request.method !== 'GET') {

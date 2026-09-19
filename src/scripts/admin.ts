@@ -1,4 +1,5 @@
 import CMS from 'decap-cms-app';
+import './admin-analytics';
 import { PreparedGitHubBackend } from './admin-github';
 import { previewMediaLibrary } from './admin-library';
 

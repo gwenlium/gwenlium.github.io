@@ -28,3 +28,15 @@
 .admin-media-card :is(audio, video) { width: 100%; max-height: 180px; }
 .admin-media-card span { overflow-wrap: anywhere; }
 @media (max-width: 480px) { .admin-media { padding: 16px; } .admin-media fieldset { grid-template-columns: 1fr; } .admin-media h1 { font-size: 20px; } }
+
+.admin-analytics-launch { position: fixed; right: 18px; bottom: 18px; z-index: 1000; padding: 11px 18px; border: 1px solid #607585; border-radius: 5px; background: #edf3f7; color: #14222e; box-shadow: 0 2px 12px #0002; font: 600 14px system-ui, sans-serif; cursor: pointer; }
+.admin-analytics-launch:focus-visible { outline: 3px solid #2478b3; outline-offset: 3px; }
+.admin-analytics .analytics-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.admin-analytics select { padding: 9px; border: 1px solid #a6adb6; border-radius: 4px; color: #17202a; background: white; font: inherit; }
+.analytics-totals { display: flex; gap: 40px; flex-wrap: wrap; }
+.analytics-totals dd { font-size: 32px; font-weight: 650; margin: 4px 0 0; }
+.analytics-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 24px; }
+.analytics-tables section { min-width: 0; }
+.analytics-tables table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.analytics-tables th, .analytics-tables td { padding: 8px 4px; text-align: left; border-bottom: 1px solid #dce3e8; overflow-wrap: anywhere; }
+.analytics-tables th:last-child, .analytics-tables td:last-child { text-align: right; }
