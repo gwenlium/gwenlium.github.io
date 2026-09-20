@@ -1,104 +1,22 @@
-.page-pixels {
-  position: fixed;
-  z-index: 80;
-  inset: var(--workspace-top, 0px) 0 var(--workspace-bottom, 0px);
-  overflow: clip;
-  pointer-events: none;
-}
-
-.page-pixels[hidden] { display: none !important; }
-
-.page-pixels__layer {
-  position: absolute;
-  inset: 0;
-  opacity: .18;
-  pointer-events: none;
-  background-image: repeating-linear-gradient(90deg, currentColor 0 var(--pixel-size), transparent var(--pixel-size) var(--pixel-column));
-  background-position: var(--pixel-x) 0;
-  mask-image: repeating-linear-gradient(0deg, #000 0 var(--pixel-size), transparent var(--pixel-size) var(--pixel-row));
-  mask-position: 0 var(--pixel-y);
-}
-
-.page-pixels__layer:nth-child(1) {
-  view-transition-name: page-pixels-a;
-  color: var(--sage);
-  --pixel-size: 8px;
-  --pixel-column: 83px;
-  --pixel-row: 71px;
-  --pixel-x: 13px;
-  --pixel-y: 17px;
-}
-
-.page-pixels__layer:nth-child(2) {
-  view-transition-name: page-pixels-b;
-  color: var(--pink);
-  --pixel-size: 6px;
-  --pixel-column: 109px;
-  --pixel-row: 89px;
-  --pixel-x: 43px;
-  --pixel-y: 31px;
-}
-
-.page-pixels__layer:nth-child(3) {
-  view-transition-name: page-pixels-c;
-  color: var(--accent-ink);
-  --pixel-size: 4px;
-  --pixel-column: 137px;
-  --pixel-row: 103px;
-  --pixel-x: 29px;
-  --pixel-y: 61px;
-}
-
-.page-pixels__layer:nth-child(4) {
-  view-transition-name: page-pixels-d;
-  color: var(--line);
-  --pixel-size: 10px;
-  --pixel-column: 157px;
-  --pixel-row: 127px;
-  --pixel-x: 79px;
-  --pixel-y: 47px;
-}
-
-@keyframes workspace-crossfade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes workspace-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes workspace-fade-out { from { opacity: 1; } to { opacity: 0; } }
-@keyframes workspace-pixels { 0%, 100% { opacity: 0; } 18% { opacity: 1; } }
 
-/* Fetch first; the outgoing fade finishes before the incoming pixel reveal starts. */
+/* Keep the site chrome steady and crossfade only the loaded page content. */
 html::view-transition-group(root),
 html::view-transition-old(root),
 html::view-transition-new(root) { animation: none !important; mix-blend-mode: normal; }
 html::view-transition-old(root) { display: none; }
 html::view-transition-new(root) { opacity: 1; }
 html::view-transition-group(page-content) { animation: none !important; overflow: clip; }
-html::view-transition-old(page-content) { animation: workspace-fade-out 110ms ease-in both !important; mix-blend-mode: normal; }
-html::view-transition-new(page-content) { animation: workspace-crossfade 220ms cubic-bezier(.2, .6, .3, 1) 110ms both !important; mix-blend-mode: normal; }
+html::view-transition-old(page-content) { animation: workspace-fade-out 160ms ease-out both !important; mix-blend-mode: normal; }
+html::view-transition-new(page-content) { animation: workspace-fade-in 160ms ease-out both !important; mix-blend-mode: normal; }
 
-html::view-transition-group(page-pixels-a),
-html::view-transition-group(page-pixels-b),
-html::view-transition-group(page-pixels-c),
-html::view-transition-group(page-pixels-d) { animation: none !important; overflow: clip; pointer-events: none; }
-html::view-transition-old(page-pixels-a),
-html::view-transition-old(page-pixels-b),
-html::view-transition-old(page-pixels-c),
-html::view-transition-old(page-pixels-d) { display: none; }
-html::view-transition-new(page-pixels-a),
-html::view-transition-new(page-pixels-b),
-html::view-transition-new(page-pixels-c),
-html::view-transition-new(page-pixels-d) { animation: workspace-pixels 220ms ease-out 110ms both !important; mix-blend-mode: normal; }
-html::view-transition-new(page-pixels-b) { animation-duration: 200ms !important; }
-html::view-transition-new(page-pixels-c) { animation-duration: 180ms !important; }
-html::view-transition-new(page-pixels-d) { animation-duration: 160ms !important; }
-
-html[data-motion='reduced'] .page-pixels { display: none !important; }
 html[data-motion='reduced']::view-transition-old(*),
 html[data-motion='reduced']::view-transition-new(*) { animation: none !important; }
 @media (prefers-reduced-motion: reduce) {
-  html:not([data-motion='full']) .page-pixels { display: none !important; }
   html:not([data-motion='full'])::view-transition-old(*),
   html:not([data-motion='full'])::view-transition-new(*) { animation: none !important; }
 }
 @media (forced-colors: active) {
-  .page-pixels { display: none !important; }
   html::view-transition-old(*), html::view-transition-new(*) { animation: none !important; }
 }
-@media print { .page-pixels { display: none !important; } }
