@@ -3,14 +3,18 @@ const interactionStyles = `
 .media-zoom-trigger picture, .media-zoom-trigger img { display:block; max-width:100%; }
 .media-zoom-trigger:focus-visible { outline:3px solid var(--ink, #203a2e); outline-offset:5px; }
 .media-dialog { width:min(1100px, 94vw); max-width:94vw; max-height:92dvh; padding:0; overflow:auto; border:2px solid var(--ink, #203a2e); background:var(--surface, #f5f1df); color:var(--ink, #203a2e); box-shadow:8px 8px 0 #10291a45; }
-.media-dialog::backdrop { background:#10251de8; backdrop-filter:blur(5px); }
-.media-dialog__bar { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.7rem 1rem; border-bottom:1px solid var(--line, #8a9b86); background:var(--sage, #b8c8a4); font-family:var(--font-ui, monospace); font-size:.75rem; }
-.media-dialog__close { flex:none; padding:.35rem .6rem; border:1px solid var(--ink, #203a2e); background:var(--surface-raised, #fffbea); color:inherit; font:inherit; cursor:pointer; }
+.media-dialog::backdrop { background:transparent; backdrop-filter:none; }
+.media-dialog__bar { cursor:move; touch-action:none; user-select:none; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.7rem 1rem; border-bottom:1px solid var(--line, #8a9b86); background:var(--sage, #b8c8a4); font-family:var(--font-ui, monospace); font-size:.75rem; }
+.media-dialog__close { min-width:44px; min-height:44px; flex:none; padding:.35rem .6rem; border:1px solid var(--ink, #203a2e); background:var(--surface-raised, #fffbea); color:inherit; font:inherit; cursor:pointer; }
 .media-dialog__close:focus-visible { outline:3px solid currentColor; outline-offset:3px; }
 .media-dialog__content { margin:0; padding:1rem; }
 .media-dialog__content img, .media-dialog__content video { display:block; width:100%; max-height:70dvh; object-fit:contain; }
 .media-dialog__caption { margin-top:.8rem; font-family:var(--font-reading, sans-serif); line-height:1.6; white-space:pre-line; overflow-wrap:anywhere; }
 .media-dialog__caption:empty { display:none; }
+.media-dialog[open] { animation:media-window-open 220ms cubic-bezier(.2,.8,.2,1); }
+@keyframes media-window-open { from { opacity:0; transform:translateY(12px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+@media (max-width:600px) { .media-dialog { width:96vw; max-width:96vw; max-height:88dvh; } .media-dialog__content { padding:.5rem; } .media-dialog__bar { padding:.4rem .6rem; } .media-dialog__content img, .media-dialog__content video { max-height:68dvh; } }
+@media (prefers-reduced-motion:reduce) { .media-dialog[open] { animation:none; } }
 .media-dialog__error { padding:1rem; font-family:var(--font-reading, sans-serif); }
 `;
 
@@ -83,6 +87,23 @@ function openLightbox(trigger: HTMLElement, source: string, kind: 'image' | 'vid
     const bounds = dialog.getBoundingClientRect();
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dismissLightbox();
   });
+  const bar = dialog.querySelector<HTMLElement>('.media-dialog__bar')!;
+  let drag: { x: number; y: number; left: number; top: number } | undefined;
+  bar.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || (event.target as Element).closest('button')) return;
+    const rect = dialog.getBoundingClientRect();
+    drag = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top };
+    bar.setPointerCapture(event.pointerId);
+  });
+  bar.addEventListener('pointermove', event => {
+    if (!drag) return;
+    dialog.style.position = 'fixed';
+    dialog.style.margin = '0';
+    dialog.style.left = `${Math.max(0, Math.min(innerWidth - dialog.offsetWidth, drag.left + event.clientX - drag.x))}px`;
+    dialog.style.top = `${Math.max(0, Math.min(innerHeight - bar.offsetHeight, drag.top + event.clientY - drag.y))}px`;
+  });
+  bar.addEventListener('pointerup', () => { drag = undefined; });
+  bar.addEventListener('pointercancel', () => { drag = undefined; });
   dialog.showModal();
   dialog.querySelector('button')!.focus();
 }

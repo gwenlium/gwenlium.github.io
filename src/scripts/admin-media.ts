@@ -159,7 +159,8 @@ function inspectRaster(data: Uint8Array): Raster {
       const length = view.getUint16(position);
       if (length < 2) fail('The JPEG header is corrupt.');
       need(position, length);
-      if (marker === 0xe2 && text(data, position + 2, 4) === 'MPF\0') fail('Multipicture JPEGs are not flattened. Export a single JPEG locally first.');
+      // APP2 MPF metadata can describe a camera thumbnail or HDR gain map.
+      // Decode the primary photograph; canvas re-encoding strips auxiliary images and metadata.
       if (marker !== undefined && [0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
         if (length < 8) fail('The JPEG dimensions are corrupt.');
         size = dimensions(view.getUint16(position + 5), view.getUint16(position + 3));
@@ -321,18 +322,17 @@ function encodeCanvas(element: HTMLCanvasElement, type: string, signal?: AbortSi
 }
 
 function watermark(creator: string, size: Dimensions): HTMLCanvasElement {
-  const nominalWidth = Math.max(120, [...creator].length * 21 + 32);
-  const fitted = bounded(nominalWidth, 54, Math.min(420, Math.max(1, Math.floor(size.width * 0.6))));
+  const nominalWidth = Math.max(180, [...creator].length * 17 + 64);
+  const fitted = bounded(nominalWidth, 76, Math.min(460, Math.max(1, Math.floor(size.width * 0.38))));
   const scale = Math.min(1, size.height / fitted.height);
   const mark = canvas({ width: Math.max(1, Math.floor(fitted.width * scale)), height: Math.max(1, Math.floor(fitted.height * scale)) });
-  mark.context.scale(mark.element.width / nominalWidth, mark.element.height / 54);
-  mark.context.fillStyle = 'rgba(0, 0, 0, 0.65)';
-  mark.context.beginPath();
-  mark.context.roundRect(0, 0, nominalWidth, 54, 7);
-  mark.context.fill();
-  mark.context.fillStyle = '#fff';
-  mark.context.font = '600 30px sans-serif';
-  mark.context.fillText(creator, 16, 36, nominalWidth - 32);
+  mark.context.scale(mark.element.width / nominalWidth, mark.element.height / 76);
+  mark.context.font = '500 28px sans-serif';
+  mark.context.lineWidth = 2;
+  mark.context.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+  mark.context.strokeText(creator, 24, 40, nominalWidth - 64);
+  mark.context.fillStyle = 'rgba(255, 255, 255, 0.65)';
+  mark.context.fillText(creator, 24, 40, nominalWidth - 64);
   return mark.element;
 }
 

@@ -1,6 +1,7 @@
 ---
 import { createMarkdownProcessor } from '@astrojs/markdown-remark';
 import { load } from 'cheerio';
+import DialogueReader from './DialogueReader.astro';
 import Media from './Media.astro';
 import PostCard from './PostCard.astro';
 import SubscribeForm from './SubscribeForm.astro';
@@ -66,7 +67,7 @@ const galleryItems = definition.content === 'gallery' ? selectItems(gallery, (it
 const musicTracks = definition.content === 'music' ? selectItems(tracks, (track) => track.id) : [];
 ---
 
-{definition.content === 'text' && <div class="prose window-text" set:html={body} />}
+{definition.content === 'text' && <DialogueReader id={`reading-${definition.id}`}><div class="prose window-text" data-dialogue-blocks set:html={body} /></DialogueReader>}
 
 {definition.content === 'media' && (
   definition.media.length ? <div class="window-media-list">{limitItems(definition.media).map((media) => <Media {...media} />)}</div>

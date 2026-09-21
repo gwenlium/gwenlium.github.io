@@ -30,7 +30,7 @@ const outputKinds = { webp: 'image', gif: 'image', mp3: 'audio', mp4: 'video' };
 const xmlEntities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' };
 const mediaDemuxers = 'mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,avi,ogg,mp3,wav,flac,aac,aiff,asf,mpeg,mpegts';
 const settings = {
-  version: 1,
+  version: 2,
   imageEdge: 1600,
   webpQuality: 78,
   videoWidth: 1280,
@@ -202,10 +202,10 @@ function boundedDimensions(width, height, edge) {
 
 async function watermark(directory, creator, width, height) {
   const label = creator.replace(/[&<>"']/g, (character) => xmlEntities[character]);
-  const nominalWidth = Math.max(120, [...creator].length * 21 + 32);
-  const nominalHeight = 54;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${nominalWidth}" height="${nominalHeight}" viewBox="0 0 ${nominalWidth} ${nominalHeight}"><rect width="100%" height="100%" rx="7" fill="#000" fill-opacity="0.65"/><text x="16" y="36" font-family="sans-serif" font-size="30" font-weight="600" fill="#fff" textLength="${nominalWidth - 32}" lengthAdjust="spacingAndGlyphs">${label}</text></svg>`;
-  const dimensions = boundedDimensions(nominalWidth, nominalHeight, Math.min(420, Math.max(1, Math.floor(width * 0.6))));
+  const nominalWidth = Math.max(180, [...creator].length * 17 + 64);
+  const nominalHeight = 76;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${nominalWidth}" height="${nominalHeight}" viewBox="0 0 ${nominalWidth} ${nominalHeight}"><text x="24" y="40" font-family="sans-serif" font-size="28" font-weight="500" fill="#fff" fill-opacity="0.65" stroke="#000" stroke-opacity="0.4" stroke-width="2" paint-order="stroke" textLength="${nominalWidth - 64}" lengthAdjust="spacingAndGlyphs">${label}</text></svg>`;
+  const dimensions = boundedDimensions(nominalWidth, nominalHeight, Math.min(460, Math.max(1, Math.floor(width * 0.38))));
   const scale = Math.min(1, height / dimensions.height);
   const markWidth = Math.max(1, Math.floor(dimensions.width * scale));
   const markHeight = Math.max(1, Math.floor(dimensions.height * scale));
@@ -394,7 +394,7 @@ async function main() {
   const media = await inspectInput(input, options);
   const site = JSON.parse(await readFile(path.join(root, 'src', 'content', 'site.json'), 'utf8'));
   if (typeof site.name !== 'string' || !site.name.trim() || site.name.length > 200 || /[\u0000-\u001f\u007f]/.test(site.name)) throw new Error('Set site.name to a nonempty creator name (up to 200 characters, without control characters) before importing.');
-  const creator = site.name.trim();
+  const creator = typeof site.watermarkText === 'string' && site.watermarkText.trim() ? site.watermarkText.trim() : `© ${site.name.trim()}`;
   const inputHash = await hashFile(input);
   const converter = media.kind === 'image' ? '' : (await runFfmpeg(['-version'])).stdout.split(/\r?\n/, 1)[0];
   const conversionKey = JSON.stringify({ settings, kind: media.kind, extension: media.extension, creator, start: options.start, duration: options.duration, converter });

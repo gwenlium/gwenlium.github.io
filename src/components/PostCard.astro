@@ -19,6 +19,7 @@ const { title, date, excerpt, cover, coverAlt, tags } = post.data;
       <li><a class="tag" href={`/${post.data.section}/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>
     ))}</ul>}
     <a class="read-post" href={postUrl(post)} aria-label={`Read ${title}`}>Read entry <Icon name="arrow" size={14} /></a>
+    <a class="read-post" href={`${postUrl(post)}?dialogue=1`}>Dialogue mode</a>
   </div>
 </article>
 
@@ -36,8 +37,9 @@ const { title, date, excerpt, cover, coverAlt, tags } = post.data;
   .post-tags { display: flex; flex-wrap: wrap; gap: .4rem; padding: 0; margin: .8rem 0; list-style: none; }
   .post-tags li { min-width: 0; max-width: 100%; }
   .read-post { display: inline-flex; align-items: center; gap: .5rem; margin-top: .5rem; font-size: .75rem; text-underline-offset: .25em; }
+  .read-post + .read-post { margin-left: 1rem; }
   .post-cover { min-width: 0; }
   .post-cover :global(figure) { margin: 0; }
-  .post-cover :global(img) { width: 100%; max-height: 15rem; object-fit: cover; }
+  .post-cover :global(img) { width: 100%; max-height: 15rem; object-fit: contain; }
   @container window-content (min-width: 640px) { .has-cover { grid-template-columns: minmax(10rem, 31%) minmax(0, 1fr); } }
 </style>

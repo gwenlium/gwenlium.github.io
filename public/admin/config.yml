@@ -359,12 +359,22 @@ collections:
             widget: string
             required: true
             default: Gwenlium
+          - name: watermarkText
+            label: Watermark credit
+            widget: string
+            required: false
+            default: © Gwendolyn Ural Erkut · gwenlium.dev
+            hint: A small translucent credit on new image and video uploads. Existing uploads keep their
+              original watermark.
+            pattern:
+              - ^.{1,200}$
+              - Use 1 to 200 characters.
           - name: description
             label: Site description
             widget: text
             required: false
             default: ""
-            hint: Your description for search engines and previews. All fields in this public repository are
+            hint: Used for search previews and on Home when Homepage introduction is empty. All fields in this public repository are
               publicly readable.
           - name: intro
             label: Homepage introduction
@@ -446,8 +456,8 @@ collections:
                 widget: image
                 required: false
                 default: ""
-                hint: Choose an existing preview or upload an image. Only the resized, watermarked preview is
-                  published; the original stays on your device.
+                hint: Project artwork for social previews and trailers. To show a picture with a journal entry, set
+                  that post’s Cover image.
               - name: coverAlt
                 label: Cover alternative text
                 widget: string

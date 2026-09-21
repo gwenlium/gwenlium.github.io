@@ -1,0 +1,27 @@
+---
+interface Props { id: string }
+const { id } = Astro.props;
+---
+<div class="dialogue-reader" data-dialogue-reader>
+  <div data-dialogue-option hidden><button class="button button-secondary" type="button" data-dialogue-enter aria-controls={id}>Dialogue mode</button></div>
+  <div class="dialogue-heading" data-dialogue-heading hidden><span class="eyebrow">Dialogue mode</span><button class="button button-secondary" type="button" data-dialogue-exit>Read all</button></div>
+  <div id={id} data-dialogue-content><slot /></div>
+  <nav class="dialogue-controls" aria-label="Dialogue reading" data-dialogue-controls hidden>
+    <button class="button button-secondary" type="button" data-dialogue-back disabled>Back</button>
+    <span role="status" aria-live="polite" data-dialogue-progress></span>
+    <button class="button" type="button" data-dialogue-next><span data-dialogue-next-label>Continue</span></button>
+  </nav>
+</div>
+<style>
+  [data-dialogue-option] { margin-bottom: .8rem; }
+  .dialogue-heading, .dialogue-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; padding: .75rem 0; }
+  .dialogue-controls { position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); }
+  [data-dialogue-progress] { font-size: .75rem; }
+  .dialogue-reader :global([data-dialogue-hidden]) { display: none !important; }
+  button { min-height: 44px; }
+  [hidden] { display: none !important; }
+  @media print { [data-dialogue-option], .dialogue-heading, .dialogue-controls { display: none !important; } .dialogue-reader :global([data-dialogue-hidden]) { display: revert !important; } }
+</style>
+<script>
+  import '../scripts/dialogue-reader';
+</script>

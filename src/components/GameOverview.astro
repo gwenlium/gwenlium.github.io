@@ -1,4 +1,5 @@
 ---
+import DialogueReader from './DialogueReader.astro';
 import Window from '../components/Window.astro';
 import Media from '../components/Media.astro';
 import Icon from '../components/Icon.astro';
@@ -40,10 +41,9 @@ if (game.trailerUrl) {
     {game.status && <p class="game-status"><span aria-hidden="true">◆</span> {game.status}</p>}
   </header>
     <div class="game-grid">
-      {game.cover && <div class="game-cover"><Media src={game.cover} alt={game.coverAlt} eager /></div>}
       {(game.description || links.length > 0 || hasWindowOverride('game-details')) && (
         <Window windowId="game-details">
-          {game.description && <div class="game-description prose"><p>{game.description}</p></div>}
+          {game.description && <DialogueReader id="game-reading"><div class="game-description prose" data-dialogue-blocks>{game.description.split(/\n\s*\n/).map(paragraph => <p>{paragraph}</p>)}</div></DialogueReader>}
           {links.length > 0 && <nav class="game-links" aria-label="Game links">
             {links.map((link) => <a class="button" href={link.url}>{link.label}<Icon name="external" size={14} /></a>)}
           </nav>}

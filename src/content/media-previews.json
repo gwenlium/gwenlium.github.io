@@ -6,6 +6,12 @@
       "width": 1600,
       "height": 1173
     },
+    "/media/proto-recompute-preview-380740e424d86df73096a30fd6ba8cde.webp": {
+      "sha256": "f96994d71b996e609f4fe6eef22f57962c261a051a2b8dacf062d82215f4bee4",
+      "kind": "image",
+      "width": 1600,
+      "height": 1173
+    },
     "/media/ui-confirm-preview-1bff1150661fda803fda6a4aa90e5d10.mp3": {
       "sha256": "d21bcde115a19c99afda428057bf2125969384f3a038f9bd94d03e7b9e6c8c28",
       "kind": "audio",

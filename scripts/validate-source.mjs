@@ -379,7 +379,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
   if (settings) {
     const { file, value } = settings;
     text(value.name, file, 'name', true);
-    optionalStrings(value, ['description', 'intro', 'status', 'featuredPost', 'newsletterHeading', 'newsletterButtonLabel'], file);
+    optionalStrings(value, ['watermarkText', 'description', 'intro', 'status', 'featuredPost', 'newsletterHeading', 'newsletterButtonLabel'], file);
     url(value.githubUrl, file, 'githubUrl');
     if (text(value.newsletterUrl, file, 'newsletterUrl')) {
       try {

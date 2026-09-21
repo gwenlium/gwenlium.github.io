@@ -56,7 +56,8 @@ export class PreparedGitHubBackend extends GitHubBackend {
       this.api.readFile(registryPath, null, { branch: head.commit.sha }),
       this.api.readFile('src/content/site.json', null, { branch: head.commit.sha }),
     ]);
-    const creator = typeof site === 'string' ? JSON.parse(site).name : undefined;
+    const settings = typeof site === 'string' ? JSON.parse(site) : {};
+    const creator = settings.watermarkText?.trim() || (settings.name ? `© ${settings.name}` : undefined);
     if (typeof creator !== 'string' || !creator.trim()) throw new Error('Set your display name in Pages > Home & site settings before uploading.');
     return { registry: registryFrom(registry), creator: creator.trim() };
   }

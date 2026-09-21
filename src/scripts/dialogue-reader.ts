@@ -39,7 +39,7 @@ function collectChunks(sources: HTMLElement[]): HTMLElement[][] {
 
 function createReader(root: HTMLElement): Reader | undefined {
   const window = root.closest('[data-desktop-window]');
-  const option = window?.querySelector<HTMLElement>('[data-dialogue-option]');
+  const option = root.querySelector<HTMLElement>('[data-dialogue-option]') ?? window?.querySelector<HTMLElement>('[data-dialogue-option]');
   const enter = option?.querySelector<HTMLButtonElement>('[data-dialogue-enter]');
   const heading = root.querySelector<HTMLElement>('[data-dialogue-heading]');
   const exit = root.querySelector<HTMLButtonElement>('[data-dialogue-exit]');
@@ -157,7 +157,13 @@ function initializeReaders() {
   document.querySelectorAll<HTMLElement>('[data-dialogue-reader]').forEach(root => {
     if (readers.has(root)) return;
     const reader = createReader(root);
-    if (reader) readers.set(root, reader);
+    if (reader) {
+      readers.set(root, reader);
+      if (new URLSearchParams(location.search).get('dialogue') === '1') {
+        const option = root.querySelector<HTMLElement>('[data-dialogue-option]') ?? root.closest('[data-desktop-window]')?.querySelector<HTMLElement>('[data-dialogue-option]');
+        option?.querySelector<HTMLButtonElement>('[data-dialogue-enter]')?.click();
+      }
+    }
   });
   revealFragment(fragmentTarget());
 }

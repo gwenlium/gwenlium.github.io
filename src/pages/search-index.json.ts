@@ -156,7 +156,7 @@ export async function GET(): Promise<Response> {
     entries.set(entry.id, { ...entry, text: text(entry.text) });
   }
   const pages = [
-    { id: 'home', title: 'Home', url: '/', text: text(site.name, site.description, hasDefaultContent('home-intro') ? site.intro : '') },
+    { id: 'home', title: 'Home', url: '/', text: text(site.name, site.description, hasDefaultContent('home-intro') ? site.intro || site.description : '') },
     { id: 'devlog', title: pageSettings.devlog.title, url: '/devlog/', text: 'Games, code and creative projects' },
     { id: 'life', title: pageSettings.life.title, url: '/life/', text: 'Personal journal, everyday life, photos and videos' },
     { id: 'gallery', title: pageSettings.gallery.title, url: '/gallery/', text: 'Images and videos' },
