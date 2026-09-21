@@ -219,7 +219,7 @@ export function containedFile(directory, pathname) {
 
 export function validateSource(root = projectRoot, now = new Date()) {
   const errors = [];
-  const report = (file, field, message) => errors.push(`${file}: ${field} — ${message}`);
+  const report = (file, field, message) => errors.push(`${file}: ${field} - ${message}`);
   const posts = readPosts(root, report);
   const publicDirectory = path.join(root, 'public');
   const previews = readMediaPreviews(root, report);
@@ -395,23 +395,28 @@ export function validateSource(root = projectRoot, now = new Date()) {
     if (typeof value.featuredPost === 'string' && value.featuredPost.trim()) {
       if (!posts.some((post) => post.data.permalink === value.featuredPost && isPublishedPost(post.data, now))) report(file, 'featuredPost', 'Choose an existing published post permalink, or leave it empty. Draft and future posts cannot be featured publicly.');
     }
-    for (const field of ['game', 'about']) {
-      if (value[field] === undefined) continue;
-      if (!isObject(value[field])) {
-        report(file, field, 'Use an object for this section.');
-        continue;
-      }
-      const section = value[field];
-      optionalStrings(section, field === 'game' ? ['title', 'description', 'status'] : ['body'], file, `${field}.`);
-      links(section.links, file, `${field}.links`);
-      if (field === 'game') {
-        image(section.cover, section.coverAlt, file, 'game.cover', `${siteOrigin}/game/`);
-        url(section.trailerUrl, file, 'game.trailerUrl', { media: true, kind: 'video', allowTrailer: true, base: `${siteOrigin}/game/` });
-      } else {
-        image(section.avatar, section.avatarAlt, file, 'about.avatar', `${siteOrigin}/about/`);
-        if (typeof section.body === 'string') markdown(section.body, file, `${siteOrigin}/about/`);
+    if (value.game !== undefined) {
+      if (!isObject(value.game)) report(file, 'game', 'Use an object for this section.');
+      else {
+        optionalStrings(value.game, ['title', 'description', 'status'], file, 'game.');
+        links(value.game.links, file, 'game.links');
+        image(value.game.cover, value.game.coverAlt, file, 'game.cover', `${siteOrigin}/devlog/`);
+        url(value.game.trailerUrl, file, 'game.trailerUrl', { media: true, kind: 'video', allowTrailer: true, base: `${siteOrigin}/devlog/` });
       }
     }
+  }
+  for (const page of ['about', 'devlog', 'life', 'gallery', 'music', 'subscribe', 'not-found']) {
+    const data = json(`pages/${page}`);
+    if (!data) continue;
+    const { file, value } = data;
+    text(value.title, file, 'title', true);
+    optionalStrings(value, ['eyebrow', 'intro'], file);
+    if (page === 'about') {
+      optionalStrings(value, ['body'], file);
+      image(value.avatar, value.avatarAlt, file, 'avatar', `${siteOrigin}/about/`);
+      links(value.links, file, 'links');
+    }
+    if (page === 'subscribe') text(value.rssDescription, file, 'rssDescription', true);
   }
   const art = json('gallery');
   if (art) {

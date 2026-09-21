@@ -50,7 +50,7 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
   const errors = [];
   const errorSet = new Set();
   const report = (file, field, message) => {
-    const error = `${file}: ${field} — ${message}`;
+    const error = `${file}: ${field} - ${message}`;
     if (!errorSet.has(error)) {
       errorSet.add(error);
       errors.push(error);

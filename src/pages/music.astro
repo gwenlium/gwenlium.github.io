@@ -1,4 +1,5 @@
 ---
+import { pages } from '../lib/pages';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 import Media from '../components/Media.astro';
@@ -7,10 +8,11 @@ import MusicLibrary from '../components/MusicLibrary.astro';
 import { tracks } from '../lib/settings';
 ---
 
-<SiteLayout title="Music">
+<SiteLayout title={pages.music.title}>
   <header class="page-heading">
-    <span class="eyebrow">Tracks</span>
-    <h1>Music</h1>
+    <span class="eyebrow">{pages.music.eyebrow}</span>
+    <h1>{pages.music.title}</h1>
+    {pages.music.intro && <p class="page-intro">{pages.music.intro}</p>}
   </header>
   <MusicLibrary />
   <Window windowId="music-catalogue">

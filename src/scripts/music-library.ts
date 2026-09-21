@@ -185,7 +185,7 @@ function renderTracks(list: HTMLOListElement, ids: string[], source: 'personal' 
     number.setAttribute('aria-hidden', 'true');
     const label = document.createElement('span');
     label.className = 'playlist-track__title';
-    label.textContent = track && !track.src ? `${title} — audio unavailable` : title;
+    label.textContent = track && !track.src ? `${title} - audio unavailable` : title;
     const actions = document.createElement('div');
     actions.className = 'playlist-track__actions';
     const addButton = (action: string, text: string, disabled = false) => {
@@ -224,7 +224,7 @@ function renderLibrary(): void {
   selection.replaceChildren();
   destination.replaceChildren(option('', 'Choose a playlist'));
   state.playlists.forEach((playlist, index) => {
-    const title = `${index + 1}. ${playlist.name} — ${playlist.ids.length} ${playlist.ids.length === 1 ? 'track' : 'tracks'}`;
+    const title = `${index + 1}. ${playlist.name} - ${playlist.ids.length} ${playlist.ids.length === 1 ? 'track' : 'tracks'}`;
     selection.append(option(playlist.id, title));
     destination.append(option(playlist.id, title));
   });

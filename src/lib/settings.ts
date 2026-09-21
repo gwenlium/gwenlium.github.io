@@ -1,4 +1,5 @@
 import siteData from '../content/site.json';
+import aboutData from '../content/pages/about.json';
 import galleryData from '../content/gallery.json';
 import musicData from '../content/music.json';
 
@@ -81,11 +82,10 @@ export const site: SiteSettings = {
     ...settings.game,
   },
   about: {
-    body: '',
-    avatar: '',
-    avatarAlt: '',
-    links: [],
-    ...settings.about,
+    body: aboutData.body ?? '',
+    avatar: aboutData.avatar ?? '',
+    avatarAlt: aboutData.avatarAlt ?? '',
+    links: aboutData.links ?? [],
   },
 };
 

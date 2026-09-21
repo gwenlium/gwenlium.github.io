@@ -1,3 +1,4 @@
+import { pages as pageSettings } from '../lib/pages';
 import { createMarkdownProcessor } from '@astrojs/markdown-remark';
 import { load } from 'cheerio';
 import { getPosts, postSearchText, postUrl, type Post } from '../lib/content';
@@ -156,14 +157,17 @@ export async function GET(): Promise<Response> {
   }
   const pages = [
     { id: 'home', title: 'Home', url: '/', text: text(site.name, site.description, hasDefaultContent('home-intro') ? site.intro : '') },
-    { id: 'devlog', title: 'Devlog', url: '/devlog/', text: 'Games, code and creative projects' },
-    { id: 'life', title: 'Life', url: '/life/', text: 'Personal journal, everyday life, photos and videos' },
-    { id: 'gallery', title: 'Gallery', url: '/gallery/', text: 'Images and videos' },
-    { id: 'music', title: 'Music', url: '/music/', text: 'Music and tracks' },
-    { id: 'about', title: 'About', url: '/about/', text: text(site.name, hasDefaultContent('about-bio') ? site.about.body : '', hasDefaultContent('about-portrait') && site.about.avatar ? site.about.avatarAlt : '') },
-    { id: 'subscribe', title: 'Updates', url: '/subscribe/', text: 'Subscriptions RSS Email updates' },
+    { id: 'devlog', title: pageSettings.devlog.title, url: '/devlog/', text: 'Games, code and creative projects' },
+    { id: 'life', title: pageSettings.life.title, url: '/life/', text: 'Personal journal, everyday life, photos and videos' },
+    { id: 'gallery', title: pageSettings.gallery.title, url: '/gallery/', text: 'Images and videos' },
+    { id: 'music', title: pageSettings.music.title, url: '/music/', text: 'Music and tracks' },
+    { id: 'about', title: pageSettings.about.title.replaceAll('{name}', site.name), url: '/about/', text: text(site.name, hasDefaultContent('about-bio') ? site.about.body : '', hasDefaultContent('about-portrait') && site.about.avatar ? site.about.avatarAlt : '') },
+    { id: 'subscribe', title: pageSettings.subscribe.title, url: '/subscribe/', text: 'Subscriptions RSS Email updates' },
   ];
-  for (const page of pages) add({ ...page, id: `page:${page.id}`, kind: 'page', tags: [] });
+  for (const page of pages) {
+    const settings = page.id === 'home' ? undefined : pageSettings[page.id as keyof typeof pageSettings];
+    add({ ...page, text: text(page.text, settings?.eyebrow, settings?.intro), id: `page:${page.id}`, kind: 'page', tags: [] });
+  }
   for (const post of posts) add({
     id: `post:${post.data.permalink}`, title: post.data.title, url: postUrl(post), kind: 'post',
     text: postTexts.get(post.data.permalink) ?? '', tags: post.data.tags,

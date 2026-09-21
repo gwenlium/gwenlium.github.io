@@ -27,7 +27,7 @@ collections:
         widget: hidden
         default: devlog
       - name: draft
-        label: Draft — excluded from the website, NOT private
+        label: Draft - excluded from the website, NOT private
         widget: boolean
         required: false
         default: true
@@ -177,7 +177,7 @@ collections:
         widget: hidden
         default: life
       - name: draft
-        label: Draft — excluded from the website, NOT private
+        label: Draft - excluded from the website, NOT private
         widget: boolean
         required: false
         default: true
@@ -313,11 +313,11 @@ collections:
       - label: Published or scheduled
         field: draft
         pattern: false
-  - name: site
-    label: Site settings
+  - name: pages
+    label: Pages
     files:
       - name: site
-        label: Home, subscriptions & about
+        label: Home & site settings
         file: src/content/site.json
         fields:
           - name: name
@@ -445,46 +445,174 @@ collections:
                 collapsed: true
             hint: This showcase appears inside Devlog and on the homepage. Write development updates in the
               Devlog collection; there is no separate Game page.
-          - name: about
-            label: About
-            widget: object
+        preview_path: /
+      - name: about
+        label: About
+        file: src/content/pages/about.json
+        preview_path: /about/
+        fields:
+          - name: title
+            label: Page heading
+            widget: string
+            hint: Use {name} to include your display name.
+          - name: eyebrow
+            label: Small heading
+            widget: string
             required: false
+            default: ""
+          - name: intro
+            label: Introduction
+            widget: text
+            required: false
+            default: ""
+          - name: body
+            label: Your bio
+            widget: text
+            required: false
+            default: ""
+            hint: Plain text; blank lines separate paragraphs.
+          - name: avatar
+            label: Portrait
+            widget: image
+            required: false
+            default: ""
+            hint: Choose an existing preview or upload an image. Only the resized, watermarked preview is
+              published; the original stays on your device.
+          - name: avatarAlt
+            label: Portrait alternative text
+            widget: string
+            required: false
+            default: ""
+            hint: Required when a portrait is set.
+          - name: links
+            label: Profile links
+            widget: list
+            required: false
+            default: []
             fields:
-              - name: body
-                label: Your bio
-                widget: text
-                required: false
-                default: ""
-                hint: Plain text; blank lines separate paragraphs.
-              - name: avatar
-                label: Portrait
-                widget: image
-                required: false
-                default: ""
-                hint: Choose an existing preview or upload an image. Only the resized, watermarked preview is
-                  published; the original stays on your device.
-              - name: avatarAlt
-                label: Portrait alternative text
+              - name: label
+                label: Link label
                 widget: string
-                required: false
-                default: ""
-                hint: Required when a portrait is set.
-              - name: links
-                label: Profile links
-                widget: list
-                required: false
-                default: []
-                fields:
-                  - name: label
-                    label: Link label
-                    widget: string
-                    required: true
-                  - name: url
-                    label: URL
-                    widget: string
-                    required: true
-                    hint: Use a complete https:// URL, or a site path beginning with /.
-                collapsed: true
+                required: true
+              - name: url
+                label: URL
+                widget: string
+                required: true
+                hint: Use a complete https:// URL, or a site path beginning with /.
+            collapsed: true
+      - name: devlog
+        label: Devlog
+        file: src/content/pages/devlog.json
+        preview_path: /devlog/
+        fields:
+          - name: title
+            label: Page heading
+            widget: string
+          - name: eyebrow
+            label: Small heading
+            widget: string
+            required: false
+            default: ""
+          - name: intro
+            label: Introduction
+            widget: text
+            required: false
+            default: ""
+      - name: life
+        label: Life
+        file: src/content/pages/life.json
+        preview_path: /life/
+        fields:
+          - name: title
+            label: Page heading
+            widget: string
+          - name: eyebrow
+            label: Small heading
+            widget: string
+            required: false
+            default: ""
+          - name: intro
+            label: Introduction
+            widget: text
+            required: false
+            default: ""
+      - name: gallery
+        label: Gallery
+        file: src/content/pages/gallery.json
+        preview_path: /gallery/
+        fields:
+          - name: title
+            label: Page heading
+            widget: string
+          - name: eyebrow
+            label: Small heading
+            widget: string
+            required: false
+            default: ""
+          - name: intro
+            label: Introduction
+            widget: text
+            required: false
+            default: ""
+      - name: music
+        label: Music
+        file: src/content/pages/music.json
+        preview_path: /music/
+        fields:
+          - name: title
+            label: Page heading
+            widget: string
+          - name: eyebrow
+            label: Small heading
+            widget: string
+            required: false
+            default: ""
+          - name: intro
+            label: Introduction
+            widget: text
+            required: false
+            default: ""
+      - name: subscribe
+        label: Subscriptions
+        file: src/content/pages/subscribe.json
+        preview_path: /subscribe/
+        fields:
+          - name: title
+            label: Page heading
+            widget: string
+          - name: eyebrow
+            label: Small heading
+            widget: string
+            required: false
+            default: ""
+          - name: intro
+            label: Introduction
+            widget: text
+            required: false
+            default: ""
+          - name: rssDescription
+            label: RSS description
+            widget: text
+      - name: not-found
+        label: 404 - Page not found
+        file: src/content/pages/not-found.json
+        preview_path: /404.html
+        fields:
+          - name: title
+            label: Page heading
+            widget: string
+          - name: eyebrow
+            label: Small heading
+            widget: string
+            required: false
+            default: ""
+          - name: intro
+            label: Introduction
+            widget: text
+            required: false
+            default: ""
+    description: Edit every page here. Manage journal entries in Devlog and Life, artwork in Gallery,
+      tracks in Music, and window titles and content in Windows.
   - name: gallery
     label: Gallery
     files:
@@ -647,7 +775,7 @@ collections:
                   - .*\S.*
                   - Enter a title, not only spaces.
               - name: enabled
-                label: Enabled — visible on website, NOT a privacy setting
+                label: Enabled - visible on website, NOT a privacy setting
                 widget: boolean
                 required: false
                 default: false
@@ -704,7 +832,7 @@ collections:
                 default: text
                 hint: default preserves the built-in content and is forbidden for custom windows. Other choices
                   replace a built-in window's content. site-settings, music-player and start-menu
-                  must use default. Edit original default content in Site settings, Devlog, Life,
+                  must use default. Edit original default content in Pages, Devlog, Life,
                   Gallery or Music.
                 options:
                   - default

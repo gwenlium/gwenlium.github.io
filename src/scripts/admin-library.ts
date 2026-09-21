@@ -128,7 +128,7 @@ export const previewMediaLibrary = {
           card.append(player);
         }
         const label = document.createElement('span');
-        label.textContent = `${url.slice('/media/'.length)} — ${entry.kind}${entry.width && entry.height ? ` ${entry.width} × ${entry.height}` : ''}${entry.duration ? ` (${entry.duration.toFixed(1)} seconds)` : ''}`;
+        label.textContent = `${url.slice('/media/'.length)} - ${entry.kind}${entry.width && entry.height ? ` ${entry.width} × ${entry.height}` : ''}${entry.duration ? ` (${entry.duration.toFixed(1)} seconds)` : ''}`;
         const button = document.createElement('button');
         button.type = 'button';
         button.textContent = 'Use media';

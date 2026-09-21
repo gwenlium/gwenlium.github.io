@@ -1,13 +1,14 @@
 ---
+import { pages } from '../lib/pages';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 ---
-<SiteLayout title="Page not found" noindex>
+<SiteLayout title={pages['not-found'].title} noindex>
   <Window windowId="not-found">
     <div class="empty-state">
-      <p class="eyebrow">404</p>
-      <h1 class="page-heading">Page not found</h1>
-      <p>This address doesn’t have a page.</p>
+      <span class="eyebrow">{pages['not-found'].eyebrow}</span>
+      <h1 class="page-heading">{pages['not-found'].title}</h1>
+      {pages['not-found'].intro && <p class="page-intro">{pages['not-found'].intro}</p>}
     </div>
   </Window>
 </SiteLayout>

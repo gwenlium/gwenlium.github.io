@@ -1,4 +1,5 @@
 ---
+import { pages } from '../lib/pages';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 import Media from '../components/Media.astro';
@@ -8,10 +9,11 @@ const images = gallery.filter((item) => item.type === 'image').length;
 const videos = gallery.filter((item) => item.type === 'video').length;
 ---
 
-<SiteLayout title="Gallery">
+<SiteLayout title={pages.gallery.title}>
   <header class="page-heading">
-    <span class="eyebrow">Images & videos</span>
-    <h1>Gallery</h1>
+    <span class="eyebrow">{pages.gallery.eyebrow}</span>
+    <h1>{pages.gallery.title}</h1>
+    {pages.gallery.intro && <p class="page-intro">{pages.gallery.intro}</p>}
   </header>
   <Window windowId="gallery-content">
   {gallery.length ? (

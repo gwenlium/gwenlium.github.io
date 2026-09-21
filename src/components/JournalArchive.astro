@@ -1,4 +1,5 @@
 ---
+import { pages } from '../lib/pages';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 import Icon from '../components/Icon.astro';
@@ -8,7 +9,8 @@ import { getPosts, postSearchText, postUrl } from '../lib/content';
 
 interface Props { section: 'devlog' | 'life' }
 const { section } = Astro.props;
-const title = section === 'life' ? 'Life' : 'Devlog';
+const page = pages[section];
+const title = page.title;
 const archiveUrl = `/${section}/`;
 const posts = await getPosts(section);
 const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort((a, b) => a.localeCompare(b, 'en'));
@@ -25,7 +27,7 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
 
 <SiteLayout title={title}>
   <header class="page-heading archive-heading">
-    <div><p class="eyebrow">{section === 'life' ? 'Everyday life' : 'Games, code & creative projects'}</p><h1>{title}</h1></div>
+    <div><p class="eyebrow">{page.eyebrow}</p><h1>{title}</h1>{page.intro && <p class="page-intro">{page.intro}</p>}</div>
   </header>
 
   <div data-devlog data-archive-url={archiveUrl}>

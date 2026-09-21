@@ -1,4 +1,5 @@
 ---
+import { pages } from '../lib/pages';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 import Media from '../components/Media.astro';
@@ -10,10 +11,11 @@ const paragraphs = about.body.trim() ? about.body.trim().split(/\n\s*\n/) : [];
 const showPortrait = Boolean(getWindowDefinition('about-portrait')?.enabled && (about.avatar || hasWindowOverride('about-portrait')));
 ---
 
-<SiteLayout title="About" image={about.avatar || undefined} imageAlt={about.avatarAlt || undefined}>
+<SiteLayout title={pages.about.title.replaceAll('{name}', site.name)} image={about.avatar || undefined} imageAlt={about.avatarAlt || undefined}>
   <header class="page-heading">
-    <span class="eyebrow">Profile</span>
-    <h1>About {site.name}</h1>
+    <span class="eyebrow">{pages.about.eyebrow}</span>
+    <h1>{pages.about.title.replaceAll('{name}', site.name)}</h1>
+    {pages.about.intro && <p class="page-intro">{pages.about.intro}</p>}
   </header>
   <div class:list={['about-grid', { 'about-grid--with-avatar': showPortrait }]}>
     {showPortrait && <aside class="about-avatar"><Window windowId="about-portrait"><Media src={about.avatar} alt={about.avatarAlt} eager sizes="(max-width: 800px) 300px, 25vw" /></Window></aside>}
@@ -28,6 +30,7 @@ const showPortrait = Boolean(getWindowDefinition('about-portrait')?.enabled && (
           </div>
         )}
       </Window>
+      {about.links.length > 0 && <nav aria-label="Profile links"><ul>{about.links.map(link => <li><a href={link.url}>{link.label}</a></li>)}</ul></nav>}
     </div>
   </div>
 </SiteLayout>
