@@ -28,6 +28,7 @@ const { title, date, excerpt, cover, coverAlt, tags } = post.data;
   .post-card:last-child { padding-bottom: 0; border-bottom: 0; }
   .post-details { min-width: 0; }
   time { color: var(--muted); font-size: .72rem; }
+  .post-details > .tag + time { display: block; margin-top: .65rem; }
   h2 { margin: .65rem 0; font-size: clamp(1rem, .8rem + 1.5cqi, 1.35rem); line-height: 1.45; }
   h2 a { text-decoration: none; }
   h2 a:hover { text-decoration: underline; text-underline-offset: .2em; }
