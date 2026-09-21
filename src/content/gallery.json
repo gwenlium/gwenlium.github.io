@@ -1,3 +1,13 @@
 {
-  "items": []
+  "items": [
+    {
+      "type": "image",
+      "caption": "A drawing made from my closest friend\nhttps://www.instagram.com/viruscat_/",
+      "poster": "",
+      "id": "1",
+      "title": "Portrait of me",
+      "src": "/media/image-preview-25fd6541d00bfa06d8ab245434545113.webp",
+      "alt": "A drawing made from my closest friend"
+    }
+  ]
 }
