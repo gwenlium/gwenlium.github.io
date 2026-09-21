@@ -7,5 +7,13 @@ import subscribe from '../content/pages/subscribe.json';
 import notfound from '../content/pages/not-found.json';
 
 export interface PageMedia { type: 'image' | 'video' | 'audio'; src: string; alt?: string; caption?: string; poster?: string }
-
-export const pages = { about: { ...about, photos: about.photos as string[], media: about.media as PageMedia[] }, devlog, life, gallery, music, subscribe, 'not-found': notfound };
+interface PageCopy { title: string; eyebrow?: string; intro?: string }
+function page<T extends PageCopy>(data: T) {
+  return { ...data, eyebrow: data.eyebrow ?? '', intro: data.intro ?? '' };
+}
+const aboutContent = about as PageCopy & { body?: string; avatar?: string; avatarAlt?: string; links?: { label: string; url: string }[]; photos?: string[]; media?: PageMedia[] };
+export const pages = {
+  about: { ...page(aboutContent), photos: aboutContent.photos ?? [], media: aboutContent.media ?? [] },
+  devlog: page(devlog), life: page(life), gallery: page(gallery), music: page(music),
+  subscribe: page(subscribe), 'not-found': page(notfound),
+};

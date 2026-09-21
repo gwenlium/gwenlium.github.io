@@ -58,7 +58,9 @@ export interface MusicTrack {
   coverAlt: string;
 }
 
-const settings = siteData as Partial<SiteSettings>;
+type SavedSettings = Partial<Omit<SiteSettings, 'game' | 'about'>> & { game?: Partial<GameSettings>; about?: Partial<AboutSettings> };
+const settings: SavedSettings = siteData;
+const savedAbout: Partial<AboutSettings> = aboutData;
 
 export const site: SiteSettings = {
   name: settings.name ?? 'Gwenlium',
@@ -82,10 +84,10 @@ export const site: SiteSettings = {
     ...settings.game,
   },
   about: {
-    body: aboutData.body ?? '',
-    avatar: aboutData.avatar ?? '',
-    avatarAlt: aboutData.avatarAlt ?? '',
-    links: aboutData.links ?? [],
+    body: savedAbout.body ?? '',
+    avatar: savedAbout.avatar ?? '',
+    avatarAlt: savedAbout.avatarAlt ?? '',
+    links: savedAbout.links ?? [],
   },
 };
 

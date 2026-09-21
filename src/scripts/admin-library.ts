@@ -108,7 +108,7 @@ export const previewMediaLibrary = {
       timing.hidden = !timed || full.checked;
       timing.disabled = timing.hidden || Boolean(controller || inspector);
       fullWarning.hidden = !timed || !full.checked;
-      convert.textContent = timed && full.checked ? 'Prepare full copy' : 'Prepare preview';
+      convert.textContent = input.multiple && (input.files?.length ?? 0) > 1 ? 'Prepare pictures' : timed && full.checked ? 'Prepare full copy' : 'Prepare preview';
       convert.disabled = !fileKind || Boolean(controller || inspector);
     }
 
@@ -241,6 +241,7 @@ export const previewMediaLibrary = {
           previewMedia.append(media);
         }
         previewDetails.textContent = `${prepared.length} prepared copy/copies. Review each copy before uploading.`;
+        publish.textContent = prepared.length > 1 ? `Upload and use ${prepared.length} pictures` : 'Upload and use copy';
         preview.hidden = false;
         status.textContent = 'Review the prepared copy before uploading. Uploaded copies are public; the original stays on this device.';
         publish.focus();
