@@ -1,5 +1,11 @@
 {
   "files": {
+    "/media/image-preview-4d60403638517b7fed569d09169f0231.webp": {
+      "sha256": "4d60403638517b7fed569d09169f0231d2c291d2e0dc0680de6522b569cbd576",
+      "kind": "image",
+      "width": 1600,
+      "height": 1173
+    },
     "/media/ui-confirm-preview-1bff1150661fda803fda6a4aa90e5d10.mp3": {
       "sha256": "d21bcde115a19c99afda428057bf2125969384f3a038f9bd94d03e7b9e6c8c28",
       "kind": "audio",
