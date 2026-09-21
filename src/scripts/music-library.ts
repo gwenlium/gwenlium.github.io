@@ -391,6 +391,7 @@ function showCopyDialog(url: string, title: string): void {
   close.type = 'button';
   close.className = 'button-secondary';
   close.textContent = 'Close';
+  close.dataset.closeDialog = '';
   close.addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => {
     dialog.remove();

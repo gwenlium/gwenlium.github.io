@@ -1,4 +1,4 @@
-type InterfaceSound = 'confirm' | 'move' | 'type';
+type InterfaceSound = 'confirm' | 'close' | 'finish' | 'move' | 'type';
 type Sound = {
   src: string;
   data?: Promise<ArrayBuffer | undefined>;
@@ -12,15 +12,19 @@ type Sound = {
 
 const lifetime = new AbortController();
 const listenerOptions = { signal: lifetime.signal };
-const kinds: InterfaceSound[] = ['confirm', 'move', 'type'];
+const kinds: InterfaceSound[] = ['confirm', 'close', 'finish', 'move', 'type'];
 const sounds: Record<InterfaceSound, Sound> = {
   confirm: { src: 'media/ui-confirm-preview-1bff1150661fda803fda6a4aa90e5d10.mp3', lastStarted: -Infinity, volume: 0.5, interval: 0 },
+  close: { src: 'media/ui-close-preview-118db8c6fb2f8447298b044e352b6186.mp3', lastStarted: -Infinity, volume: 0.5, interval: 0 },
+  finish: { src: 'media/ui-finish-preview-50fc0240359eaa2fc6a9734c964812cd.mp3', lastStarted: -Infinity, volume: 0.5, interval: 0 },
   move: { src: 'media/ui-move-preview-04b4a0067da6cbf8dcbeab2cdc8b8f64.mp3', lastStarted: -Infinity, volume: 0.35, interval: 45 },
   // The typing preview contains only the first recorded click of the source's click train.
   type: { src: 'media/ui-type-preview-e6f898635cd9d3cd27a585878e1230ee.mp3', lastStarted: -Infinity, volume: 0.3, interval: 55 },
 };
 let context: AudioContext | undefined;
-let pendingConfirmUntil = 0;
+let pendingAction: 'confirm' | 'close' | 'finish' | undefined;
+let pendingActionUntil = 0;
+let navigating = false;
 
 function foreground(): boolean {
   return !lifetime.signal.aborted && document.visibilityState === 'visible' && document.hasFocus();
@@ -36,7 +40,7 @@ function stopVoice(sound: Sound): void {
 }
 
 function silence(): void {
-  pendingConfirmUntil = 0;
+  pendingAction = undefined;
   for (const kind of kinds) stopVoice(sounds[kind]);
 }
 
@@ -45,6 +49,7 @@ function startVoice(kind: InterfaceSound): void {
   if (!context || context.state !== 'running' || !sound.buffer || !sound.output) return;
   const now = performance.now();
   if (now - sound.lastStarted < sound.interval) return;
+  if (kind === 'close' || kind === 'finish') stopVoice(sounds.confirm);
   stopVoice(sound);
   const voice = context.createBufferSource();
   voice.buffer = sound.buffer;
@@ -58,15 +63,16 @@ function startVoice(kind: InterfaceSound): void {
   sound.lastStarted = now;
 }
 
-function flushConfirmation(): void {
-  if (!pendingConfirmUntil) return;
-  if (!foreground() || performance.now() > pendingConfirmUntil) {
-    pendingConfirmUntil = 0;
+function flushAction(): void {
+  if (!pendingAction) return;
+  if (!foreground() || performance.now() > pendingActionUntil) {
+    pendingAction = undefined;
     return;
   }
-  if (context?.state !== 'running' || !sounds.confirm.buffer) return;
-  pendingConfirmUntil = 0;
-  startVoice('confirm');
+  if (context?.state !== 'running' || !sounds[pendingAction].buffer) return;
+  const kind = pendingAction;
+  pendingAction = undefined;
+  startVoice(kind);
 }
 
 async function fetchRecording(kind: InterfaceSound): Promise<ArrayBuffer | undefined> {
@@ -86,7 +92,7 @@ async function decodeRecording(audio: AudioContext, kind: InterfaceSound): Promi
     const buffer = await audio.decodeAudioData(data);
     if (lifetime.signal.aborted) return;
     sounds[kind].buffer = buffer;
-    if (kind === 'confirm') flushConfirmation();
+    if (kind === pendingAction) flushAction();
   } catch {
     // An aborted context or unsupported recording must not break the controls.
   }
@@ -107,7 +113,7 @@ function initializeAudio(): void {
     void decodeRecording(context, kind);
   }
   context.addEventListener('statechange', () => {
-    if (context?.state === 'running') flushConfirmation();
+    if (context?.state === 'running') flushAction();
     else silence();
   }, listenerOptions);
 }
@@ -118,9 +124,9 @@ function unlock(event: Event): void {
   // can reject valid touch/keyboard activation before the document gains focus.
   initializeAudio();
   if (!context) return;
-  if (context.state === 'running') { flushConfirmation(); return; }
+  if (context.state === 'running') { flushAction(); return; }
   // A blocked or interrupted resume must not prevent a later valid gesture.
-  void context.resume().then(flushConfirmation, () => { pendingConfirmUntil = 0; });
+  void context.resume().then(flushAction, () => { pendingAction = undefined; });
 }
 
 export function playInterfaceSound(kind: InterfaceSound): void {
@@ -131,12 +137,25 @@ export function playInterfaceSound(kind: InterfaceSound): void {
   if (!context) return;
   if (context.state !== 'running' || !sounds[kind].buffer) {
     // Only the latest click may wait briefly for decode/resume, never old hover or typing events.
-    if (kind === 'confirm') pendingConfirmUntil = performance.now() + 300;
+    if (kind !== 'move' && kind !== 'type') {
+      pendingAction = kind;
+      pendingActionUntil = performance.now() + 300;
+    }
     return;
   }
-  if (kind === 'confirm') pendingConfirmUntil = 0;
+  if (kind !== 'move' && kind !== 'type') pendingAction = undefined;
   startVoice(kind);
 }
+
+document.addEventListener('gwenlium:window-command', event => {
+  const detail = (event as CustomEvent<{ id?: string; action?: string }>).detail;
+  if (navigating || typeof detail?.id !== 'string' || (detail.action !== 'close' && detail.action !== 'minimize')) return;
+  const root = document.querySelector<HTMLElement>(`[data-desktop-window][data-window-id="${CSS.escape(detail.id)}"]`);
+  if (root && !root.hidden && !root.inert) playInterfaceSound('close');
+}, { ...listenerOptions, capture: true });
+document.addEventListener('close', event => {
+  if (!navigating && event.target instanceof HTMLDialogElement && event.target.isConnected && !event.target.open) playInterfaceSound('close');
+}, { ...listenerOptions, capture: true });
 
 // Fetch small assets early; the browser's autoplay policy governs playback.
 for (const kind of kinds) sounds[kind].data = fetchRecording(kind);
@@ -149,9 +168,11 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') silence();
 }, listenerOptions);
 document.addEventListener('astro:before-swap', () => {
+  navigating = true;
   stopVoice(sounds.move);
   stopVoice(sounds.type);
 }, listenerOptions);
+document.addEventListener('astro:page-load', () => { navigating = false; }, listenerOptions);
 
 if (import.meta.hot) import.meta.hot.dispose(() => {
   lifetime.abort();

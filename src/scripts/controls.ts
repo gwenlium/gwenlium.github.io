@@ -7,6 +7,8 @@ const listenerOptions = { signal: lifetime.signal };
 const controls = 'a[href], area[href], button, input:not([type="hidden"]), select, textarea, summary, [contenteditable="true"], [role="button"], [role="tab"], [role="menuitem"], [role="option"]';
 const regions = '[data-desktop-window], .taskbar, .footer-navigation, #page-scroll';
 const nativeArrows = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [role="slider"], [role="spinbutton"], video, audio, [data-window-drag]';
+const actionSoundControls = '[data-window-action="close"], [data-window-action="minimize"], [data-player-close], [data-player-minimize], [data-close-settings], [data-close-start], [data-close-dialog], .media-dialog__close, [data-player-queue-close], [data-player-queue-toggle][aria-expanded="true"], [data-dialogue-exit], [data-dialogue-finish]';
+const dismissControls = '[data-window-notice-dismiss], [data-library-action="cancel-add"], [data-library-action="cancel-delete"], [data-library-action="dismiss-shared"]';
 const rememberedFocus = new WeakMap<HTMLElement, HTMLElement>();
 const caret = document.createElement('span');
 caret.className = 'control-caret pixel-caret';
@@ -436,7 +438,10 @@ document.addEventListener('click', (event) => {
   const label = event.target.closest('label');
   // A label forwards activation to its input; sound only that forwarded click.
   if (label?.control === element && !element.contains(event.target)) return;
-  playInterfaceSound('confirm');
+  // These actions play their own sound when the dismissal or finish actually starts.
+  if (element.matches(actionSoundControls)) return;
+  const dismiss = element.matches(dismissControls) || (element.matches('summary') && element.parentElement?.hasAttribute('open'));
+  playInterfaceSound(dismiss ? 'close' : 'confirm');
 }, { ...listenerOptions, capture: true });
 document.addEventListener('pointerout', (event) => {
   if (!event.relatedTarget) pointerPosition = null;

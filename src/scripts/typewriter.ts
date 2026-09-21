@@ -61,6 +61,7 @@ function finishAll(): void {
   for (const writer of writers.values()) finish(writer);
   cancelAnimationFrame(contentFrame);
   contentFrame = 0;
+  for (const root of queuedRoots) delete root.dataset.typing;
   queuedRoots.clear();
 }
 
@@ -187,7 +188,7 @@ function collectText(root: HTMLElement, pending: Map<Text, TextRun>): TextRun[] 
 
 function reconcileText(root: HTMLElement): void {
   const current = writers.get(root);
-  if (!root.isConnected) { if (current) finish(current); return; }
+  if (!root.isConnected) { if (current) finish(current); else delete root.dataset.typing; return; }
   const pending = new Map(current?.runs.slice(current.run).map(run => [run.node, run]) ?? []);
   const runs = collectText(root, pending);
   const retained = new Set(runs.map(run => run.node));
@@ -196,7 +197,7 @@ function reconcileText(root: HTMLElement): void {
     if (!retained.has(run.node) && seenText.get(run.node) === run.text) seenText.delete(run.node);
   }
   root.setAttribute('data-typewriter-started', '');
-  if (!runs.length || motionReduced()) { if (current) finish(current); return; }
+  if (!runs.length || motionReduced()) { if (current) finish(current); else delete root.dataset.typing; return; }
   const total = runs.reduce((count, run) => count + run.ends.length - run.position, 0);
   const cursor = current?.cursor ?? document.createElement('span');
   if (!current) {
@@ -271,6 +272,8 @@ document.addEventListener('gwenlium:typewriter-reveal', event => {
     let node: Node | null;
     while ((node = walker.nextNode())) seenText.delete(node as Text);
   }
+  // Keep completion indicators hidden while the new block waits for its first frame.
+  if (!motionReduced()) root.dataset.typing = '';
   queueRoot(root);
 }, listenerOptions);
 document.addEventListener('scroll', queueCursors, { ...listenerOptions, capture: true, passive: true });

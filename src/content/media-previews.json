@@ -12,10 +12,20 @@
       "width": 1600,
       "height": 1173
     },
+    "/media/ui-close-preview-118db8c6fb2f8447298b044e352b6186.mp3": {
+      "sha256": "aa1a959af9188513d6904404ae3f9bb95a5d62fdea2746957bf8c714434b3765",
+      "kind": "audio",
+      "duration": 0.967596
+    },
     "/media/ui-confirm-preview-1bff1150661fda803fda6a4aa90e5d10.mp3": {
       "sha256": "d21bcde115a19c99afda428057bf2125969384f3a038f9bd94d03e7b9e6c8c28",
       "kind": "audio",
       "duration": 1.045964
+    },
+    "/media/ui-finish-preview-50fc0240359eaa2fc6a9734c964812cd.mp3": {
+      "sha256": "e1cc048e29373c33bd5aa5f9d610525aedb0906fc7a66221a8c3150d4ab258cb",
+      "kind": "audio",
+      "duration": 0.889229
     },
     "/media/ui-move-preview-04b4a0067da6cbf8dcbeab2cdc8b8f64.mp3": {
       "sha256": "54236ef0a734e96c392bc8d8c0e8afc76a7ff95cd2590fe2da3fb2561b9d1531",

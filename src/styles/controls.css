@@ -36,6 +36,8 @@
 .control-caret[data-side='right'] { rotate: 180deg; }
 .control-caret[data-side='above'] { rotate: 90deg; }
 .control-caret[data-side='below'] { rotate: -90deg; }
+.dialogue-caret { position: relative; display: inline-block; flex-shrink: 0; rotate: 90deg; visibility: hidden; }
+[data-typewriter-started]:not([data-typing]) .dialogue-caret { visibility: visible; animation: jrpg-caret 1.1s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   html:not([data-motion='full']) .pixel-caret { animation: none !important; transition: none; }
 }

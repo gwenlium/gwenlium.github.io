@@ -9,7 +9,7 @@ const { id } = Astro.props;
   <nav class="dialogue-controls" aria-label="Dialogue reading" data-dialogue-controls hidden>
     <button class="button button-secondary" type="button" data-dialogue-back disabled>Back</button>
     <span role="status" aria-live="polite" data-dialogue-progress></span>
-    <button class="button" type="button" data-dialogue-next><span data-dialogue-next-label>Continue</span></button>
+    <button class="button" type="button" data-dialogue-next><span data-dialogue-next-label>Continue</span><span class="dialogue-caret pixel-caret" aria-hidden="true"></span></button>
   </nav>
 </div>
 <style>

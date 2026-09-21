@@ -1,3 +1,5 @@
+import { playInterfaceSound } from './interface-audio';
+
 const interactionStyles = `
 .media-zoom-trigger { display:block; width:100%; padding:0; border:0; background:transparent; color:inherit; cursor:zoom-in; text-align:inherit; }
 .media-zoom-trigger picture, .media-zoom-trigger img { display:block; max-width:100%; }
@@ -26,6 +28,7 @@ let previousOverflow = '';
 
 function dismissLightbox(restoreFocus = true) {
   if (!lightbox) return;
+  if (restoreFocus && lightbox.open) playInterfaceSound('close');
   lightbox.querySelector('video')?.pause();
   if (lightbox.open) lightbox.close();
   lightbox.remove();

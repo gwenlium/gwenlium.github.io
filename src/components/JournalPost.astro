@@ -137,7 +137,6 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
   .dialogue-controls { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: .75rem; border-top: 1px solid var(--line); background: var(--surface-raised); }
   .dialogue-progress { flex: 1; text-align: center; font-family: var(--font-reading); font-size: .9rem; color: var(--muted); }
   .dialogue-controls button:disabled { cursor: default; opacity: .5; }
-  .dialogue-caret { position: relative; display: inline-block; flex-shrink: 0; rotate: 90deg; animation: jrpg-caret 1.1s ease-in-out infinite; }
   @media (pointer: coarse) { .dialogue-option button { min-height: 28px; } }
   @container window-content (max-width: 360px) {
     .dialogue-heading, .dialogue-controls { padding: .5rem; }

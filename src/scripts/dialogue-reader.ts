@@ -1,4 +1,6 @@
 import type { TypewriterRevealDetail } from './typewriter';
+import { animateWindow, cancelWindowAnimation } from './window-motion';
+import { playInterfaceSound } from './interface-audio';
 
 type Reader = { setEnabled: (enabled: boolean) => void; content: HTMLElement; leave: () => void; dispose: () => void };
 
@@ -58,6 +60,7 @@ function createReader(root: HTMLElement): Reader | undefined {
   const hiddenBlocks = new Set<HTMLElement>();
   let active = false;
   let index = 0;
+  let finishMotion: Promise<boolean> | undefined;
 
   function restoreBlocks() {
     for (const block of hiddenBlocks) {
@@ -95,6 +98,7 @@ function createReader(root: HTMLElement): Reader | undefined {
     const last = index === chunks.length - 1;
     back!.disabled = index === 0;
     nextLabel!.textContent = last ? 'Finish' : 'Continue';
+    next!.toggleAttribute('data-dialogue-finish', last);
     progress!.textContent = `${index + 1} of ${chunks.length}`;
     if (focusNext || (document.activeElement === back && back!.disabled)) next!.focus({ preventScroll: true });
     if (scroll) heading!.scrollIntoView({ block: 'start', behavior: 'instant' });
@@ -104,6 +108,9 @@ function createReader(root: HTMLElement): Reader | undefined {
   }
 
   function leave(focus = false) {
+    cancelWindowAnimation(root);
+    finishMotion = undefined;
+    root.inert = false;
     if (!active) return;
     active = false;
     restoreBlocks();
@@ -118,6 +125,19 @@ function createReader(root: HTMLElement): Reader | undefined {
     }
   }
 
+  async function finishDialogue() {
+    if (!active || finishMotion) return;
+    playInterfaceSound('finish');
+    root.inert = true;
+    const motion = animateWindow(root, 'close');
+    finishMotion = motion;
+    const completed = await motion;
+    if (finishMotion !== motion) return;
+    finishMotion = undefined;
+    root.inert = false;
+    if (completed) leave(true);
+  }
+
   enter.addEventListener('click', () => {
     const target = fragmentTarget();
     const linkedChunk = target ? chunks.findIndex(chunk => chunk.some(block => block.contains(target))) : -1;
@@ -126,10 +146,13 @@ function createReader(root: HTMLElement): Reader | undefined {
   back.addEventListener('click', () => { if (active && index > 0) showChunk(index - 1); }, { signal });
   next.addEventListener('click', () => {
     if (!active) return;
-    if (index === chunks.length - 1) leave(true);
+    if (index === chunks.length - 1) void finishDialogue();
     else showChunk(index + 1);
   }, { signal });
-  exit.addEventListener('click', () => leave(true), { signal });
+  exit.addEventListener('click', () => {
+    playInterfaceSound('close');
+    leave(true);
+  }, { signal });
   option.hidden = document.documentElement.dataset.dialogue !== 'on';
   return {
     content, leave,

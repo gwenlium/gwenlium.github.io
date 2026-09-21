@@ -127,6 +127,7 @@ const definition = getWindowDefinition('music-player')!;
 <script>
   import { animateWindow, cancelWindowAnimation } from '../scripts/window-motion';
   import { registerWindow, resetWindowLayout, setWindowMaximized } from '../scripts/window-layout';
+  import { playInterfaceSound } from '../scripts/interface-audio';
   import '../scripts/music-library';
 
   type PlayerVisibility = 'open' | 'collapsed' | 'closed';
@@ -454,6 +455,7 @@ const definition = getWindowDefinition('music-player')!;
 
 
     private setQueueOpen(open: boolean, focus = false) {
+      if (!open && !this.queue.hidden) playInterfaceSound('close');
       this.queue.hidden = !open;
       this.queueToggle.setAttribute('aria-expanded', String(open));
       this.queueToggle.setAttribute('aria-label', open ? 'Close queue' : 'Open queue');
