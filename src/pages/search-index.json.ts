@@ -142,7 +142,6 @@ export async function GET(): Promise<Response> {
       case 'post-related': return text(...relatedPosts.map((post) => post.data.title));
       case 'game-details': return text(game.description, ...gameLinks.map((link) => link.label));
       case 'game-trailer': return text(game.title || 'Game', 'trailer');
-      case 'gallery-content': return text(...gallery.map(artworkText));
       case 'music-catalogue': return text(...tracks.map(trackText));
       case 'about-portrait': return site.about.avatarAlt;
       case 'about-bio': return site.about.body;
@@ -212,9 +211,8 @@ export async function GET(): Promise<Response> {
     windowEntries.push({ id: `window:${definition.id}`, title: definition.title, url, kind: 'window', text: body, tags });
   }
 
-  const galleryDefault = hasDefaultContent('gallery-content');
   for (const item of gallery) {
-    const url = galleryDefault ? `/gallery/#${encodeURIComponent(`work-${item.id}`)}` : artworkDestinations.get(item.id);
+    const url = `/gallery/#${encodeURIComponent(`work-${item.id}`)}`;
     if (url) add({ id: `artwork:${item.id}`, title: item.title, url, kind: 'artwork', text: artworkText(item), tags: item.topics });
   }
   const musicDefault = hasDefaultContent('music-catalogue');

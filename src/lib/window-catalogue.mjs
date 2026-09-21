@@ -15,7 +15,6 @@ export const builtinWindowPages = {
   'post-related': 'post',
   'game-details': 'devlog',
   'game-trailer': 'devlog',
-  'gallery-content': 'gallery',
   'music-library': 'music',
   'music-catalogue': 'music',
   'about-portrait': 'about',

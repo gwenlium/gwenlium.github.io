@@ -188,23 +188,6 @@
       "limit": 0
     },
     {
-      "id": "gallery-content",
-      "page": "gallery",
-      "title": "Gallery",
-      "enabled": true,
-      "tone": "pink",
-      "floating": false,
-      "initiallyClosed": false,
-      "width": 0,
-      "height": 0,
-      "content": "default",
-      "body": "",
-      "media": [],
-      "links": [],
-      "items": [],
-      "limit": 0
-    },
-    {
       "id": "music-library",
       "page": "music",
       "title": "Your playlists",
