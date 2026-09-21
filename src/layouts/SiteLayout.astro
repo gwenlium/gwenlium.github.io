@@ -55,6 +55,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
         const motion = ['full', 'reduced', 'system'].includes(saved.motion) ? saved.motion : 'system';
         const reading = saved.reading === 'readable' ? 'readable' : 'pixel';
         const root = document.documentElement;
+        root.dataset.dialogue = saved.dialogue === 'on' ? 'on' : 'off';
         const backgrounds = { auto: true, dots: true, polygons: true, circuits: true, checker: true, wave: true, stars: true, rain: true, off: true };
         const background = typeof saved.background === 'string' && Object.hasOwn(backgrounds, saved.background) ? saved.background : 'auto';
         if (!root.dataset.backgroundAuto) {
@@ -145,7 +146,26 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
     <PixelTransition />
     <Window windowId="site-settings" class="settings-window">
       <div class="settings-content">
-        <p class="settings-note">Display and reading settings.</p>
+        <header class="settings-intro"><span class="eyebrow">Make yourself at home</span><h2>Your space, your pace.</h2><p>Changes apply immediately across the site.</p></header>
+        <section class="settings-section" aria-labelledby="settings-reading-title">
+          <h3 id="settings-reading-title"><Icon name="book" size={18} />Reading</h3>
+          <label class="preference-switch" for="dialogue-preference">
+            <span><strong>Dialogue mode</strong><small>Read one passage at a time in posts, About and other text windows.</small></span>
+            <input id="dialogue-preference" type="checkbox" role="switch" data-preference="dialogue" aria-describedby="dialogue-preference-help" />
+            <span class="preference-switch__track" aria-hidden="true"></span>
+          </label>
+          <p class="settings-help" id="dialogue-preference-help">On for every page. You can still choose “Read all” for an individual entry.</p>
+        <fieldset class="preference-group">
+          <legend>Reading font</legend>
+          <div class="preference-options preference-options--font">
+            <label class="font-option-readable"><input type="radio" name="reading" value="readable" data-preference="reading" />Readable</label>
+            <label><input type="radio" name="reading" value="pixel" data-preference="reading" checked />Pixel</label>
+          </div>
+          <p>Changes the font used for posts and longer text.</p>
+        </fieldset>
+        </section>
+        <section class="settings-section" aria-labelledby="settings-appearance-title">
+          <h3 id="settings-appearance-title"><Icon name="sun" size={18} />Appearance</h3>
         <fieldset class="preference-group">
           <legend>Theme</legend>
           <div class="preference-options">
@@ -154,15 +174,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
             <label><input type="radio" name="theme" value="system" data-preference="theme" checked />System</label>
           </div>
         </fieldset>
-        <fieldset class="preference-group">
-          <legend>Motion</legend>
-          <div class="preference-options">
-            <label><input type="radio" name="motion" value="full" data-preference="motion" />Full</label>
-            <label><input type="radio" name="motion" value="reduced" data-preference="motion" />Reduced</label>
-            <label><input type="radio" name="motion" value="system" data-preference="motion" checked />System</label>
-          </div>
-          <p>System follows your device’s accessibility preference. Reduced motion skips text typing.</p>
-        </fieldset>
+          <details class="settings-background"><summary>Desktop background <span>Choose a pattern</span></summary>
         <fieldset class="preference-group" aria-describedby="background-preference-help">
           <legend>Background</legend>
           <div class="preference-options">
@@ -178,16 +190,22 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
           </div>
           <p id="background-preference-help">Auto changes the pattern on each new visit. Reduced motion keeps it still.</p>
         </fieldset>
+          </details>
+        </section>
+        <section class="settings-section" aria-labelledby="settings-motion-title">
+          <h3 id="settings-motion-title"><Icon name="play" size={18} />Motion</h3>
         <fieldset class="preference-group">
-          <legend>Reading font</legend>
-          <div class="preference-options preference-options--font">
-            <label class="font-option-readable"><input type="radio" name="reading" value="readable" data-preference="reading" />Readable</label>
-            <label><input type="radio" name="reading" value="pixel" data-preference="reading" checked />Pixel</label>
+          <legend>Motion</legend>
+          <div class="preference-options">
+            <label><input type="radio" name="motion" value="full" data-preference="motion" />Full</label>
+            <label><input type="radio" name="motion" value="reduced" data-preference="motion" />Reduced</label>
+            <label><input type="radio" name="motion" value="system" data-preference="motion" checked />System</label>
           </div>
-          <p>Changes the font used for posts and longer text.</p>
+          <p>System follows your device’s accessibility preference. Reduced motion skips text typing.</p>
         </fieldset>
+        </section>
         <div class="settings-bottom">
-          <p data-preferences-status role="status" aria-live="polite">Saved on this device when browser storage is available.</p>
+          <p data-preferences-status role="status" aria-live="polite">Saved on this device.</p>
           <button type="button" class="button" data-close-settings>Done<Icon name="arrow" size={16} /></button>
         </div>
       </div>

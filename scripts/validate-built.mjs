@@ -187,6 +187,17 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
     const route = routeForFile(directory, file);
     if (unpublished.has(route)) report(name, 'route', `Unpublished source ${unpublished.get(route)} generated a public page. Exclude drafts and future posts from getStaticPaths().`);
     const { $ } = documentFor(file);
+    if (!route.startsWith('/admin')) {
+      $('a[href]').each((_, element) => {
+        const href = $(element).attr('href');
+        try {
+          const target = new URL(href, siteOrigin);
+          if (target.origin === siteOrigin && /^\/admin(?:\/|$)/.test(target.pathname)) {
+            report(name, 'navigation', 'The site editor must not be linked from public pages.');
+          }
+        } catch { /* URL validation below reports malformed links. */ }
+      });
+    }
     let base = new URL(route, siteOrigin).href;
     const configuredBase = $('base[href]').first().attr('href');
     if (configuredBase !== undefined) {

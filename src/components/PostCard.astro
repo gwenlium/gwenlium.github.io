@@ -19,7 +19,6 @@ const { title, date, excerpt, cover, coverAlt, tags } = post.data;
       <li><a class="tag" href={`/${post.data.section}/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>
     ))}</ul>}
     <a class="read-post" href={postUrl(post)} aria-label={`Read ${title}`}>Read entry <Icon name="arrow" size={14} /></a>
-    <a class="read-post" href={`${postUrl(post)}?dialogue=1`}>Dialogue mode</a>
   </div>
 </article>
 

@@ -12,12 +12,13 @@ type Preferences = {
   motion: MotionPreference;
   reading: ReadingPreference;
   background: BackgroundPreference;
+  dialogue: 'on' | 'off';
 };
 
 type BeforeSwapEvent = Event & { newDocument: Document };
 
 const storageKey = 'gwenlium:preferences';
-const defaults: Preferences = { theme: 'system', motion: 'system', reading: 'pixel', background: 'auto' };
+const defaults: Preferences = { theme: 'system', motion: 'system', reading: 'pixel', background: 'auto', dialogue: 'off' };
 // The first-paint script chooses once; this value survives all ClientRouter swaps.
 const autoBackground = document.documentElement.dataset.backgroundAuto || 'dots';
 const darkScheme = window.matchMedia('(prefers-color-scheme: dark)');
@@ -45,6 +46,7 @@ function readPreferences(fallback: Preferences): Preferences {
   if (!saved || typeof saved !== 'object') return { ...defaults };
   const value = saved as Record<string, unknown>;
   return {
+    dialogue: value.dialogue === 'on' ? 'on' : 'off',
     theme: value.theme === 'light' || value.theme === 'dark' ? value.theme : 'system',
     motion: value.motion === 'full' || value.motion === 'reduced' ? value.motion : 'system',
     reading: value.reading === 'readable' ? 'readable' : 'pixel',
@@ -57,6 +59,11 @@ function readPreferences(fallback: Preferences): Preferences {
 let preferences = readPreferences(defaults);
 
 function applyPreferences(root: HTMLElement = document.documentElement): void {
+  const previousDialogue = root.dataset.dialogue;
+  root.dataset.dialogue = preferences.dialogue;
+  if (root === document.documentElement && previousDialogue !== preferences.dialogue) {
+    document.dispatchEvent(new CustomEvent('gwenlium:dialogue-preference', { detail: { enabled: preferences.dialogue === 'on' } }));
+  }
   root.dataset.themePreference = preferences.theme;
   root.dataset.motionPreference = preferences.motion;
   root.dataset.theme = preferences.theme === 'system'
@@ -75,7 +82,9 @@ function applyPreferences(root: HTMLElement = document.documentElement): void {
 function syncControls(): void {
   document.querySelectorAll<HTMLInputElement>('input[data-preference]').forEach((input) => {
     const key = input.dataset.preference;
-    if (key === 'theme' || key === 'motion' || key === 'reading' || key === 'background') {
+    if (key === 'dialogue') {
+      input.checked = preferences.dialogue === 'on';
+    } else if (key === 'theme' || key === 'motion' || key === 'reading' || key === 'background') {
       input.checked = input.value === preferences[key];
     }
   });
@@ -109,7 +118,9 @@ document.addEventListener('change', (event) => {
   if (!(input instanceof HTMLInputElement) || !input.matches('input[data-preference]')) return;
   const key = input.dataset.preference;
   const value = input.value;
-  if (key === 'theme' && (value === 'light' || value === 'dark' || value === 'system')) {
+  if (key === 'dialogue') {
+    preferences.dialogue = input.checked ? 'on' : 'off';
+  } else if (key === 'theme' && (value === 'light' || value === 'dark' || value === 'system')) {
     preferences.theme = value;
   } else if (key === 'motion' && (value === 'full' || value === 'reduced' || value === 'system')) {
     preferences.motion = value;

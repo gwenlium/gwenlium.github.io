@@ -1,6 +1,6 @@
 import type { TypewriterRevealDetail } from './typewriter';
 
-type Reader = { content: HTMLElement; leave: () => void; dispose: () => void };
+type Reader = { setEnabled: (enabled: boolean) => void; content: HTMLElement; leave: () => void; dispose: () => void };
 
 const readers = new Map<HTMLElement, Reader>();
 const lifetime = new AbortController();
@@ -74,7 +74,7 @@ function createReader(root: HTMLElement): Reader | undefined {
     hiddenBlocks.add(block);
   }
 
-  function showChunk(position: number, focusNext = false) {
+  function showChunk(position: number, focusNext = false, scroll = true) {
     index = position;
     active = true;
     restoreBlocks();
@@ -97,7 +97,7 @@ function createReader(root: HTMLElement): Reader | undefined {
     nextLabel!.textContent = last ? 'Finish' : 'Continue';
     progress!.textContent = `${index + 1} of ${chunks.length}`;
     if (focusNext || (document.activeElement === back && back!.disabled)) next!.focus({ preventScroll: true });
-    heading!.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) heading!.scrollIntoView({ block: 'start', behavior: 'instant' });
     content!.dispatchEvent(new CustomEvent<TypewriterRevealDetail>('gwenlium:typewriter-reveal', {
       bubbles: true, detail: { blocks: chunks[index] },
     }));
@@ -110,8 +110,9 @@ function createReader(root: HTMLElement): Reader | undefined {
     delete root.dataset.dialogueActive;
     heading!.hidden = true;
     controls!.hidden = true;
-    option!.hidden = false;
+    option!.hidden = document.documentElement.dataset.dialogue !== 'on';
     if (focus) {
+      option!.hidden = false;
       enter!.focus({ preventScroll: true });
       option!.scrollIntoView({ block: 'nearest', behavior: 'instant' });
     }
@@ -129,9 +130,17 @@ function createReader(root: HTMLElement): Reader | undefined {
     else showChunk(index + 1);
   }, { signal });
   exit.addEventListener('click', () => leave(true), { signal });
-  option.hidden = false;
+  option.hidden = document.documentElement.dataset.dialogue !== 'on';
   return {
     content, leave,
+    setEnabled(enabled) {
+      if (enabled) {
+        if (!active) showChunk(0, false, false);
+      } else {
+        leave();
+        option.hidden = true;
+      }
+    },
     dispose() {
       events.abort();
       leave();
@@ -159,14 +168,16 @@ function initializeReaders() {
     const reader = createReader(root);
     if (reader) {
       readers.set(root, reader);
-      if (new URLSearchParams(location.search).get('dialogue') === '1') {
-        const option = root.querySelector<HTMLElement>('[data-dialogue-option]') ?? root.closest('[data-desktop-window]')?.querySelector<HTMLElement>('[data-dialogue-option]');
-        option?.querySelector<HTMLButtonElement>('[data-dialogue-enter]')?.click();
-      }
+      reader.setEnabled(document.documentElement.dataset.dialogue === 'on' || new URLSearchParams(location.search).get('dialogue') === '1');
     }
   });
   revealFragment(fragmentTarget());
 }
+
+document.addEventListener('gwenlium:dialogue-preference', () => {
+  const enabled = document.documentElement.dataset.dialogue === 'on';
+  for (const reader of readers.values()) reader.setEnabled(enabled);
+}, listenerOptions);
 
 function disposeReaders() {
   for (const reader of readers.values()) reader.dispose();
