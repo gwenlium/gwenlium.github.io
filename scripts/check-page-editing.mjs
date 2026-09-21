@@ -10,9 +10,22 @@ const pages = config.collections.find(collection => collection.name === 'pages')
 const expected = ['site', 'about', 'devlog', 'life', 'gallery', 'music', 'subscribe', 'not-found'];
 assert.deepEqual(pages.map(page => page.name).sort(), expected.sort());
 const originals = new Map();
+const fixtureSlug = `cms-photo-check-${process.pid}`;
+const fixturePost = `src/content/posts/${fixtureSlug}.md`;
 const registry = JSON.parse(fs.readFileSync('src/content/media-previews.json', 'utf8'));
 const photo = Object.entries(registry.files).find(([, entry]) => entry.kind === 'image')?.[0];
 try {
+  const windowsFile = 'src/content/windows.json';
+  const windowsRaw = fs.readFileSync(windowsFile, 'utf8');
+  originals.set(windowsFile, windowsRaw);
+  const windows = JSON.parse(windowsRaw);
+  for (const window of windows.windows) {
+    if (['home-intro', 'about-bio', 'post-entry', 'subscribe-rss', 'not-found'].includes(window.id)) {
+      window.enabled = true;
+      window.content = 'default';
+    }
+  }
+  fs.writeFileSync(windowsFile, `${JSON.stringify(windows, null, 2)}\n`);
   for (const page of pages) {
     const raw = fs.readFileSync(page.file, 'utf8');
     originals.set(page.file, raw);
@@ -36,14 +49,12 @@ try {
     fs.writeFileSync(page.file, `${JSON.stringify(data, null, 2)}\n`);
   }
   if (photo) {
-    const postFile = 'src/content/posts/opening.md';
-    const raw = fs.readFileSync(postFile, 'utf8');
-    originals.set(postFile, raw);
-    fs.writeFileSync(postFile, raw.replace(/^---\n/, `---\nphotos:\n  - ${photo}\n  - ${photo}\n`));
+    assert(!fs.existsSync(fixturePost));
+    fs.writeFileSync(fixturePost, `---\ntitle: CMS photo test\npermalink: ${fixtureSlug}\nsection: devlog\ndraft: false\ndate: 2020-01-01\nphotos:\n  - ${photo}\n  - ${photo}\n---\nGallery test.\n`);
   }
   execFileSync('npm', ['run', 'build'], { stdio: 'pipe' });
   if (photo) {
-    const post = load(fs.readFileSync('dist/devlog/opening/index.html', 'utf8'));
+    const post = load(fs.readFileSync(`dist/devlog/${fixtureSlug}/index.html`, 'utf8'));
     assert.equal(post('.entry-media img').length, 2);
     assert(fs.readFileSync('dist/rss.xml', 'utf8').includes(photo));
   }
@@ -69,5 +80,6 @@ try {
   }
   console.log('CMS editing verified for all 8 page entries, including rich About content, photo galleries and links.');
 } finally {
+  if (photo && fs.existsSync(fixturePost)) fs.unlinkSync(fixturePost);
   for (const [file, raw] of originals) fs.writeFileSync(file, raw);
 }
