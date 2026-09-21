@@ -41,8 +41,9 @@ if (game.trailerUrl) {
     {game.status && <p class="game-status"><span aria-hidden="true">◆</span> {game.status}</p>}
   </header>
     <div class="game-grid">
-      {(game.description || links.length > 0 || hasWindowOverride('game-details')) && (
+      {(game.cover || game.description || links.length > 0 || hasWindowOverride('game-details')) && (
         <Window windowId="game-details">
+          {game.cover && <div class="game-cover"><Media src={game.cover} alt={game.coverAlt} eager /></div>}
           {game.description && <DialogueReader id="game-reading"><div class="game-description prose" data-dialogue-blocks>{game.description.split(/\n\s*\n/).map(paragraph => <p>{paragraph}</p>)}</div></DialogueReader>}
           {links.length > 0 && <nav class="game-links" aria-label="Game links">
             {links.map((link) => <a class="button" href={link.url}>{link.label}<Icon name="external" size={14} /></a>)}
@@ -59,8 +60,9 @@ if (game.trailerUrl) {
 
 <style>
   .game-grid { display: grid; gap: 1.8rem; }
-  .game-cover { overflow: hidden; padding: .5rem; border: 1px solid var(--line); background: var(--surface-raised); box-shadow: var(--shadow); }
-  .game-cover :global(img) { max-height: 650px; object-fit: contain; }
+  .game-cover { min-width: 0; margin-bottom: 1.25rem; }
+  .game-cover :global(figure) { margin: 0; }
+  .game-cover :global(img) { width: 100%; max-height: 320px; object-fit: contain; }
   .game-status { display: inline-flex; align-items: center; gap: .6rem; padding: .5rem .7rem; border: 1px solid var(--line); background: var(--sage); color: var(--ink); font-size: .75rem; }
   .game-status span { font-size: .6rem; }
   .game-description p { white-space: pre-line; margin-top: 0; }
