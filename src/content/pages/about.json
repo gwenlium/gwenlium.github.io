@@ -1,16 +1,16 @@
 {
-  "title": "About {name}",
+  "photos": [],
+  "body": "Hello world!\n\nI'm Gwendolyn Ural Erkut, a human just like any other living in this very world.\nI work as an engineer but I also do enjoy many other things such as art, music and games. I like to create things and thus want to share it with all of you.\n\nI do enjoy playing the piano, the violin and the guitar A LOT!!! Another art I enjoy creating with is photography especially with abstract objects or portraits of people.\nI touched a computer the first time when I was around 3 years old and I remember that time vividly. Since then, computers and alike have been a big part in my life. Thus my profession...and my huge interest in games and electronics in general.\n\nIf you could ask me which game I enjoy the most, I wouldn't have a straight 'This is the game I enjoy the most' answer. I have too many! But few franchises that left me a remarkable impact were the Zelda, Pikmin, Mario, NieR and Silent Hill games. I do also enjoy Gravity Rush a lot (in my eyes quite a unique game). For me, games are art or rather a medium that can represent many arts in one place.\n\nI don't only play games for entertainment but rather also analyse them for hours. How do the physics work? What shaders were used in the engine to develop x and y? Why plays the game the way it does etc. I would spent hours to find glitches in a game to see the cracks in the code for example! This obsession I got proved to be very useful in developing my own game; Proto:ReCompute.\n\nThank you for checking in!",
+  "media": [],
   "eyebrow": "Profile",
   "intro": "",
-  "body": "Hello world!\n\nI'm Gwendolyn Ural Erkut, a human just like any other living in this very world.\nI work as an engineer but I also do enjoy many other things such as art, music and games. I like to create things and thus want to share it with all of you.\n\nI do enjoy playing the piano, the violin and the guitar A LOT!!! Another art I enjoy creating with is photography especially with abstract objects or portraits of people.\nI touched a computer the first time when I was around 3 years old and I remember that time vividly. Since then, computers and alike have been a big part in my life. Thus my profession...and my huge interest in games and electronics in general.\n\nIf you could ask me which game I enjoy the most, I wouldn't have a straight 'This is the game I enjoy the most' answer. I have too many! But few franchises that left me a remarkable impact were the Zelda, Pikmin, Mario, NieR and Silent Hill games. I do also enjoy Gravity Rush a lot (in my eyes quite a unique game). For me, games are art or rather a medium that can represant many arts in one place.\n\nI don't only play games for entertainment but rather also analyse them for hours. How do the physics work? What shaders were used in the engine to develop x and y? Why plays the game the way it does etc. I would spent hours to find glitches in a game to see the cracks in the code for example! This obsession I got proved to be very useful in developing my own game; Proto:ReCompute.\n\nThank you for checking in!",
-  "avatar": "/media/gwendolyn-portrait-preview-fe32960d39d30d48130fb1526ad2aaa3.webp",
-  "avatarAlt": "Gwendolyn seated at a computer desk, resting her chin on her hand.",
+  "avatarAlt": "",
+  "title": "About {name}",
+  "avatar": "",
   "links": [
     {
       "url": "https://www.instagram.com/_gwen.lyn_/",
       "label": "Instagram"
     }
-  ],
-  "photos": [],
-  "media": []
+  ]
 }
