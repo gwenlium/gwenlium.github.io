@@ -54,7 +54,12 @@ function createReader(root: HTMLElement): Reader | undefined {
   if (!option || !enter || !heading || !exit || !content || !controls || !back || !next || !nextLabel || !progress) return;
   const sources = Array.from(content.querySelectorAll<HTMLElement>('[data-dialogue-blocks]'));
   const chunks = collectChunks(sources);
-  if (!chunks.length) return;
+  if (chunks.length <= 1) {
+    option.hidden = true;
+    heading.hidden = true;
+    controls.hidden = true;
+    return;
+  }
   const events = new AbortController();
   const { signal } = events;
   const hiddenBlocks = new Set<HTMLElement>();

@@ -13,9 +13,11 @@ const page = pages[section];
 const title = page.title;
 const archiveUrl = `/${section}/`;
 const posts = await getPosts(section);
+const years = [...new Set(posts.map((post) => post.data.date.getUTCFullYear()))].sort((a, b) => b - a);
 const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort((a, b) => a.localeCompare(b, 'en'));
 const searchIndex = posts.map((post) => ({
   id: post.data.permalink,
+  date: post.data.date.toISOString(),
   title: post.data.title,
   url: postUrl(post),
   kind: 'post',
@@ -40,20 +42,25 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
           <button class="button" type="submit">Search</button>
           <button class="button button-secondary" type="button" data-clear hidden>Clear</button>
         </div>
+        <div class="archive-controls">
+          <label>Year<select name="year" aria-controls="devlog-results"><option value="">All years</option>{years.map((year) => <option value={year}>{year}</option>)}</select></label>
+          <label>Order<select name="sort" aria-controls="devlog-results"><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+        </div>
       </form>
       {tags.length > 0 && <nav class="tag-filters" aria-label="Filter entries by tag">
         <a href={archiveUrl} class="tag" data-tag="" aria-current="true">All entries</a>
         {tags.map((tag) => <a class="tag" href={`${archiveUrl}?tag=${encodeURIComponent(tag)}`} data-tag={tag}>{tag}</a>)}
       </nav>}
       <p class="result-count" role="status" aria-live="polite" aria-atomic="true" data-result-count>{posts.length} {posts.length === 1 ? 'entry' : 'entries'}</p>
-      <noscript><p class="search-note">Search and tag filtering need JavaScript. All published entries are listed below.</p></noscript>
-      <p class="search-note" id="devlog-search-help">Search by relevance, including typos and partial words. Use quotes for an exact phrase or a minus sign to exclude a word.</p>
+      <noscript><p class="search-note">Search, filters, sorting, and pagination need JavaScript. All published entries are listed below.</p></noscript>
+      <p class="search-note" id="devlog-search-help">Search titles and text, including typos and partial words. Use quotes for an exact phrase or a minus sign to exclude a word.</p>
     </Window>
 
     <Window windowId={`${section}-entries`}>
-      <div id="devlog-results" class="post-list">
+      <div id="devlog-results" class="post-list" tabindex="-1" aria-label="Journal entries">
         {posts.map((post) => <div class="post-result" data-post-id={post.data.permalink}><PostCard post={post} /></div>)}
       </div>
+      <nav class="archive-pagination" aria-label="Entry pages" data-pagination hidden></nav>
       {posts.length === 0 && <div class="empty-state archive-empty">
         <Icon name="book" size={36} /><h2>No entries published yet.</h2>
       </div>}
@@ -67,6 +74,7 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
 </SiteLayout>
 
 <script>
+  import { paginateArchive, pageNumbers } from '../lib/archive-pagination.mjs';
   import { createSearchIndex } from '../lib/search';
   import type { SearchEntry } from '../lib/search-types';
   let searchController: AbortController | undefined;
@@ -78,18 +86,22 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
     const form = root.querySelector<HTMLFormElement>('[data-search-form]');
     const input = form?.querySelector<HTMLInputElement>('input[name="q"]');
     const clearSearch = form?.querySelector<HTMLButtonElement>('[data-clear]');
+    const yearInput = form?.querySelector<HTMLSelectElement>('[name=year]');
+    const sortInput = form?.querySelector<HTMLSelectElement>('[name=sort]');
+    const pagination = root.querySelector<HTMLElement>('[data-pagination]');
     const count = root.querySelector<HTMLElement>('[data-result-count]');
     const empty = root.querySelector<HTMLElement>('[data-no-results]');
     const resultList = root.querySelector<HTMLElement>('#devlog-results');
     const searchData = root.querySelector<HTMLScriptElement>('#devlog-search-index');
-    if (!form || !input || !clearSearch || !count || !empty || !resultList || !searchData) return;
+    if (!yearInput || !sortInput || !pagination || !form || !input || !clearSearch || !count || !empty || !resultList || !searchData) return;
     searchController = new AbortController();
     const { signal } = searchController;
     const clears = root.querySelectorAll<HTMLButtonElement>('[data-clear]');
     const filters = root.querySelectorAll<HTMLAnchorElement>('[data-tag]');
     const results = resultList.querySelectorAll<HTMLElement>('[data-post-id]');
-    const index: SearchEntry[] = JSON.parse(searchData.textContent || '[]');
+    const index: (SearchEntry & { date: string })[] = JSON.parse(searchData.textContent || '[]');
     const search = createSearchIndex(index);
+    const dates = new Map(index.map((entry) => [entry.id, entry.date]));
     const cards = new Map(Array.from(results, (element) => [element.dataset.postId, element]));
     let editingSearch = false;
 
@@ -97,30 +109,60 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
       const parameters = new URL(location.href).searchParams;
       const query = parameters.get('q') ?? '';
       const tag = parameters.get('tag') ?? '';
+      const year = parameters.get('year') ?? '';
+      const sort = parameters.get('sort') === 'oldest' ? 'oldest' : 'newest';
+      yearInput.value = year;
+      sortInput.value = sort;
       input.value = query;
       const matches = search.search(query, 'post').filter((entry) => !tag || entry.tags.includes(tag));
-      const matchedIds = new Set(matches.map((entry) => entry.id));
+      const page = paginateArchive(matches.map((entry) => ({ ...entry, date: dates.get(entry.id)! })), { year, sort, page: parameters.get('page') });
+      const matchedIds = new Set(page.entries.map((entry) => entry.id));
       results.forEach((result) => { result.hidden = !matchedIds.has(result.dataset.postId!); });
-      for (const match of matches) {
+      for (const match of page.entries) {
         const card = cards.get(match.id);
         if (card) resultList.append(card);
       }
-      const visible = matches.length;
-      count.textContent = `${visible} ${visible === 1 ? 'entry' : 'entries'}${query || tag ? ' found' : ''}${tag ? ` tagged ${tag}` : ''}`;
+      const visible = page.total;
+      count.textContent = `${visible} ${visible === 1 ? 'entry' : 'entries'}${query || tag ? ' found' : ''}${tag ? ` tagged ${tag}` : ''}${year ? ` in ${year}` : ''}${visible ? ` · ${page.start}–${page.end} · Page ${page.page} of ${page.pages}` : ''}`;
       empty.hidden = visible > 0 || index.length === 0;
-      clearSearch.hidden = !query && !tag;
+      clearSearch.hidden = !query && !tag && !year;
+      pagination.hidden = page.pages <= 1;
+      pagination.replaceChildren();
+      const addPage = (number: number, label: string, current = false) => {
+        const link = document.createElement('a');
+        link.className = 'button button-secondary';
+        const target = new URL(location.href);
+        target.searchParams.set('page', String(number));
+        link.href = target.pathname + target.search;
+        link.dataset.page = String(number);
+        link.textContent = label;
+        link.setAttribute('aria-label', label === String(number) ? `Page ${number}` : label);
+        if (current) link.setAttribute('aria-current', 'page');
+        pagination.append(link);
+      };
+      if (page.page > 1) addPage(page.page - 1, 'Previous');
+      for (const number of pageNumbers(page.page, page.pages)) {
+        if (number === null) { const gap = document.createElement('span'); gap.textContent = '…'; gap.setAttribute('aria-hidden', 'true'); pagination.append(gap); }
+        else addPage(number, String(number), number === page.page);
+      }
+      if (page.page < page.pages) addPage(page.page + 1, 'Next');
       filters.forEach((filter) => {
         if (filter.dataset.tag === tag) filter.setAttribute('aria-current', 'true');
         else filter.removeAttribute('aria-current');
-        const target = new URL(root!.dataset.archiveUrl!, location.origin);
+        const target = new URL(location.href);
+        target.searchParams.delete('page');
+        target.searchParams.delete('tag');
         if (query) target.searchParams.set('q', query);
         if (filter.dataset.tag) target.searchParams.set('tag', filter.dataset.tag);
         filter.href = `${target.pathname}${target.search}`;
       });
     };
 
-    function setFilters(query: string, tag: string, replace = false) {
+    const setFilters = (query: string, tag: string, replace = false) => {
       const url = new URL(location.href);
+      url.searchParams.delete('page');
+      yearInput.value ? url.searchParams.set('year', yearInput.value) : url.searchParams.delete('year');
+      sortInput.value === 'oldest' ? url.searchParams.set('sort', 'oldest') : url.searchParams.delete('sort');
       query ? url.searchParams.set('q', query) : url.searchParams.delete('q');
       tag ? url.searchParams.set('tag', tag) : url.searchParams.delete('tag');
       if (url.href !== location.href) {
@@ -131,6 +173,21 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
       synchronize();
     }
 
+    for (const select of [yearInput, sortInput]) select.addEventListener('change', () => {
+      setFilters(input.value, new URL(location.href).searchParams.get('tag') ?? '');
+      editingSearch = false;
+    }, { signal });
+    pagination.addEventListener('click', (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+      const link = (event.target as Element).closest<HTMLAnchorElement>('a[data-page]');
+      if (!link) return;
+      event.preventDefault();
+      history.pushState(history.state, '', link.href);
+      synchronize();
+      resultList.focus({ preventScroll: true });
+      resultList.scrollIntoView({ block: 'start', behavior: 'instant' });
+      editingSearch = false;
+    }, { signal });
     input.addEventListener('input', () => {
       setFilters(input.value, new URL(location.href).searchParams.get('tag') ?? '', editingSearch);
       editingSearch = true;
@@ -148,6 +205,7 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
       editingSearch = false;
     }, { signal }));
     clears.forEach((clear) => clear.addEventListener('click', () => {
+      yearInput.value = '';
       setFilters('', '');
       editingSearch = false;
       input.focus();
@@ -165,6 +223,14 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
 </script>
 
 <style>
+  .archive-controls { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+  .archive-controls label { flex: 1 1 10rem; }
+  .archive-controls select { display: block; width: 100%; min-height: 44px; margin-top: .5rem; padding: .5rem; background: var(--page-bg); color: var(--ink); border: 1px solid var(--line); font: inherit; }
+  .archive-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .5rem; margin-top: 1.5rem; }
+  .archive-pagination :global(a) { min-width: 44px; min-height: 44px; justify-content: center; }
+  .archive-pagination :global([aria-current=page]) { background: var(--sage); color: var(--ink); outline: 2px solid var(--ink); outline-offset: 1px; }
+  [data-pagination][hidden] { display: none; }
+  .tag-filters a { min-height: 44px; display: inline-flex; align-items: center; }
   .archive-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   [data-devlog] { display: grid; gap: 1.5rem; }
   .search-form label { display: block; margin-bottom: .65rem; font-size: .75rem; }
