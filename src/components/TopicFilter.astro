@@ -1,21 +1,24 @@
 ---
 import { topicKey } from '../lib/topics.mjs';
-interface Props { topics: string[]; id: string }
-const { topics, id } = Astro.props;
+interface Props { topics: string[]; id: string; search?: boolean }
+const { topics, id, search = false } = Astro.props;
 ---
-<div class="topic-toolbar">
+<div class="topic-toolbar" role={search ? 'search' : undefined} aria-label={search ? 'Search and filter gallery' : undefined}>
+  {search && <label for={`${id}-query`}>Search gallery<input id={`${id}-query`} name="q" type="search" data-catalogue-search autocomplete="off" maxlength="2048" placeholder="Titles, descriptions, topics…" aria-describedby={`${id}-search-help`} /></label>}
   <label for={id}>Topic<select id={id} data-topic-select><option value="">All topics</option>{topics.map(topic => <option value={topicKey(topic)}>{topic}</option>)}</select></label>
-  <button class="button-secondary" type="button" data-topic-reset hidden>Clear filters</button>
+  <button class="button-secondary" type="button" data-topic-reset hidden>{search ? 'Clear search and filters' : 'Clear filters'}</button>
   <p role="status" aria-live="polite" data-topic-status></p>
 </div>
-<p class="topic-empty" data-topic-empty hidden>No items match these filters. Choose another topic or clear the filters.</p>
+{search && <p class="search-help" id={`${id}-search-help`}>Typos and partial words work. Use quotes for a phrase, or a minus sign to exclude a word.</p>}
+<p class="topic-empty" data-topic-empty hidden>{search ? 'No pictures or videos match this search and filters. Change them or clear the filters.' : 'No items match these filters. Choose another topic or clear the filters.'}</p>
 <style>
   .topic-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem 1rem; margin-bottom: 1.1rem; }
   label { display: grid; gap: .5rem; flex: 1 1 12rem; min-width: 0; font-size: .75rem; }
-  select { min-width: 0; width: 100%; min-height: 44px; border: 1px solid var(--line); padding: .6rem; background: var(--surface-raised); color: var(--ink); font: .9rem var(--font-reading); }
+  select, input { min-width: 0; width: 100%; min-height: 44px; border: 1px solid var(--line); padding: .6rem; background: var(--surface-raised); color: var(--ink); font: .9rem var(--font-reading); }
   button { min-height: 44px; font: .75rem var(--font-ui); cursor: pointer; }
   p { margin: 0; font: .85rem/1.6 var(--font-reading); color: var(--muted); }
   .topic-empty { padding: 1rem 0; }
+  .search-help { margin-bottom: 1rem; font-size: .75rem; }
   [hidden] { display: none !important; }
 </style>
 <script>

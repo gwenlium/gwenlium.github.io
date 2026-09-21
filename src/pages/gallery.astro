@@ -28,7 +28,7 @@ const videos = gallery.filter((item) => item.type === 'video').length;
         </div>
 
       </div>
-      <TopicFilter topics={topicOptions(gallery)} id="gallery-topic" />
+      <TopicFilter topics={topicOptions(gallery)} id="gallery-topic" search />
       <div class="gallery-grid">
         {gallery.map((item) => (
           <article class="gallery-item" data-gallery-type={item.type} data-item-topics={JSON.stringify(item.topics)} id={`work-${item.id}`}>

@@ -102,8 +102,10 @@ collections:
         widget: markdown
         required: false
         default: ""
-        hint: Write Markdown or use the rich-text editor. Pictures and GIFs are processed locally. Add audio
-          or video in the media fields below. Saved content is public on GitHub, including drafts.
+        hint: Use the Image control in the rich-text editor to insert pictures where they belong in the
+          article. Put a picture on its own line to keep it visible beside the following dialogue
+          passages until the next picture or heading. Pictures and GIFs are processed locally. Add
+          audio or video in the media fields below. Saved content is public on GitHub, including drafts.
         editor_components:
           - image
       - name: photos
@@ -269,8 +271,10 @@ collections:
         widget: markdown
         required: false
         default: ""
-        hint: Write Markdown or use the rich-text editor. Pictures and GIFs are processed locally. Add audio
-          or video in the media fields below. Saved content is public on GitHub, including drafts.
+        hint: Use the Image control in the rich-text editor to insert pictures where they belong in the
+          article. Put a picture on its own line to keep it visible beside the following dialogue
+          passages until the next picture or heading. Pictures and GIFs are processed locally. Add
+          audio or video in the media fields below. Saved content is public on GitHub, including drafts.
         editor_components:
           - image
       - name: photos
@@ -774,14 +778,16 @@ collections:
                       - image
                       - video
               - name: alt
-                label: Description / alternative text
+                label: Alternative text
                 widget: string
                 required: true
+                hint: Describe the picture for people who cannot see it. Use Description below for the text shown with the post.
               - name: caption
-                label: Caption
+                label: Description
                 widget: text
                 required: false
                 default: ""
+                hint: Shown below the picture and in the expanded viewer. Blank lines separate paragraphs.
               - name: poster
                 label: Poster image
                 widget: image

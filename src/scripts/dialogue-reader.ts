@@ -3,6 +3,7 @@ import { animateWindow, cancelWindowAnimation } from './window-motion';
 import { playInterfaceSound } from './interface-audio';
 
 type Reader = { setEnabled: (enabled: boolean) => void; content: HTMLElement; leave: () => void; dispose: () => void };
+type Chunk = { blocks: HTMLElement[]; scene?: HTMLElement[] };
 
 const readers = new Map<HTMLElement, Reader>();
 const lifetime = new AbortController();
@@ -14,7 +15,17 @@ function fragmentTarget(hash = location.hash): HTMLElement | null {
   catch { return null; }
 }
 
-function collectChunks(sources: HTMLElement[]): HTMLElement[][] {
+function isIllustration(block: HTMLElement): boolean {
+  if (!(block.matches('img') || block.querySelector('img')) || block.querySelector('video, audio, iframe')) return false;
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    if (node.textContent?.trim() && !node.parentElement?.closest('figcaption, script, style, noscript, [aria-hidden="true"]')) return false;
+  }
+  return true;
+}
+
+function collectChunks(sources: HTMLElement[]): Chunk[] {
   const blocks = sources.flatMap(source => {
     // Raw, unwrapped HTML text (or SVG) stays together rather than being lost or copied.
     if (Array.from(source.childNodes).some(node => node instanceof Text && node.data.trim())
@@ -22,19 +33,28 @@ function collectChunks(sources: HTMLElement[]): HTMLElement[][] {
     return Array.from(source.children).filter((node): node is HTMLElement => node instanceof HTMLElement
       && !node.matches('script, style, noscript, template, [hidden]'));
   });
-  const chunks: HTMLElement[][] = [];
+  const chunks: Chunk[] = [];
   let headings: HTMLElement[] = [];
+  let scene: HTMLElement[] | undefined;
   for (const block of blocks) {
-    if (block.matches('h1, h2, h3, h4, h5, h6')) headings.push(block);
-    else if (block.matches('figcaption') && !headings.length && chunks.length) chunks[chunks.length - 1].push(block);
-    else {
-      chunks.push([...headings, block]);
+    if (block.matches('h1, h2, h3, h4, h5, h6')) {
+      headings.push(block);
+      scene = undefined;
+    } else if (block.matches('figcaption') && !headings.length && chunks.length) {
+      const previous = chunks[chunks.length - 1];
+      previous.blocks.push(block);
+      if (previous.scene && previous.blocks.includes(previous.scene[0])) previous.scene.push(block);
+    } else {
+      // A standalone picture establishes the scene; mixed text/media stays one authored passage.
+      if (isIllustration(block)) scene = [block];
+      else if (block.querySelector('img, video, audio, iframe')) scene = undefined;
+      chunks.push({ blocks: [...headings, block], scene });
       headings = [];
     }
   }
   if (headings.length) {
-    if (chunks.length) chunks[chunks.length - 1].push(...headings);
-    else chunks.push(headings);
+    if (chunks.length) chunks[chunks.length - 1].blocks.push(...headings);
+    else chunks.push({ blocks: headings });
   }
   return chunks;
 }
@@ -60,12 +80,14 @@ function createReader(root: HTMLElement): Reader | undefined {
     controls.hidden = true;
     return;
   }
+  const blocks = chunks.flatMap(chunk => chunk.blocks);
   const events = new AbortController();
   const { signal } = events;
   const hiddenBlocks = new Set<HTMLElement>();
   let active = false;
   let index = 0;
   let finishMotion: Promise<boolean> | undefined;
+  let scene: HTMLElement[] | undefined;
 
   function restoreBlocks() {
     for (const block of hiddenBlocks) {
@@ -83,6 +105,14 @@ function createReader(root: HTMLElement): Reader | undefined {
   }
 
   function showChunk(position: number, focusNext = false, scroll = true) {
+    const chunk = chunks[position];
+    const visibleBlocks = chunk.scene ? Array.from(new Set([...chunk.scene, ...chunk.blocks])) : chunk.blocks;
+    const sceneChanged = scene !== chunk.scene;
+    if (sceneChanged) {
+      if (scene) delete scene[0].dataset.dialogueScene;
+      scene = chunk.scene;
+      if (scene) scene[0].dataset.dialogueScene = '';
+    }
     index = position;
     active = true;
     restoreBlocks();
@@ -90,11 +120,11 @@ function createReader(root: HTMLElement): Reader | undefined {
     option!.hidden = true;
     heading!.hidden = false;
     controls!.hidden = false;
-    for (let other = 0; other < chunks.length; other++) {
-      if (other !== index) chunks[other].forEach(hideBlock);
+    for (const block of blocks) {
+      if (!visibleBlocks.includes(block)) hideBlock(block);
     }
     for (const source of sources) {
-      if (!chunks[index].some(block => source.contains(block))) hideBlock(source);
+      if (!visibleBlocks.some(block => source.contains(block))) hideBlock(source);
     }
     // Advancing never leaves an invisible video/audio playing, and revisiting never autoplays it.
     content!.querySelectorAll<HTMLMediaElement>('video, audio').forEach(media => {
@@ -106,9 +136,9 @@ function createReader(root: HTMLElement): Reader | undefined {
     next!.toggleAttribute('data-dialogue-finish', last);
     progress!.textContent = `${index + 1} of ${chunks.length}`;
     if (focusNext || (document.activeElement === back && back!.disabled)) next!.focus({ preventScroll: true });
-    if (scroll) heading!.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) root.scrollIntoView({ block: 'start', behavior: 'instant' });
     content!.dispatchEvent(new CustomEvent<TypewriterRevealDetail>('gwenlium:typewriter-reveal', {
-      bubbles: true, detail: { blocks: chunks[index] },
+      bubbles: true, detail: { blocks: sceneChanged ? visibleBlocks : chunk.blocks },
     }));
   }
 
@@ -116,6 +146,8 @@ function createReader(root: HTMLElement): Reader | undefined {
     cancelWindowAnimation(root);
     finishMotion = undefined;
     root.inert = false;
+    if (scene) delete scene[0].dataset.dialogueScene;
+    scene = undefined;
     if (!active) return;
     active = false;
     restoreBlocks();
@@ -145,7 +177,7 @@ function createReader(root: HTMLElement): Reader | undefined {
 
   enter.addEventListener('click', () => {
     const target = fragmentTarget();
-    const linkedChunk = target ? chunks.findIndex(chunk => chunk.some(block => block.contains(target))) : -1;
+    const linkedChunk = target ? chunks.findIndex(chunk => chunk.blocks.some(block => block.contains(target))) : -1;
     showChunk(Math.max(0, linkedChunk), true);
   }, { signal });
   back.addEventListener('click', () => { if (active && index > 0) showChunk(index - 1); }, { signal });
@@ -187,17 +219,18 @@ function revealFragment(target: HTMLElement | null, scroll = false) {
 }
 
 function initializeReaders() {
+  const enabled = document.documentElement.dataset.dialogue === 'on' || new URLSearchParams(location.search).get('dialogue') === '1';
   for (const [root, reader] of readers) {
     if (!root.isConnected) { reader.dispose(); readers.delete(root); }
   }
   // Restored floating windows can live outside main; bind to their original nodes.
   document.querySelectorAll<HTMLElement>('[data-dialogue-reader]').forEach(root => {
-    if (readers.has(root)) return;
-    const reader = createReader(root);
-    if (reader) {
-      readers.set(root, reader);
-      reader.setEnabled(document.documentElement.dataset.dialogue === 'on' || new URLSearchParams(location.search).get('dialogue') === '1');
-    }
+    const existing = readers.get(root);
+    const reader = existing ?? createReader(root);
+    if (!reader) return;
+    if (!existing) readers.set(root, reader);
+    // Finish and Read all apply to one visit, including retained/back-forward page nodes.
+    reader.setEnabled(enabled);
   });
   revealFragment(fragmentTarget());
 }
@@ -225,12 +258,15 @@ document.addEventListener('click', event => {
   }
 }, { ...listenerOptions, capture: true });
 
-function navigateHistory() {
+function navigateHistory(event: HashChangeEvent) {
+  const from = new URL(event.oldURL);
+  const to = new URL(event.newURL);
+  // Page navigation restores its own reader; only fragment history reveals the full current page.
+  if (from.pathname !== to.pathname || from.search !== to.search) return;
   for (const reader of readers.values()) reader.leave();
   revealFragment(fragmentTarget(), true);
 }
 window.addEventListener('hashchange', navigateHistory, listenerOptions);
-window.addEventListener('popstate', navigateHistory, listenerOptions);
 window.addEventListener('pagehide', disposeReaders, listenerOptions);
 window.addEventListener('pageshow', initializeReaders, listenerOptions);
 document.addEventListener('astro:before-swap', disposeReaders, listenerOptions);

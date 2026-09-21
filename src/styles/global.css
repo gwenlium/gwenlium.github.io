@@ -272,6 +272,12 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
 .prose iframe { max-width: 100%; border: 1px solid var(--line); }
 .prose [data-zoom] { cursor: zoom-in; }
 
+@media screen {
+  [data-dialogue-reader][data-dialogue-active] [data-dialogue-scene] { margin: 0 0 1rem; padding: .6rem; border: 1px solid var(--line); background: var(--page-bg); }
+  [data-dialogue-reader][data-dialogue-active] [data-dialogue-content] img { width: auto; height: auto; max-width: 100%; max-height: min(42svh, 24rem); object-fit: contain; margin-inline: auto; }
+  [data-dialogue-reader][data-dialogue-active] [data-dialogue-scene] img { display: block; margin-block: 0; }
+}
+
 .site-footer { position: relative; z-index: 50; min-width: 0; margin: .55rem 0; padding: .35rem 0; border: 0; background: transparent; box-shadow: none; }
 .footer-navigation { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .15rem .75rem; }
 .taskbar { position: relative; z-index: 60; display: flex; align-items: center; gap: .5rem; min-width: 0; min-height: 48px; padding: .35rem; border: 1px solid var(--line); border-radius: 3px; background: linear-gradient(180deg, var(--surface-raised), var(--surface)); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }

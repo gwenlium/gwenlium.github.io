@@ -18,7 +18,8 @@ try {
   const audio = files.find(([, value]) => value.kind === 'audio')?.[0];
   assert(image && audio, 'Media fixtures need one registered image and audio file.');
   const gallery = JSON.parse(original.get(paths[0]));
-  gallery.items.push({ id: `topic-test-${process.pid}`, title: 'Topic test picture', type: 'image', src: image, alt: 'Test picture', caption: '', poster: '', topics: ['Portraits', 'Nature'] });
+  const description = 'A quiet portrait study.\n\nDrawn by a close friend.';
+  gallery.items.push({ id: `topic-test-${process.pid}`, title: 'Topic test picture', type: 'image', src: image, alt: 'Test picture', caption: description, poster: '', topics: ['Portraits', 'Nature'] });
   const music = JSON.parse(original.get(paths[1]));
   music.tracks.push({ id: `topic-test-${process.pid}`, title: 'Topic test track', src: audio, cover: '', coverAlt: '', topics: ['Piano', 'Ambient'] });
   const windows = JSON.parse(original.get(paths[2]));
@@ -31,6 +32,9 @@ try {
     assert($(`[data-topic-pick="${topic}"]`).length);
     assert($('[data-item-topics]').toArray().some(element => JSON.parse($(element).attr('data-item-topics')).includes(topic)));
   }
+  const galleryPage = load(fs.readFileSync('dist/gallery/index.html', 'utf8'));
+  assert.equal(galleryPage(`#work-topic-test-${process.pid} figcaption`).text(), description);
+  assert.equal(galleryPage(`#work-topic-test-${process.pid} img`).attr('alt'), 'Test picture');
   const search = fs.readFileSync('dist/search-index.json', 'utf8');
   assert(search.includes('Portraits') && search.includes('Piano'));
   console.log('Gallery and music topics verified in filters, item labels, search, and combined type matching.');

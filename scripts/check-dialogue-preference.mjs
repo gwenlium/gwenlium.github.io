@@ -88,6 +88,17 @@ document.dispatchEvent({ type: 'astro:before-swap', newDocument: nextDocument })
 assert(paragraphs.every(node => !node.hidden), 'navigation cleanup restores blocks');
 document.dispatchEvent({ type: 'astro:page-load' });
 assert.deepEqual(paragraphs.map(node => node.hidden), [false, true, true]);
+root.nodes['[data-dialogue-next]'].dispatchEvent({ type: 'click' });
+root.nodes['[data-dialogue-next]'].dispatchEvent({ type: 'click' });
+root.nodes['[data-dialogue-next]'].dispatchEvent({ type: 'click' });
+await new Promise(resolve => setImmediate(resolve));
+assert(paragraphs.every(node => !node.hidden), 'Finish reveals the complete post for this visit');
+document.dispatchEvent({ type: 'astro:page-load' });
+assert.deepEqual(paragraphs.map(node => node.hidden), [false, true, true], 'revisiting retained content restarts dialogue after Finish');
+window.dispatchEvent({ type: 'hashchange', oldURL: 'https://gwenlium.dev/devlog/', newURL: 'https://gwenlium.dev/about/#chapter' });
+assert.deepEqual(paragraphs.map(node => node.hidden), [false, true, true], 'cross-page fragment history must not turn dialogue off');
+window.dispatchEvent({ type: 'hashchange', oldURL: 'https://gwenlium.dev/about/#first', newURL: 'https://gwenlium.dev/about/#chapter' });
+assert(paragraphs.every(node => !node.hidden), 'same-page fragment history still reveals the full post');
 localStorage.setItem = () => { throw new Error('storage blocked'); };
 toggle.checked = false; document.dispatchEvent({ type: 'change', target: toggle });
 assert(paragraphs.every(node => !node.hidden));
