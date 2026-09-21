@@ -20,7 +20,7 @@
 .admin-media-help { color: #4c5964; font-size: 13px; margin: 0; }
 .admin-media progress { width: 100%; }
 .admin-media [data-status] { overflow-wrap: anywhere; }
-.admin-media [data-preview-media] { display: flex; justify-content: center; padding: 10px; background: #15212a; }
+.admin-media [data-preview-media] { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; justify-items: center; padding: 10px; background: #15212a; }
 .admin-media [data-preview-media] :is(img, video, audio) { display: block; max-width: 100%; max-height: 50dvh; object-fit: contain; }
 .admin-media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 14px; }
 .admin-media-card { display: flex; flex-direction: column; justify-content: end; gap: 8px; min-width: 0; padding: 12px; border: 1px solid #cbd3dc; border-radius: 5px; }

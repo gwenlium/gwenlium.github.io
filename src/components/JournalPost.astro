@@ -46,6 +46,7 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
           </div>
           <div id="entry-content" data-dialogue-content>
             <div class="prose entry-body" data-dialogue-blocks><Content /></div>
+            {post.data.photos.length > 0 && <div class="entry-media" data-dialogue-blocks>{post.data.photos.map(src => <Media src={src} alt="" />)}</div>}
             {post.data.media.length > 0 && <div class="entry-media" data-dialogue-blocks>{post.data.media.map((media) => <Media {...media} />)}</div>}
           </div>
           <nav class="dialogue-controls" aria-label="Dialogue reading" data-dialogue-controls hidden>

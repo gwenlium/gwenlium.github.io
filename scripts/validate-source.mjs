@@ -269,6 +269,11 @@ export function validateSource(root = projectRoot, now = new Date()) {
   const optionalStrings = (value, fields, file, prefix = '') => {
     for (const field of fields) text(value[field], file, `${prefix}${field}`);
   };
+  const photos = (items, file, base) => {
+    if (items === undefined) return;
+    if (!Array.isArray(items)) return report(file, 'photos', 'Use a list of photo URLs.');
+    items.forEach((src, index) => url(src, file, `photos[${index}]`, { media: true, kind: 'image', base, required: true }));
+  };
   const mediaItems = (items, file, field, { gallery = false, base = `${siteOrigin}/` } = {}) => {
     if (items === undefined) return;
     if (!Array.isArray(items)) return report(file, field, 'Use an array of media objects.');
@@ -354,6 +359,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
     if (data.featured !== undefined && typeof data.featured !== 'boolean') report(file, 'featured', 'Use the YAML boolean true or false.');
     const base = `${siteOrigin}/${data.section ?? 'devlog'}/${permalinkPattern.test(data.permalink ?? '') ? data.permalink : 'post'}/`;
     image(data.cover, data.coverAlt, file, 'cover', base);
+    photos(data.photos, file, base);
     mediaItems(data.media, file, 'media', { base });
     markdown(post.body, file, base);
   }
@@ -413,6 +419,9 @@ export function validateSource(root = projectRoot, now = new Date()) {
     optionalStrings(value, ['eyebrow', 'intro'], file);
     if (page === 'about') {
       optionalStrings(value, ['body'], file);
+      if (typeof value.body === 'string') markdown(value.body, file, `${siteOrigin}/about/`);
+      photos(value.photos, file, `${siteOrigin}/about/`);
+      mediaItems(value.media, file, 'media', { base: `${siteOrigin}/about/` });
       image(value.avatar, value.avatarAlt, file, 'avatar', `${siteOrigin}/about/`);
       links(value.links, file, 'links');
     }

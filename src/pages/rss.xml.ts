@@ -14,11 +14,12 @@ function escapeHtml(value: string): string {
 
 function articleContent(post: Post, base: URL): string {
   if (post.rendered?.html === undefined) throw new Error(`Missing rendered RSS content for ${post.id}`);
-  const { cover, coverAlt, excerpt, media } = post.data;
+  const { cover, coverAlt, excerpt, media, photos } = post.data;
   const parts = [
     cover ? `<p><img src="${escapeHtml(cover)}" alt="${escapeHtml(coverAlt)}" /></p>` : '',
     excerpt ? `<p>${escapeHtml(excerpt)}</p>` : '',
     post.rendered.html,
+    ...photos.map(src => `<figure><img src="${escapeHtml(src)}" alt="" /></figure>`),
     ...media.map((item) => {
       const src = escapeHtml(item.src);
       const caption = item.caption ? `<figcaption>${escapeHtml(item.caption)}</figcaption>` : '';

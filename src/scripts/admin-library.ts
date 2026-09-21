@@ -3,21 +3,21 @@ import { preparePreview, previewInputKind } from './admin-media';
 import type { PreparedPreview, PreviewInputKind } from './admin-media';
 import '../styles/admin.css';
 
-type PickerOptions = { imagesOnly?: boolean; config?: { kinds?: Array<'image' | 'video' | 'audio'> } };
+type PickerOptions = { imagesOnly?: boolean; allowMultiple?: boolean; value?: string | string[]; config?: { multiple?: boolean; kinds?: Array<'image' | 'video' | 'audio'> } };
 const imageExtensions = '.jpg,.jpeg,.png,.webp,.gif';
 const videoExtensions = '.mp4,.mov,.m4v,.webm,.mkv,.avi,.ogv,.mpg,.mpeg,.mts,.m2ts';
 const audioExtensions = '.mp3,.wav,.flac,.ogg,.oga,.opus,.m4a,.aac,.aif,.aiff,.wma';
 
 export const previewMediaLibrary = {
   name: 'gwenlium-previews',
-  init({ handleInsert }: { handleInsert: (url: string) => void }) {
+  init({ handleInsert }: { handleInsert: (url: string | string[]) => void }) {
     const dialog = document.createElement('dialog');
     dialog.className = 'admin-media';
     dialog.setAttribute('aria-labelledby', 'admin-media-title');
     dialog.innerHTML = `<header><h1 id="admin-media-title">Media library</h1><button type="button" data-close aria-label="Close media picker">Close</button></header>
       <p>Originals stay on this device. Images and animations are resized and watermarked; video is watermarked and compressed; audio is converted to MP3. Uploaded copies and saved drafts are public.</p>
-      <form data-prepare><label>Picture, GIF, audio or video<input type="file" data-file required></label>
-        <label>Public name (optional)<input data-name pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxlength="64" placeholder="song-title or artwork-name"></label>
+      <form data-prepare><label>Pictures, GIFs, audio or video<input type="file" data-file required></label>
+        <label>Public name (optional)<input data-name pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxlength="54" placeholder="song-title or artwork-name"></label>
         <fieldset data-length hidden><legend>Publication length</legend>
           <label class="admin-media-choice"><input type="radio" name="admin-media-length" value="preview" data-short checked>Short preview</label>
           <label class="admin-media-choice"><input type="radio" name="admin-media-length" value="full" data-full>Full length</label>
@@ -29,7 +29,7 @@ export const previewMediaLibrary = {
       </form>
       <p data-status role="status" aria-live="polite"></p><progress data-progress max="1" hidden></progress>
       <section data-preview hidden><h2>Prepared copy</h2><div data-preview-media></div><p data-preview-details></p><button type="button" data-publish>Upload and use copy</button></section>
-      <section><h2>Existing media</h2><div class="admin-media-grid" data-library></div></section>`;
+      <button type="button" data-insert-selection hidden>Use selected pictures</button><section><h2>Existing media</h2><div class="admin-media-grid" data-library></div></section>`;
     document.body.append(dialog);
     const element = <T extends HTMLElement>(selector: string) => dialog.querySelector<T>(selector)!;
     const form = element<HTMLFormElement>('[data-prepare]');
@@ -55,19 +55,22 @@ export const previewMediaLibrary = {
     let controller: AbortController | undefined;
     let inspector: AbortController | undefined;
     let fileKind: PreviewInputKind | undefined;
-    let prepared: PreparedPreview | undefined;
-    let objectURL: string | undefined;
+    let prepared: PreparedPreview[] = [];
+    let objectURLs: string[] = [];
+    const selected = new Set<string>();
+    const insertSelection = element<HTMLButtonElement>('[data-insert-selection]');
+    const isMultiple = () => options.allowMultiple !== false && options.config?.multiple === true;
     let options: PickerOptions = {};
     let opener: HTMLElement | null = null;
     let publishing = false;
     let opening = 0;
 
     function clearPreview() {
-      previewMedia.querySelector<HTMLMediaElement>('video, audio')?.pause();
+      previewMedia.querySelectorAll<HTMLMediaElement>('video, audio').forEach(media => media.pause());
       previewMedia.replaceChildren();
-      if (objectURL) URL.revokeObjectURL(objectURL);
-      objectURL = undefined;
-      prepared = undefined;
+      objectURLs.forEach(url => URL.revokeObjectURL(url));
+      objectURLs = [];
+      prepared = [];
       preview.hidden = true;
     }
 
@@ -85,11 +88,13 @@ export const previewMediaLibrary = {
       if (opener?.isConnected) opener.focus({ preventScroll: true });
     }
 
-    function insert(url: string) {
+    function insert(url: string | string[]) {
       if (publishing) return;
-      handleInsert(url);
+      handleInsert(isMultiple() ? [...new Set([...(Array.isArray(options.value) ? options.value : options.value ? [options.value] : []), ...(Array.isArray(url) ? url : [url])])] : url);
       hide();
     }
+
+    insertSelection.addEventListener('click', () => { if (selected.size) insert([...selected]); });
 
     function accepts(kind: PreviewInputKind) {
       const mediaKind = kind === 'animation' ? 'image' : kind;
@@ -131,9 +136,17 @@ export const previewMediaLibrary = {
         label.textContent = `${url.slice('/media/'.length)} - ${entry.kind}${entry.width && entry.height ? ` ${entry.width} × ${entry.height}` : ''}${entry.duration ? ` (${entry.duration.toFixed(1)} seconds)` : ''}`;
         const button = document.createElement('button');
         button.type = 'button';
-        button.textContent = 'Use media';
+        button.textContent = isMultiple() ? (selected.has(url) ? 'Selected' : 'Select picture') : 'Use media';
+        if (isMultiple()) button.setAttribute('aria-pressed', String(selected.has(url)));
         button.title = url;
-        button.addEventListener('click', () => insert(url));
+        button.addEventListener('click', () => {
+          if (!isMultiple()) { insert(url); return; }
+          if (selected.has(url)) selected.delete(url); else selected.add(url);
+          button.textContent = selected.has(url) ? 'Selected' : 'Select picture';
+          button.setAttribute('aria-pressed', String(selected.has(url)));
+          insertSelection.disabled = selected.size === 0;
+          insertSelection.textContent = `Use selected pictures (${selected.size})`;
+        });
         card.append(label, button);
         library.append(card);
       }
@@ -157,11 +170,14 @@ export const previewMediaLibrary = {
       progress.removeAttribute('value');
       status.textContent = 'Checking the file on this device…';
       try {
-        const kind = await previewInputKind(file, abort.signal);
+        const kinds: PreviewInputKind[] = [];
+        for (const candidate of Array.from(input.files ?? [])) kinds.push(await previewInputKind(candidate, abort.signal));
+        if (kinds.some(kind => !accepts(kind))) throw new Error('Choose only supported files for this field. Nothing was uploaded.');
+        const kind = kinds.find(kind => kind !== 'image') ?? 'image';
         if (abort.signal.aborted || !dialog.open) return;
         if (!accepts(kind)) throw new Error(`Choose ${options.imagesOnly ? 'an image or GIF' : options.config?.kinds?.join(' or ')} for this field. Nothing was uploaded.`);
         fileKind = kind;
-        status.textContent = '';
+        status.textContent = `${input.files?.length ?? 0} file(s) ready to prepare.`;
       } catch (error) {
         if (inspector === abort && dialog.open) {
           status.textContent = abort.signal.aborted ? 'Checking cancelled. Choose a file to try again.' : error instanceof Error ? error.message : 'Could not inspect this file.';
@@ -200,33 +216,36 @@ export const previewMediaLibrary = {
       status.textContent = 'Preparing on this device. Nothing has been uploaded.';
       try {
         const { creator } = await editorBackend().media();
-        const result = await preparePreview(file, {
-          creator, name: name.value.trim(), signal: abort.signal,
-          ...(fileKind === 'image' ? {} : full.checked ? { fullLength: true } : { start: Number(start.value), duration: Number(duration.value) }),
-          onProgress(value) {
-            if (abort.signal.aborted) return;
-            if (value === undefined) progress.removeAttribute('value');
-            else progress.value = Math.max(0, Math.min(1, value));
-          },
-        });
-        if (abort.signal.aborted || !dialog.open) return;
-        if (!accepts(result.entry.kind)) throw new Error('The prepared media does not match this field. Nothing was uploaded.');
-        prepared = result;
-        objectURL = URL.createObjectURL(result.file);
-        const media = document.createElement(result.entry.kind === 'image' ? 'img' : result.entry.kind);
-        media.src = objectURL;
-        if (media instanceof HTMLMediaElement) media.controls = true;
-        else media.alt = 'Prepared, watermarked image or animation';
-        previewMedia.append(media);
-        const details = [`${fileKind === 'image' ? 'Image' : full.checked ? 'Full length' : 'Short preview'}`];
-        if ('width' in result.entry) details.push(`${result.entry.width} × ${result.entry.height}`);
-        if (result.entry.duration) details.push(`${result.entry.duration.toFixed(2)} seconds`);
-        details.push(`${(result.file.size / 1048576).toFixed(2)} MiB`);
-        previewDetails.textContent = details.join(', ');
+        const files = Array.from(input.files ?? []);
+        for (const [index, candidate] of files.entries()) {
+          status.textContent = `Preparing ${index + 1} of ${files.length}: ${candidate.name}`;
+          const kind = await previewInputKind(candidate, abort.signal);
+          const result = await preparePreview(candidate, {
+            creator, name: name.value.trim() && files.length > 1 ? `${name.value.trim()}-${index + 1}` : name.value.trim(), signal: abort.signal,
+            ...(kind === 'image' ? {} : full.checked ? { fullLength: true } : { start: Number(start.value), duration: Number(duration.value) }),
+            onProgress(value) {
+              if (abort.signal.aborted) return;
+              if (value === undefined) progress.removeAttribute('value');
+              else progress.value = Math.max(0, Math.min(1, value));
+            },
+          });
+          if (abort.signal.aborted || !dialog.open) { clearPreview(); return; }
+          if (!accepts(result.entry.kind)) throw new Error('The prepared media does not match this field. Nothing was uploaded.');
+          prepared.push(result);
+          const objectURL = URL.createObjectURL(result.file);
+          objectURLs.push(objectURL);
+          const media = document.createElement(result.entry.kind === 'image' ? 'img' : result.entry.kind);
+          media.src = objectURL;
+          if (media instanceof HTMLMediaElement) media.controls = true;
+          else media.alt = 'Prepared, watermarked image or animation';
+          previewMedia.append(media);
+        }
+        previewDetails.textContent = `${prepared.length} prepared copy/copies. Review each copy before uploading.`;
         preview.hidden = false;
         status.textContent = 'Review the prepared copy before uploading. Uploaded copies are public; the original stays on this device.';
         publish.focus();
       } catch (error) {
+        clearPreview();
         if (request === opening && dialog.open) status.textContent = abort.signal.aborted ? 'Processing cancelled. Nothing was uploaded.' : error instanceof Error ? error.message : 'Could not prepare this file.';
       } finally {
         if (controller === abort) controller = undefined;
@@ -238,17 +257,21 @@ export const previewMediaLibrary = {
     });
 
     publish.addEventListener('click', async () => {
-      if (!prepared || publishing) return;
+      if (!prepared.length || publishing) return;
       publishing = true;
       close.disabled = publish.disabled = convert.disabled = input.disabled = true;
       form.inert = library.inert = true;
       status.textContent = 'Uploading the prepared copy and its registry together…';
       try {
-        const url = await editorBackend().publishPreview(prepared);
+        const urls: string[] = [];
+        for (const [index, item] of prepared.entries()) {
+          status.textContent = `Uploading ${index + 1} of ${prepared.length}…`;
+          urls.push(await editorBackend().publishPreview(item));
+        }
         publishing = false;
-        insert(url);
+        insert(isMultiple() ? urls : urls[0]);
       } catch (error) {
-        status.textContent = error instanceof Error ? error.message : 'The prepared copy was not published.';
+        status.textContent = `${error instanceof Error ? error.message : 'Upload failed.'} Some copies may already be in Existing media. Retry to finish; existing copies are reused.`;
       } finally {
         publishing = false;
         close.disabled = publish.disabled = convert.disabled = input.disabled = false;
@@ -260,6 +283,11 @@ export const previewMediaLibrary = {
       async show(next: PickerOptions = {}) {
         if (dialog.open) return;
         options = next;
+        selected.clear();
+        input.multiple = isMultiple();
+        insertSelection.hidden = !isMultiple();
+        insertSelection.disabled = true;
+        insertSelection.textContent = 'Use selected pictures';
         const request = ++opening;
         opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         form.reset();

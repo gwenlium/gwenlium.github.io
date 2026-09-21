@@ -28,6 +28,7 @@ const posts = defineCollection({
     cover: z.string().default(''),
     coverAlt: z.string().default(''),
     featured: z.boolean().default(false),
+    photos: z.array(z.string()).default([]),
     media: z.array(z.object({
       type: z.enum(['image', 'video', 'audio']).default('image'),
       src: z.string().default(''),

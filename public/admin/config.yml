@@ -106,8 +106,22 @@ collections:
           or video in the media fields below. Saved content is public on GitHub, including drafts.
         editor_components:
           - image
+      - name: photos
+        label: Photo gallery (upload multiple pictures)
+        widget: image
+        required: false
+        default: []
+        media_library:
+          allow_multiple: true
+          config:
+            multiple: true
+            kinds:
+              - image
+        hint: Select several pictures together, prepare and upload them, then insert the selection. Drag
+          pictures to reorder them. Use Pictures, video & audio below for individual descriptions
+          and captions.
       - name: media
-        label: Additional media
+        label: Pictures, video & audio
         widget: list
         required: false
         default: []
@@ -147,6 +161,9 @@ collections:
             hint: Choose an existing preview or upload an image. Only the resized, watermarked preview is
               published; the original stays on your device.
         collapsed: true
+        label_singular: Picture, video or audio
+        hint: Add as many items as you like. Each item has its own description and caption. Drag items to
+          change their order.
     label_singular: Devlog post
     description: Games, code and creative projects. Use project tags to group updates about the same project.
     filter:
@@ -256,8 +273,22 @@ collections:
           or video in the media fields below. Saved content is public on GitHub, including drafts.
         editor_components:
           - image
+      - name: photos
+        label: Photo gallery (upload multiple pictures)
+        widget: image
+        required: false
+        default: []
+        media_library:
+          allow_multiple: true
+          config:
+            multiple: true
+            kinds:
+              - image
+        hint: Select several pictures together, prepare and upload them, then insert the selection. Drag
+          pictures to reorder them. Use Pictures, video & audio below for individual descriptions
+          and captions.
       - name: media
-        label: Additional media
+        label: Pictures, video & audio
         widget: list
         required: false
         default: []
@@ -297,6 +328,9 @@ collections:
             hint: Choose an existing preview or upload an image. Only the resized, watermarked preview is
               published; the original stays on your device.
         collapsed: true
+        label_singular: Picture, video or audio
+        hint: Add as many items as you like. Each item has its own description and caption. Drag items to
+          change their order.
     label_singular: Life post
     description: Personal stories, everyday life, photos and videos.
     filter:
@@ -467,10 +501,12 @@ collections:
             default: ""
           - name: body
             label: Your bio
-            widget: text
+            widget: markdown
             required: false
             default: ""
-            hint: Plain text; blank lines separate paragraphs.
+            hint: Write formatted text, headings, links and inline pictures.
+            editor_components:
+              - image
           - name: avatar
             label: Portrait
             widget: image
@@ -500,6 +536,64 @@ collections:
                 required: true
                 hint: Use a complete https:// URL, or a site path beginning with /.
             collapsed: true
+          - name: photos
+            label: Photo gallery (upload multiple pictures)
+            widget: image
+            required: false
+            default: []
+            media_library:
+              allow_multiple: true
+              config:
+                multiple: true
+                kinds:
+                  - image
+            hint: Select several pictures together, prepare and upload them, then insert the selection. Drag
+              pictures to reorder them. Use Pictures, video & audio below for individual
+              descriptions and captions.
+          - name: media
+            label: Pictures, video & audio
+            widget: list
+            required: false
+            default: []
+            fields:
+              - name: type
+                label: Media type
+                widget: select
+                required: true
+                default: image
+                options:
+                  - image
+                  - video
+                  - audio
+              - name: src
+                label: Media file
+                widget: file
+                required: true
+                hint: Upload a picture, GIF, audio or video, or reuse registered media. Choose the matching media
+                  type above (GIFs are images). Timed media defaults to a short preview; full length
+                  is an explicit choice. Originals stay on your device.
+              - name: alt
+                label: Description or alternative text
+                widget: string
+                required: false
+                default: ""
+                hint: Describe images for people who cannot see them; name video and audio content.
+              - name: caption
+                label: Caption
+                widget: text
+                required: false
+                default: ""
+              - name: poster
+                label: Poster image
+                widget: image
+                required: false
+                default: ""
+                hint: Choose an existing preview or upload an image. Only the resized, watermarked preview is
+                  published; the original stays on your device.
+            collapsed: true
+            label_singular: Picture, video or audio
+            hint: Add as many items as you like. Each item has its own description and caption. Drag items to
+              change their order.
       - name: devlog
         label: Devlog
         file: src/content/pages/devlog.json
@@ -832,8 +926,8 @@ collections:
                 default: text
                 hint: default preserves the built-in content and is forbidden for custom windows. Other choices
                   replace a built-in window's content. site-settings, music-player and start-menu
-                  must use default. Edit original default content in Pages, Devlog, Life,
-                  Gallery or Music.
+                  must use default. Edit original default content in Pages, Devlog, Life, Gallery or
+                  Music.
                 options:
                   - default
                   - text
