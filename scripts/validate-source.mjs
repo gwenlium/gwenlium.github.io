@@ -270,7 +270,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
     for (const field of fields) text(value[field], file, `${prefix}${field}`);
   };
   const photos = (items, file, base) => {
-    if (items === undefined) return;
+    if (items === undefined || items === '') return;
     if (!Array.isArray(items)) return report(file, 'photos', 'Use a list of photo URLs.');
     items.forEach((src, index) => url(src, file, `photos[${index}]`, { media: true, kind: 'image', base, required: true }));
   };

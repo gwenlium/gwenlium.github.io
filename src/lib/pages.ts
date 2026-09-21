@@ -11,9 +11,9 @@ interface PageCopy { title: string; eyebrow?: string; intro?: string }
 function page<T extends PageCopy>(data: T) {
   return { ...data, eyebrow: data.eyebrow ?? '', intro: data.intro ?? '' };
 }
-const aboutContent = about as PageCopy & { body?: string; avatar?: string; avatarAlt?: string; links?: { label: string; url: string }[]; photos?: string[]; media?: PageMedia[] };
+const aboutContent = about as PageCopy & { body?: string; avatar?: string; avatarAlt?: string; links?: { label: string; url: string }[]; photos?: string[] | ''; media?: PageMedia[] };
 export const pages = {
-  about: { ...page(aboutContent), photos: aboutContent.photos ?? [], media: aboutContent.media ?? [] },
+  about: { ...page(aboutContent), photos: aboutContent.photos || [], media: aboutContent.media ?? [] },
   devlog: page(devlog), life: page(life), gallery: page(gallery), music: page(music),
   subscribe: page(subscribe), 'not-found': page(notfound),
 };

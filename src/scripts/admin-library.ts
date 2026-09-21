@@ -90,7 +90,9 @@ export const previewMediaLibrary = {
 
     function insert(url: string | string[]) {
       if (publishing) return;
-      handleInsert(isMultiple() ? [...new Set([...(Array.isArray(options.value) ? options.value : options.value ? [options.value] : []), ...(Array.isArray(url) ? url : [url])])] : url);
+      // Decap appends returned URLs to an existing multi-image field itself.
+      const existing = new Set(Array.isArray(options.value) ? options.value : options.value ? [options.value] : []);
+      handleInsert(isMultiple() ? [...new Set(Array.isArray(url) ? url : [url])].filter(item => !existing.has(item)) : url);
       hide();
     }
 
