@@ -1,4 +1,7 @@
 {
+  "maintenanceEnabled": false,
+  "maintenanceHeading": "A little maintenance",
+  "maintenanceMessage": "I am updating the website. Please check back soon!",
   "newsletterButtonLabel": "Subscribe!!1",
   "newsletterHeading": "Stay updated! And also hydrated :p",
   "name": "Gwenlium",

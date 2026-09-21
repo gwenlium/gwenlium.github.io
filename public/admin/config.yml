@@ -358,6 +358,22 @@ collections:
         label: Home & site settings
         file: src/content/site.json
         fields:
+          - name: maintenanceEnabled
+            label: Under maintenance
+            widget: boolean
+            required: false
+            default: false
+            hint: Turn on and publish, then wait for the website deployment to finish before editing. Visitors see the maintenance notice on every page; /admin/ remains accessible. Turn off and publish when ready to reopen. Local previews stay normal. This does not restrict the public repository, direct media URLs, or previously downloaded content.
+          - name: maintenanceHeading
+            label: Maintenance heading
+            widget: string
+            required: false
+            default: A little maintenance
+          - name: maintenanceMessage
+            label: Maintenance message
+            widget: text
+            required: false
+            default: I am updating the website. Please check back soon!
           - name: name
             label: Display name
             widget: string

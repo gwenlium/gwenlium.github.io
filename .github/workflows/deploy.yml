@@ -27,12 +27,14 @@ jobs:
       - run: npm ci
       - run: npm run test:preferences
       - run: npm run test:media
+      - run: npm run test:maintenance
       - run: npm run test:auth
       - run: npm run check
       - run: npm run test:archive
       - run: npm run test:topics
       - run: npm run test:pages
       - run: npm run build
+      - run: npm run maintenance:apply
       - uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: dist

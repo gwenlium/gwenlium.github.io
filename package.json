@@ -20,7 +20,9 @@
     "test:media": "node scripts/check-portrait-jpeg.mjs",
     "test:preferences": "node scripts/check-dialogue-preference.mjs",
     "test:topics": "node scripts/check-topics.mjs",
-    "test:archive": "node scripts/check-archive.mjs"
+    "test:archive": "node scripts/check-archive.mjs",
+    "test:maintenance": "node --test scripts/maintenance.test.mjs",
+    "maintenance:apply": "node scripts/apply-maintenance.mjs"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "7.3.1",

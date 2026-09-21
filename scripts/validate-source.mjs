@@ -385,6 +385,8 @@ export function validateSource(root = projectRoot, now = new Date()) {
   if (settings) {
     const { file, value } = settings;
     text(value.name, file, 'name', true);
+    if (value.maintenanceEnabled !== undefined && typeof value.maintenanceEnabled !== 'boolean') report(file, 'maintenanceEnabled', 'Use a boolean maintenance toggle.');
+    optionalStrings(value, ['maintenanceHeading', 'maintenanceMessage'], file);
     optionalStrings(value, ['watermarkText', 'description', 'intro', 'status', 'featuredPost', 'newsletterHeading', 'newsletterButtonLabel'], file);
     url(value.githubUrl, file, 'githubUrl');
     if (text(value.newsletterUrl, file, 'newsletterUrl')) {
