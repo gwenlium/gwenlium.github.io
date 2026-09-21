@@ -1,21 +1,30 @@
 {
-  "name": "Gwenlium",
-  "description": "",
-  "intro": "",
-  "status": "",
-  "githubUrl": "https://github.com/gwenlium",
-  "featuredPost": "",
-  "newsletterUrl": "https://follow.it/gwenlium-devlog?leanpub",
-  "newsletterFormAction": "https://api.follow.it/subscription-form/cjNVdmQyQWdHVWVhSjFZcDdEazZ5UG9TNU9zdTNsaWVvK3hJSTEyV3MvMzNhSW15eDRjUVpDbzRjMWF0SEhvL05UNmJSSENSUGJiS3BhWHRkcUVRVi91a1p5d2FpdEpyZlY1cDd3cE1FdEZBa0RUZGI2NGJ4QXoxTHpSMEx3T2d8dE1YcHh2T1NBb2tHUnJMUFpNMlFkcnBNVXptUENtWDA4dVN5K0ZvL1Vyaz0=/8",
-  "newsletterHeading": "Stay updated! And also hydrated :p",
   "newsletterButtonLabel": "Subscribe!!1",
+  "newsletterHeading": "Stay updated! And also hydrated :p",
+  "name": "Gwenlium",
+  "intro": "",
+  "githubUrl": "https://github.com/gwenlium",
+  "about": {
+    "body": "Hello world!\n\nI'm Gwendolyn Ural Erkut, a human just like any other living in this very world.\nI work as an engineer but I also do enjoy many other things such as art, music and games. I like to create things and thus want to share it with all of you.\n\nI do enjoy playing the piano, the violin and the guitar A LOT!!! Another art I enjoy creating with is photography especially with abstract objects or portraits of people.\nI touched a computer the first time when I was around 3 years old and I remember that time vividly. Since then, computers and alike have been a big part in my life. Thus my profession...and my huge interest in games and electronics in general.\n\nIf you could ask me which game I enjoy the most, I wouldn't have a straight 'This is the game I enjoy the most' answer. I have too many! But few franchises that left me a remarkable impact were the Zelda, Pikmin, Mario, NieR and Silent Hill games. I do also enjoy Gravity Rush a lot (in my eyes quite a unique game). For me, games are art or rather a medium that can represant many arts in one place.\n\nI don't only play games for entertainment but rather also analyse them for hours. How do the physics work? What shaders were used in the engine to develop x and y? Why plays the game the way it does etc. I would spent hours to find glitches in a game to see the cracks in the code for example! This obsession I got proved to be very useful in developing my own game; Proto:ReCompute.\n\nThank you for checking in!",
+    "links": [
+      {
+        "url": "https://www.instagram.com/_gwen.lyn_/",
+        "label": "Instagram"
+      }
+    ]
+  },
+  "featuredPost": "",
   "game": {
-    "title": "",
-    "description": "",
-    "status": "",
-    "cover": "",
-    "coverAlt": "",
+    "title": "Proto:ReCompute",
+    "description": "A 3D hack and slash RPG game in a computer/cyber world.\nIf you are familiar with DMC, NieR: Automata and the classic 3D Zelda games (such as OoT), you'll feel home with my game.",
+    "status": "Very early development",
+    "cover": "/media/image-preview-4d60403638517b7fed569d09169f0231.webp",
+    "coverAlt": "Title logo of my game",
     "trailerUrl": "",
     "links": []
-  }
+  },
+  "status": "",
+  "newsletterFormAction": "https://api.follow.it/subscription-form/cjNVdmQyQWdHVWVhSjFZcDdEazZ5UG9TNU9zdTNsaWVvK3hJSTEyV3MvMzNhSW15eDRjUVpDbzRjMWF0SEhvL05UNmJSSENSUGJiS3BhWHRkcUVRVi91a1p5d2FpdEpyZlY1cDd3cE1FdEZBa0RUZGI2NGJ4QXoxTHpSMEx3T2d8dE1YcHh2T1NBb2tHUnJMUFpNMlFkcnBNVXptUENtWDA4dVN5K0ZvL1Vyaz0=/8",
+  "newsletterUrl": "https://follow.it/gwenlium-devlog?leanpub",
+  "description": "Welcome to my quirky website where I share things I do in life with the world!"
 }
