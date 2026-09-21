@@ -163,23 +163,6 @@ function initializeMedia() {
     if (document.hidden) document.querySelectorAll('video').forEach((video) => video.pause());
   }, { signal });
 
-  document.querySelectorAll<HTMLElement>('[data-gallery]').forEach((gallery) => {
-    const filters = gallery.querySelectorAll<HTMLButtonElement>('[data-gallery-filter]');
-    const items = gallery.querySelectorAll<HTMLElement>('[data-gallery-type]');
-    const status = gallery.querySelector<HTMLElement>('[data-gallery-status]');
-    filters.forEach((filter) => filter.addEventListener('click', () => {
-      const type = filter.dataset.galleryFilter;
-      let visible = 0;
-      filters.forEach((button) => button.setAttribute('aria-pressed', String(button === filter)));
-      items.forEach((item) => {
-        item.hidden = type !== 'all' && item.dataset.galleryType !== type;
-        if (item.hidden) item.querySelectorAll('video').forEach((video) => video.pause());
-        else visible++;
-      });
-      if (status) status.textContent = `${visible} ${visible === 1 ? 'item' : 'items'} shown`;
-    }, { signal }));
-  });
-
   document.querySelectorAll<HTMLButtonElement>('[data-copy-feed]').forEach((button) => {
     button.addEventListener('click', async () => {
       const url = button.dataset.copyFeed;

@@ -1,4 +1,6 @@
 ---
+import TopicFilter from '../components/TopicFilter.astro';
+import { topicOptions } from '../lib/topics.mjs';
 import { pages } from '../lib/pages';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
@@ -17,14 +19,16 @@ import { tracks } from '../lib/settings';
   <MusicLibrary />
   <Window windowId="music-catalogue">
     {tracks.length ? (
+      <section data-topic-catalogue="music" aria-label="Music catalogue">
+      <TopicFilter topics={topicOptions(tracks)} id="music-topic" />
       <ol class="track-list">
         {tracks.map((track, index) => (
-          <li class="track" id={`track-${track.id}`} data-track-row data-track-id={track.id}>
+          <li class="track" data-item-topics={JSON.stringify(track.topics)} id={`track-${track.id}`} data-track-row data-track-id={track.id}>
             <span class="track-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
             <div class:list={['track-cover', { 'track-cover--empty': !track.cover }]}>
               {track.cover ? <Media src={track.cover} alt={track.coverAlt} sizes="68px" /> : <Icon name="music" size={24} />}
             </div>
-            <div class="track-meta"><h2>{track.title}</h2><p data-track-state>{track.src ? 'Ready' : 'Audio unavailable'}</p></div>
+            <div class="track-meta"><h2>{track.title}</h2>{track.topics.length > 0 && <div class="topic-tags">{track.topics.map(topic => <button type="button" class="tag" data-topic-pick={topic}>{topic}</button>)}</div>}<p data-track-state>{track.src ? 'Ready' : 'Audio unavailable'}</p></div>
             <div class="track-actions" role="group" aria-label={`Actions for ${track.title}`}>
               <button type="button" class="button track-play" data-play-track={track.id} aria-label={`Play ${track.title}`} aria-pressed="false" disabled={!track.src}>
                 <span data-track-button-label>Play</span>
@@ -37,6 +41,7 @@ import { tracks } from '../lib/settings';
           </li>
         ))}
       </ol>
+      </section>
     ) : (
       <div class="empty-state">
         <Icon name="music" size={36} />
@@ -50,6 +55,9 @@ import { tracks } from '../lib/settings';
   .page-heading p { max-width: 43rem; color: var(--muted); font-family: var(--font-reading); line-height: 1.7; }
   .track-list { list-style: none; margin: 0; padding: 0; }
   .track { display: grid; grid-template-columns: 2ch 68px minmax(0, 1fr); align-items: center; gap: clamp(.75rem, 2cqi, 1rem); padding: clamp(1rem, 3cqi, 1.2rem) .6rem; border-bottom: 1px solid var(--line); }
+  .track[hidden] { display: none; }
+  .topic-tags { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
+  .topic-tags button { min-height: 44px; cursor: pointer; }
   .track:first-child { padding-top: .35rem; }
   .track:last-child { border-bottom: 0; padding-bottom: .35rem; }
   .track:has([aria-current='true']) { background: color-mix(in srgb, var(--sage) 30%, var(--surface)); box-shadow: inset 3px 0 var(--line); }

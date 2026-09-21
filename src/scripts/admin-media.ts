@@ -116,9 +116,11 @@ function bytes(blob: Blob, signal?: AbortSignal): Promise<ArrayBuffer> {
   return promise;
 }
 
-function dimensions(width: number, height: number): Dimensions {
+function dimensions(width: number, height: number, stillPhoto = false): Dimensions {
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) fail('The media has no valid dimensions.');
-  if (width > maxEdge || height > maxEdge || width * height > maxPixels) fail('Source frames must be at most 8192 pixels per edge and 40 megapixels. Resize the original locally first.');
+  const edgeLimit = stillPhoto ? 16384 : maxEdge;
+  const pixelLimit = stillPhoto ? 80_000_000 : maxPixels;
+  if (width > edgeLimit || height > edgeLimit || width * height > pixelLimit) fail(stillPhoto ? 'Still photos must be at most 16384 pixels per edge and 80 megapixels.' : 'Source frames must be at most 8192 pixels per edge and 40 megapixels. Resize the original locally first.');
   return { width, height };
 }
 
@@ -163,7 +165,7 @@ function inspectRaster(data: Uint8Array): Raster {
       // Decode the primary photograph; canvas re-encoding strips auxiliary images and metadata.
       if (marker !== undefined && [0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
         if (length < 8) fail('The JPEG dimensions are corrupt.');
-        size = dimensions(view.getUint16(position + 5), view.getUint16(position + 3));
+        size = dimensions(view.getUint16(position + 5), view.getUint16(position + 3), true);
       }
       position += length;
     }
@@ -336,17 +338,17 @@ function watermark(creator: string, size: Dimensions): HTMLCanvasElement {
   return mark.element;
 }
 
-async function decodeBitmap(blob: Blob, signal?: AbortSignal): Promise<ImageBitmap> {
+async function decodeBitmap(blob: Blob, signal?: AbortSignal, resizeWidth?: number): Promise<ImageBitmap> {
   if (typeof createImageBitmap !== 'function') fail('This browser needs createImageBitmap support to prepare image previews safely.');
-  return abortable(createImageBitmap(blob, { imageOrientation: 'from-image' }), signal, (image) => image.close());
+  return abortable(createImageBitmap(blob, { imageOrientation: 'from-image', ...(resizeWidth ? { resizeWidth, resizeQuality: 'high' as const } : {}) }), signal, (image) => image.close());
 }
 
-async function still(blob: Blob, options: Settings): Promise<Generated> {
-  const bitmap = await decodeBitmap(blob, options.signal);
+async function still(blob: Blob, options: Settings, source: Dimensions): Promise<Generated> {
+  const bitmap = await decodeBitmap(blob, options.signal, Math.min(1600, source.width, source.height));
   let surface: CanvasSurface | undefined;
   let mark: HTMLCanvasElement | undefined;
   try {
-    dimensions(bitmap.width, bitmap.height);
+    dimensions(bitmap.width, bitmap.height, true);
     const size = bounded(bitmap.width, bitmap.height, 1600);
     surface = canvas(size);
     surface.context.drawImage(bitmap, 0, 0, size.width, size.height);
@@ -663,7 +665,7 @@ async function prepare(file: File, options: Settings, hasTiming: boolean): Promi
     if (raster.delays && (raster.mime === 'image/webp' || raster.delays.length > 1)) generated = await animation(data, raster, options);
     else {
       if (hasTiming || options.fullLength) fail('Length and trim settings apply only to audio, video and animated images, not still images.');
-      generated = await still(new Blob([data], { type: mime }), options);
+      generated = await still(new Blob([data], { type: mime }), options, raster);
     }
   } else {
     const extension = file.name.split('.').at(-1)?.toLowerCase() || '';

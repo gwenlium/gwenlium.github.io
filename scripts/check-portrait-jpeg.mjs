@@ -16,4 +16,14 @@ assert.equal(result.width, 320);
 assert.equal(result.height, 480);
 assert.equal(result.mime, 'image/jpeg');
 assert.throws(() => sandbox.exports.inspectRaster(new Uint8Array([0xff, 0xd8, 0xff, 0xe2, 0, 20, 77, 80, 70, 0])));
-console.log('Camera JPEG with MPF metadata accepted; truncated JPEG still rejected.');
+// Camera-sized MPF JPEG: the user's 8192 x 5464 photo exceeds the former 40 MP cap.
+const large = Buffer.from(portrait);
+const frame = large.indexOf(Buffer.from([0xff, 0xc0]));
+assert(frame > 0);
+large.writeUInt16BE(5464, frame + 5);
+large.writeUInt16BE(8192, frame + 7);
+assert.equal(sandbox.exports.inspectRaster(new Uint8Array(large)).width, 8192);
+large.writeUInt16BE(16384, frame + 5);
+large.writeUInt16BE(16384, frame + 7);
+assert.throws(() => sandbox.exports.inspectRaster(new Uint8Array(large)));
+console.log('Camera MPF JPEGs accepted through 80 MP; oversized and truncated inputs still rejected.');

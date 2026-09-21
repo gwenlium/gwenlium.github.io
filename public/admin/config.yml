@@ -374,8 +374,8 @@ collections:
             widget: text
             required: false
             default: ""
-            hint: Used for search previews and on Home when Homepage introduction is empty. All fields in this public repository are
-              publicly readable.
+            hint: Used for search previews and on Home when Homepage introduction is empty. All fields in this
+              public repository are publicly readable.
           - name: intro
             label: Homepage introduction
             widget: text
@@ -739,6 +739,20 @@ collections:
                 label: Title
                 widget: string
                 required: true
+              - name: topics
+                label: Topics
+                widget: list
+                required: false
+                default: []
+                hint: Add one or more topics, such as Portraits, Nature or Game art. Reuse the same names to group
+                  uploads.
+                field:
+                  name: topic
+                  label: Topic
+                  widget: string
+                  pattern:
+                    - .*\S.*
+                    - Enter a topic name.
               - name: type
                 label: Media type
                 widget: select
@@ -776,6 +790,7 @@ collections:
                 hint: Choose an existing preview or upload an image. Only the resized, watermarked preview is
                   published; the original stays on your device.
             collapsed: true
+            summary: "{{fields.title}} · {{fields.topics}}"
   - name: music
     label: Music
     files:
@@ -798,6 +813,20 @@ collections:
                 label: Track title
                 widget: string
                 required: true
+              - name: topics
+                label: Topics
+                widget: list
+                required: false
+                default: []
+                hint: Add one or more topics, such as Piano, Soundtracks or Ambient. Reuse the same names to group
+                  tracks.
+                field:
+                  name: topic
+                  label: Topic
+                  widget: string
+                  pattern:
+                    - .*\S.*
+                    - Enter a topic name.
               - name: src
                 label: Audio file
                 widget: file
@@ -824,6 +853,7 @@ collections:
                 default: ""
                 hint: Required when cover art is set.
             collapsed: true
+            summary: "{{fields.title}} · {{fields.topics}}"
   - name: windows
     label: Windows
     files:

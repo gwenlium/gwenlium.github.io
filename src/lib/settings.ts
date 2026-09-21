@@ -1,3 +1,4 @@
+import { normalizeTopics } from './topics.mjs';
 import siteData from '../content/site.json';
 import aboutData from '../content/pages/about.json';
 import galleryData from '../content/gallery.json';
@@ -41,6 +42,7 @@ export interface SiteSettings {
 }
 
 export interface GalleryItem {
+  topics: string[];
   id: string;
   title: string;
   src: string;
@@ -51,6 +53,7 @@ export interface GalleryItem {
 }
 
 export interface MusicTrack {
+  topics: string[];
   id: string;
   title: string;
   src: string;
@@ -93,6 +96,7 @@ export const site: SiteSettings = {
 
 export const gallery: GalleryItem[] = (galleryData.items as GalleryItem[]).map((item) => ({
   id: item.id,
+  topics: normalizeTopics(item.topics),
   title: item.title ?? '',
   src: item.src ?? '',
   alt: item.alt ?? '',
@@ -103,6 +107,7 @@ export const gallery: GalleryItem[] = (galleryData.items as GalleryItem[]).map((
 
 export const tracks: MusicTrack[] = (musicData.tracks as MusicTrack[]).map((track) => ({
   id: track.id,
+  topics: normalizeTopics(track.topics),
   title: track.title ?? '',
   src: track.src ?? '',
   cover: track.cover ?? '',

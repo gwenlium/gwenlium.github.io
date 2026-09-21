@@ -215,12 +215,12 @@ export async function GET(): Promise<Response> {
   const galleryDefault = hasDefaultContent('gallery-content');
   for (const item of gallery) {
     const url = galleryDefault ? `/gallery/#${encodeURIComponent(`work-${item.id}`)}` : artworkDestinations.get(item.id);
-    if (url) add({ id: `artwork:${item.id}`, title: item.title, url, kind: 'artwork', text: artworkText(item), tags: [] });
+    if (url) add({ id: `artwork:${item.id}`, title: item.title, url, kind: 'artwork', text: artworkText(item), tags: item.topics });
   }
   const musicDefault = hasDefaultContent('music-catalogue');
   for (const track of tracks) {
     const url = musicDefault ? `/music/#${encodeURIComponent(`track-${track.id}`)}` : trackDestinations.get(track.id);
-    if (url) add({ id: `track:${track.id}`, title: track.title, url, kind: 'track', text: trackText(track), tags: [] });
+    if (url) add({ id: `track:${track.id}`, title: track.title, url, kind: 'track', text: trackText(track), tags: track.topics });
   }
   for (const entry of windowEntries) add(entry);
 

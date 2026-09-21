@@ -269,6 +269,11 @@ export function validateSource(root = projectRoot, now = new Date()) {
   const optionalStrings = (value, fields, file, prefix = '') => {
     for (const field of fields) text(value[field], file, `${prefix}${field}`);
   };
+  const topics = (value, file, field) => {
+    if (value === undefined) return;
+    if (!Array.isArray(value)) return report(file, field, 'Use a list of topic names.');
+    value.forEach((topic, index) => text(topic, file, `${field}[${index}]`, true));
+  };
   const photos = (items, file, base) => {
     if (items === undefined || items === '') return;
     if (!Array.isArray(items)) return report(file, 'photos', 'Use a list of photo URLs.');
@@ -282,6 +287,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
       const key = `${field}[${index}]`;
       if (!isObject(item)) return report(file, key, 'Use a media object.');
       if (gallery) {
+        topics(item.topics, file, `${key}.topics`);
         if (text(item.id, file, `${key}.id`, true)) {
           if (ids.has(item.id)) report(file, `${key}.id`, `Duplicate ID ${JSON.stringify(item.id)}. Give each gallery entry a unique ID.`);
           ids.add(item.id);
@@ -446,6 +452,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
           ids.add(track.id);
         }
         text(track.title, file, `${field}.title`, true);
+        topics(track.topics, file, `${field}.topics`);
         url(track.src, file, `${field}.src`, { media: true, kind: 'audio', base: `${siteOrigin}/music/`, required: true });
         image(track.cover, track.coverAlt, file, `${field}.cover`, `${siteOrigin}/music/`);
       });
