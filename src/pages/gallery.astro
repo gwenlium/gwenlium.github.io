@@ -17,7 +17,10 @@ const videos = gallery.filter((item) => item.type === 'video').length;
     {pages.gallery.intro && <p class="page-intro">{pages.gallery.intro}</p>}
   </header>
   {gallery.length ? (
-    <section data-gallery data-topic-catalogue="gallery" aria-label="Gallery">
+    <section class="gallery-workspace" data-gallery data-topic-catalogue="gallery" aria-label="Gallery">
+      <aside class="window window--sage gallery-tools" aria-label="Gallery browser">
+        <div class="window-titlebar"><span class="window-titlebar__mark" aria-hidden="true"></span><h2 class="window-titlebar__title">Gallery browser</h2></div>
+        <div class="window-body">
       <div class="gallery-toolbar">
         <div class="gallery-filters" role="group" aria-label="Filter gallery">
           <button type="button" class="button-secondary" data-gallery-filter="all" aria-pressed="true">All <span>{gallery.length}</span></button>
@@ -27,12 +30,14 @@ const videos = gallery.filter((item) => item.type === 'video').length;
 
       </div>
       <TopicFilter topics={topicOptions(gallery)} id="gallery-topic" search />
+        </div>
+      </aside>
       <div class="gallery-grid">
         {gallery.map((item, index) => (
           <article class:list={['window', 'gallery-item', `window--${['sage', 'pink', 'lavender'][index % 3]}`]} data-gallery-type={item.type} data-item-topics={JSON.stringify(item.topics)} id={`work-${item.id}`} aria-labelledby={`work-${item.id}-title`}>
             <div class="window-titlebar"><span aria-hidden="true"><Icon name={item.type === 'video' ? 'play' : 'image'} size={13} /></span><h2 id={`work-${item.id}-title`} class="window-titlebar__title" title={item.title}>{item.title}</h2></div>
             <div class="gallery-item-body">
-              <Media src={item.src} alt={item.alt} caption={item.caption} type={item.type} poster={item.poster} sizes="(max-width: 640px) calc(100vw - 3rem), (max-width: 1024px) 50vw, 560px" />
+              <Media src={item.src} alt={item.alt} caption={item.caption} type={item.type} poster={item.poster} sizes={index === 0 ? '(min-width: 1000px) 800px, 90vw' : '(min-width: 1000px) 400px, (min-width: 640px) 45vw, 90vw'} />
               {item.topics.length > 0 && <div class="topic-tags">{item.topics.map(topic => <button type="button" class="tag" data-topic-pick={topic}>{topic}</button>)}</div>}
             </div>
           </article>
@@ -48,21 +53,32 @@ const videos = gallery.filter((item) => item.type === 'video').length;
 </SiteLayout>
 
 <style>
+  .gallery-workspace { display: grid; gap: 1.5rem; align-items: start; }
+  .gallery-tools { min-width: 0; }
+  .gallery-tools h2 { font-weight: 400; }
   .topic-tags { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .75rem; }
   .topic-tags button { min-height: 44px; cursor: pointer; }
-  .gallery-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding-bottom: clamp(.75rem, 3cqi, 1.2rem); margin-bottom: clamp(1rem, 4cqi, 1.7rem); border-bottom: 1px solid var(--line); }
+  .gallery-toolbar { display: flex; flex-wrap: wrap; gap: 1rem; padding-bottom: 1rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
   .gallery-filters { display: flex; flex-wrap: wrap; gap: .5rem; }
   .gallery-filters button { font: inherit; font-size: .7rem; cursor: pointer; }
   .gallery-filters button[aria-pressed='true'] { background: var(--ink); color: var(--surface); }
   .gallery-filters span { font-size: .6rem; opacity: .75; }
-  .gallery-toolbar p { font-size: .65rem; color: var(--muted); margin: 0; }
   .gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: clamp(1rem, 2vw, 1.5rem); align-items: start; }
-  .gallery-item { width: 100%; max-width: 560px; }
+  .gallery-item { width: 100%; min-width: 0; }
   .gallery-item[hidden] { display: none; }
   .gallery-item .window-titlebar > span { display: flex; flex-shrink: 0; }
   .gallery-item h2 { font-weight: 400; }
   .gallery-item-body { padding: clamp(.4rem, 1vw, .65rem); }
-  .gallery-item :global(img), .gallery-item :global(video) { height: auto; border-radius: 0; }
+  .gallery-item :global(img), .gallery-item :global(video) { height: auto; max-height: 520px; object-fit: contain; border-radius: 0; background: var(--page-bg); }
+  .gallery-item:target { outline: 2px solid var(--focus); outline-offset: 4px; scroll-margin-block: 1rem; }
+  @media screen and (min-width: 1000px) {
+    .gallery-workspace { grid-template-columns: minmax(250px, 290px) minmax(0, 1fr); gap: 2rem; padding: .5rem 1rem 2rem; }
+    .gallery-tools { margin-top: 2.5rem; }
+    .gallery-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1.75rem; }
+    .gallery-item:first-child { grid-column: 1 / -1; }
+    .gallery-item:first-child :global(img), .gallery-item:first-child :global(video) { max-height: min(58vh, 640px); }
+    .gallery-item:nth-child(2n + 3) { margin-top: 2rem; }
+  }
   @media (max-width: 640px) {
     .gallery-grid { grid-template-columns: minmax(0, 1fr); }
     .gallery-item { max-width: none; }

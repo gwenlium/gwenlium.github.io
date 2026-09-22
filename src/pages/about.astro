@@ -22,7 +22,7 @@ const showPortrait = Boolean(getWindowDefinition('about-portrait')?.enabled && (
     {pages.about.intro && <p class="page-intro">{pages.about.intro}</p>}
   </header>
   <div class:list={['about-grid', { 'about-grid--with-avatar': showPortrait }]}>
-    {showPortrait && <aside class="about-avatar"><Window windowId="about-portrait"><Media src={about.avatar} alt={about.avatarAlt} eager sizes="(max-width: 800px) 300px, 25vw" /></Window></aside>}
+    {showPortrait && <aside class="about-avatar"><Window windowId="about-portrait"><Media src={about.avatar} alt={about.avatarAlt} eager sizes="(min-width: 1000px) 240px, 280px" /></Window></aside>}
     <div class="about-main">
       <Window windowId="about-bio">
         <DialogueReader id="about-reading">
@@ -38,20 +38,27 @@ const showPortrait = Boolean(getWindowDefinition('about-portrait')?.enabled && (
         {pages.about.media.length > 0 && <div class="about-media" data-dialogue-blocks>{pages.about.media.map(media => <Media {...media} />)}</div>}
         </DialogueReader>
       </Window>
-      {about.links.length > 0 && <nav aria-label="Profile links"><ul>{about.links.map(link => <li><a href={link.url}>{link.label}</a></li>)}</ul></nav>}
+      {about.links.length > 0 && <nav class="profile-links" aria-label="Profile links"><ul>{about.links.map(link => <li><a href={link.url}>{link.label}</a></li>)}</ul></nav>}
     </div>
   </div>
 </SiteLayout>
 
 <style>
-  .about-grid { display: grid; gap: 1.8rem; align-items: start; }
-  .about-grid--with-avatar { grid-template-columns: minmax(180px, 1fr) minmax(0, 2.1fr); }
+  .about-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.8rem; align-items: start; }
   .about-main { display: grid; gap: 1.8rem; min-width: 0; }
-  .about-avatar { min-width: 0; }
+  .about-avatar { width: 100%; max-width: 19rem; min-width: 0; }
   .about-avatar :global(img) { max-height: 410px; object-fit: contain; }
   .about-body :global(p) { white-space: pre-line; overflow-wrap: anywhere; }
   .about-body :global(p:first-child) { margin-top: 0; }
   .about-body :global(p:last-child) { margin-bottom: 0; }
+  .profile-links ul { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; list-style: none; margin: 0; padding: 0; }
+  .profile-links li { min-width: 0; }
+  .profile-links a { display: inline-flex; align-items: center; min-height: 44px; font-size: .75rem; overflow-wrap: anywhere; }
   .empty-state :global(svg) { margin-inline: auto; }
-  @media (max-width: 800px) { .about-grid--with-avatar { grid-template-columns: 1fr; } .about-avatar { max-width: 350px; } }
+  @media screen and (min-width: 1000px) {
+    .about-grid { width: min(100%, 64rem); margin-inline: auto; gap: clamp(1.8rem, 3vw, 3rem); }
+    .about-grid--with-avatar { grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr); }
+    .about-main { width: 100%; max-width: 46rem; margin-inline: auto; gap: 1.2rem; }
+    .about-grid--with-avatar .about-main { margin-top: 3.5rem; }
+  }
 </style>

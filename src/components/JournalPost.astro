@@ -23,6 +23,8 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
 <SiteLayout title={post.data.title} description={post.data.excerpt} image={post.data.cover} imageAlt={post.data.coverAlt} article>
   <a class="back-link" href={`/${post.data.section}/`}><span aria-hidden="true">←</span> All entries</a>
   <div class="article-layout">
+    <div class="article-main">
+      <div class="article-window">
     <Window windowId="post-entry">
       <div slot="titlebar-actions" class="dialogue-option" data-dialogue-option hidden>
         <button class="button button-secondary" type="button" data-dialogue-enter aria-controls="entry-content" title="Read one block at a time">Dialogue mode</button>
@@ -62,15 +64,17 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
         </footer>
       </article>
     </Window>
+      </div>
 
     {(older || newer) && <nav class="entry-pagination" aria-label="Other journal entries">
       {older ? <a href={postUrl(older)} rel="prev"><span class="eyebrow">← Older entry</span><span>{older.data.title}</span></a> : <span />}
       {newer && <a href={postUrl(newer)} rel="next"><span class="eyebrow">Newer entry →</span><span>{newer.data.title}</span></a>}
     </nav>}
+    </div>
 
-    {(related.length > 0 || hasWindowOverride('post-related')) && <Window windowId="post-related">
+    {(related.length > 0 || hasWindowOverride('post-related')) && <div class="article-companion"><Window windowId="post-related">
       <nav aria-label="Related entries"><ul class="related-list">{related.map(({ candidate }) => <li><a href={postUrl(candidate)}>{candidate.data.title}</a><time datetime={candidate.data.date.toISOString().slice(0, 10)}>{formatDate(candidate.data.date)}</time></li>)}</ul></nav>
-    </Window>}
+    </Window></div>}
   </div>
 </SiteLayout>
 
@@ -110,7 +114,10 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
 
 <style>
   .back-link { display: inline-flex; align-items: center; gap: .65rem; font-size: .75rem; margin: 0 0 1.5rem; text-underline-offset: .25em; }
-  .article-layout { display: grid; gap: 1.5rem; max-width: 60rem; margin-inline: auto; }
+  .article-layout { display: grid; align-items: start; gap: 1.5rem; max-width: 60rem; margin-inline: auto; }
+  .article-main { display: grid; gap: 1.5rem; min-width: 0; }
+  .article-window, .article-companion { min-width: 0; }
+  .article-window:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))), .article-companion:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))) { display: none; }
   .entry { max-width: 48rem; margin: 0 auto; padding: clamp(.25rem, 2cqi, 1.5rem); }
   .entry-header { margin-bottom: clamp(1.25rem, 4cqi, 2rem); }
   .entry-header h1 { font-size: clamp(1.5rem, 1.1rem + 2.5cqi, 2.4rem); line-height: 1.4; overflow-wrap: anywhere; margin: .8rem 0 1.2rem; }
@@ -143,6 +150,11 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
     .dialogue-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .dialogue-controls button { min-width: 0; padding-inline: .5rem; }
     .dialogue-progress { grid-column: 1 / -1; grid-row: 1; }
+  }
+  @media screen and (min-width: 1000px) {
+    .article-layout { max-width: 54rem; }
+    .article-layout:has(> .article-companion :global(:is([data-desktop-window], [data-window-placeholder]))) { grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem); gap: clamp(1.5rem, 3vw, 2.5rem); max-width: 74rem; }
+    .article-companion { margin-top: 5rem; }
   }
   @media print {
     :global(#post-entry) { display: block !important; position: static !important; width: auto !important; height: auto !important; max-height: none !important; overflow: visible !important; transform: none !important; break-inside: auto; }

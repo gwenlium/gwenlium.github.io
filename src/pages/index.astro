@@ -23,6 +23,8 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
 
 <SiteLayout>
   <div class="home-page">
+    <div class="home-primary">
+    <div class="home-slot home-slot--intro">
     <Window windowId="home-intro" class="home-hero">
       <div class="hero-inner">
         <div class="hero-copy">
@@ -33,8 +35,10 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
       </div>
       <div class="hero-statusbar"><span><img src="/avatar.webp" alt="" width="16" height="16" />gwenlium.dev</span><span aria-hidden="true">◆ &nbsp; ◇ &nbsp; ◇</span></div>
     </Window>
+    </div>
 
     {(hasGame || hasWindowOverride('home-game')) && (
+      <div class="home-slot home-slot--game">
       <Window windowId="home-game" class="featured-game">
         <div class="game-preview">
           <div class="game-preview__copy">
@@ -49,9 +53,12 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
           </div>
         </div>
       </Window>
+      </div>
     )}
+    </div>
+    <div class="home-secondary">
 
-    <div class="home-columns">
+    <div class="home-slot home-slot--journal">
       <Window windowId="home-devlog" class="home-devlog">
         {featuredPost ? (
           <>
@@ -78,20 +85,23 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
     </div>
 
     {(galleryPreview.length > 0 || hasWindowOverride('home-gallery')) && (
+      <div class="home-slot home-slot--gallery">
       <Window windowId="home-gallery" class="home-gallery">
-        <div class="section-heading"><h2><Icon name="image" size={20} />Gallery</h2></div>
+        <div class="section-heading"><h2><Icon name="image" size={20} />Gallery</h2><a href="/gallery/">Browse gallery <Icon name="arrow" size={14} /></a></div>
         <div class="gallery-preview">
           {galleryPreview.map((item) => (
             <div class="gallery-preview__item">
-              <Media src={item.src} type={item.type} alt={item.alt} poster={item.poster} />
-              {item.title && <h3>{item.title}</h3>}
+              {item.title && <h3><a href={`/gallery/#work-${item.id}`}>{item.title}</a></h3>}
+              <Media src={item.src} type={item.type} alt={item.alt} caption={item.caption} poster={item.poster} sizes="(min-width: 1000px) 480px, (max-width: 640px) 90vw, 600px" />
             </div>
           ))}
         </div>
       </Window>
+      </div>
     )}
 
     {(musicPreview.length > 0 || hasWindowOverride('home-music')) && (
+      <div class="home-slot home-slot--music">
       <Window windowId="home-music" class="home-music">
         <div class="section-heading"><h2><Icon name="music" size={20} />Music</h2></div>
         <ul class="music-preview">
@@ -107,12 +117,16 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
           ))}
         </ul>
       </Window>
+      </div>
     )}
+    </div>
   </div>
 </SiteLayout>
 
 <style>
-  .home-page { display: grid; gap: 1.55rem; }
+  .home-page, .home-primary, .home-secondary { display: grid; align-items: start; gap: 1.55rem; min-width: 0; }
+  .home-slot { min-width: 0; }
+  .home-slot:not(:has(> :global(.window:not([hidden])), > :global([data-window-placeholder]:not([hidden])))) { display: none; }
   :global(.home-hero > .window-body) { padding: 0; }
   .hero-inner { position: relative; isolation: isolate; min-height: clamp(140px, 25cqi, 300px); overflow: hidden; }
   .hero-copy { position: relative; max-width: 100%; padding: clamp(.9rem, 3cqi, 2.5rem); }
@@ -126,18 +140,13 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
   .hero-statusbar > span:first-child { display: inline-flex; align-items: center; gap: .45rem; }
   .hero-statusbar > span:last-child { letter-spacing: .13em; }
   .game-preview { display: grid; gap: 1.75rem; }
-  .game-preview--with-media { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; }
-  .game-preview__media { min-width: 0; }
-  .game-preview__media :global(figure) { margin: 0; }
-  .game-preview__media :global(img), .game-preview__media :global(video) { width: 100%; max-height: 340px; object-fit: contain; }
+  .game-preview__copy { min-width: 0; }
   .game-preview h2 { font-size: clamp(1.1rem, 3cqi, 2rem); margin-bottom: .75rem; }
   .game-status { display: inline-flex; align-items: center; gap: .5rem; color: var(--muted); font-size: 10px; margin-bottom: 1rem; }
   .game-status > span { width: 5px; height: 5px; background: var(--accent-ink); }
   .game-description { font-family: var(--font-reading); font-size: .95rem; line-height: 1.75; white-space: pre-line; }
   .game-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: 1.25rem; }
   .game-trailer { display: inline-flex; align-items: center; gap: .45rem; font-size: 10px; }
-  .home-columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.55rem; align-items: start; }
-  :global(.home-columns:not(:has(> .window:not([hidden]), > [data-window-placeholder]:not([hidden])))) { display: none; }
   .devlog-empty { display: flex; align-items: center; gap: 1.4rem; min-height: 174px; padding: .75rem; }
   .empty-book { display: grid; place-items: center; flex-shrink: 0; width: 64px; height: 70px; border: 1px solid var(--line); background: repeating-linear-gradient(0deg, transparent, transparent 11px, color-mix(in srgb, var(--line) 11%, transparent) 11px, color-mix(in srgb, var(--line) 11%, transparent) 12px), var(--surface-raised); box-shadow: 3px 3px 0 var(--sage); color: var(--muted); }
   .devlog-empty h2 { font-size: 1.2rem; margin: 0 0 .6rem; }
@@ -153,11 +162,12 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
   .recent-posts li svg { grid-row: 1 / 3; grid-column: 2; }
   .section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem; }
   .section-heading h2 { display: flex; align-items: center; gap: .65rem; font-size: 1.25rem; margin: 0; }
+  .section-heading > a { display: inline-flex; align-items: center; gap: .5rem; font-size: .65rem; }
   .gallery-preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1rem; }
   .gallery-preview__item { min-width: 0; }
   .gallery-preview__item :global(figure) { margin: 0; }
-  .gallery-preview__item :global(img), .gallery-preview__item :global(video) { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
-  .gallery-preview__item h3 { margin: .65rem 0 0; font-size: 11px; line-height: 1.55; }
+  .gallery-preview__item :global(img), .gallery-preview__item :global(video) { width: 100%; height: auto; max-height: 320px; object-fit: contain; background: var(--page-bg); }
+  .gallery-preview__item h3 { margin: 0 0 .65rem; font-size: .8rem; line-height: 1.55; }
   .music-preview { list-style: none; padding: 0; margin: 0; }
   .music-preview li + li { border-top: 1px solid color-mix(in srgb, var(--line) 35%, transparent); }
   .music-preview button { display: flex; align-items: center; gap: .9rem; width: 100%; min-width: 0; padding: .65rem .4rem; border: 0; background: transparent; text-align: left; }
@@ -168,22 +178,30 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
   .track-title { font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
   .track-play { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; padding-left: .5rem; font-size: 10px; }
 
-  @media (max-width: 1150px) { .home-columns { gap: 1.1rem; } }
+  /* Named slots keep the authored desktop arrangement when a window is moved. */
+  @media screen and (min-width: 1000px) {
+    .home-page { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 2rem; padding: .75rem 1rem 2rem; }
+    .home-secondary { margin-top: 3rem; }
+    .home-slot--journal { margin-left: 2rem; }
+    .home-slot--game { margin-right: 2rem; }
+    .home-slot--music { margin-inline: 1.5rem .5rem; }
+    .hero-inner { min-height: 0; }
+    .hero-copy { padding: 1.75rem; }
+    .hero-intro { margin-bottom: 1rem; }
+  }
   @container window-content (max-width: 700px) {
     .devlog-empty { gap: 1rem; min-height: 140px; padding: .5rem; }
     .empty-book { width: 48px; height: 56px; }
-    .game-preview--with-media { grid-template-columns: minmax(0, 1fr); gap: 1.3rem; }
     .gallery-preview { gap: .75rem; }
   }
   @media (max-width: 760px) {
-    .home-page { gap: 1.15rem; }
+    .home-page, .home-primary, .home-secondary { gap: 1.15rem; }
   }
   @container window-content (max-width: 620px) {
     .hero-location { margin-bottom: 1.1rem; }
     h1 { margin-bottom: 1.25rem; }
     .hero-intro { font-size: .95rem; }
     .gallery-preview { grid-template-columns: minmax(0, 1fr); gap: 1.2rem; }
-    .gallery-preview__item :global(img), .gallery-preview__item :global(video) { max-height: 340px; object-fit: contain; }
     .track-play > span { display: none; }
     .music-preview button { gap: .6rem; }
   }

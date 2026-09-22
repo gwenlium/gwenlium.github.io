@@ -8,6 +8,9 @@ import Media from '../components/Media.astro';
 import Icon from '../components/Icon.astro';
 import MusicLibrary from '../components/MusicLibrary.astro';
 import { tracks } from '../lib/settings';
+import { getWindowDefinition } from '../lib/windows';
+const showLibrary = Boolean(getWindowDefinition('music-library')?.enabled);
+const showCatalogue = Boolean(getWindowDefinition('music-catalogue')?.enabled);
 ---
 
 <SiteLayout title={pages.music.title}>
@@ -16,7 +19,9 @@ import { tracks } from '../lib/settings';
     <h1>{pages.music.title}</h1>
     {pages.music.intro && <p class="page-intro">{pages.music.intro}</p>}
   </header>
-  <MusicLibrary />
+  <div class:list={['music-workspace', { 'music-workspace--paired': showLibrary && showCatalogue }]}>
+    {showLibrary && <div class="music-library-slot"><MusicLibrary /></div>}
+    {showCatalogue && <div class="music-catalogue-slot">
   <Window windowId="music-catalogue">
     {tracks.length ? (
       <section data-topic-catalogue="music" aria-label="Music catalogue">
@@ -49,10 +54,20 @@ import { tracks } from '../lib/settings';
       </div>
     )}
   </Window>
+    </div>}
+  </div>
 </SiteLayout>
 
 <style>
   .page-heading p { max-width: 43rem; color: var(--muted); font-family: var(--font-reading); line-height: 1.7; }
+  .music-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.8rem; align-items: start; }
+  .music-library-slot, .music-catalogue-slot { min-width: 0; }
+  @media screen and (min-width: 1000px) {
+    .music-workspace { gap: clamp(1.4rem, 2.5vw, 2.25rem); }
+    .music-workspace--paired { grid-template-columns: minmax(17rem, .78fr) minmax(0, 2fr); }
+    .music-workspace--paired .music-library-slot { margin-top: 2.5rem; }
+    .music-library-slot:only-child { width: min(100%, 32rem); }
+  }
   .track-list { list-style: none; margin: 0; padding: 0; }
   .track { display: grid; grid-template-columns: 2ch 68px minmax(0, 1fr); align-items: center; gap: clamp(.75rem, 2cqi, 1rem); padding: clamp(1rem, 3cqi, 1.2rem) .6rem; border-bottom: 1px solid var(--line); }
   .track[hidden] { display: none; }

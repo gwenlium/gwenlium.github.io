@@ -78,7 +78,7 @@ import Window from './Window.astro';
 </Window>
 
 <style>
-  :global(.music-library) { margin-bottom: 1.5rem; min-width: 0; }
+  :global(.music-library) { min-width: 0; }
   .library-intro { display: flex; justify-content: space-between; align-items: start; gap: clamp(.65rem, 3cqi, 1rem); }
   .library-intro h2 { margin: 0; font-size: clamp(1rem, .9rem + .6cqi, 1.1rem); font-weight: 400; }
   .library-capacity { flex-shrink: 0; padding: .35rem .5rem; border: 1px solid var(--line); font-size: .65rem; background: var(--surface-raised); }
@@ -90,7 +90,7 @@ import Window from './Window.astro';
   .library-form { display: flex; flex-wrap: wrap; align-items: end; gap: .65rem; }
   .library-form label { display: grid; flex: 1 1 14rem; gap: .55rem; min-width: 0; font-size: .7rem; }
   .library-form label span { display: contents; color: var(--muted); }
-  .library-form input, .library-form select, .library-selection select { width: 100%; min-height: 44px; border-radius: 0; font-family: var(--font-reading); }
+  .library-form input, .library-form select, .library-selection select { width: 100%; min-width: 0; min-height: 44px; border-radius: 0; font-family: var(--font-reading); }
   .library-form button, .library-actions button { min-width: 0; min-height: 44px; border-radius: 0; overflow-wrap: anywhere; }
   .library-create { margin-block: 1.2rem; }
   .library-selection { display: grid; grid-template-columns: minmax(0, 1fr); gap: .55rem; margin-block: 1.3rem; font-size: .75rem; }
@@ -118,7 +118,7 @@ import Window from './Window.astro';
   :global(.music-library [hidden]) { display: none !important; }
   @container window-content (max-width: 700px) {
     .playlist-workspace { grid-template-columns: minmax(0, 1fr); }
-    .playlist-summary { width: min(100%, 14rem); justify-self: center; }
+    .playlist-summary { aspect-ratio: auto; gap: .55rem; }
     .library-intro { flex-wrap: wrap; }
   }
   @container window-content (max-width: 360px) {
