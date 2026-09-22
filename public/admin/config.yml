@@ -171,7 +171,7 @@ collections:
     filter:
       field: section
       value: devlog
-    summary: "{{title}} · {{date}}"
+    summary: "{{title}} {{date}}"
     sortable_fields:
       - date
       - title
@@ -340,7 +340,7 @@ collections:
     filter:
       field: section
       value: life
-    summary: "{{title}} · {{date}}"
+    summary: "{{title}} {{date}}"
     sortable_fields:
       - date
       - title
@@ -383,7 +383,7 @@ collections:
             label: Watermark credit
             widget: string
             required: false
-            default: © Gwendolyn Ural Erkut · gwenlium.dev
+            default: © Gwendolyn Ural Erkut gwenlium.dev
             hint: A small translucent credit on new image and video uploads. Existing uploads keep their
               original watermark.
             pattern:
@@ -812,7 +812,7 @@ collections:
                 hint: Choose an existing preview or upload an image. Only the resized, watermarked preview is
                   published; the original stays on your device.
             collapsed: true
-            summary: "{{fields.title}} · {{fields.topics}}"
+            summary: "{{fields.title}} {{fields.topics}}"
   - name: music
     label: Music
     files:
@@ -875,7 +875,7 @@ collections:
                 default: ""
                 hint: Required when cover art is set.
             collapsed: true
-            summary: "{{fields.title}} · {{fields.topics}}"
+            summary: "{{fields.title}} {{fields.topics}}"
   - name: windows
     label: Windows
     files:
