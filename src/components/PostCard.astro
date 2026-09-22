@@ -3,19 +3,19 @@ import Media from './Media.astro';
 import Icon from './Icon.astro';
 import { formatDate, postUrl, type Post } from '../lib/content';
 
-interface Props { post: Post }
-const { post } = Astro.props;
+interface Props { post: Post; compact?: boolean }
+const { post, compact = false } = Astro.props;
 const { title, date, excerpt, cover, coverAlt, tags } = post.data;
 ---
 
-<article class:list={['post-card', { 'has-cover': cover }]}>
-  {cover && <div class="post-cover"><Media src={cover} alt={coverAlt} /></div>}
+<article class:list={['post-card', { 'has-cover': cover, 'post-card--compact': compact }]}>
+  {cover && <div class="post-cover">{compact ? <a href={postUrl(post)} aria-label={`Read ${title}`}><Media src={cover} alt={coverAlt} sizes="80px" /></a> : <Media src={cover} alt={coverAlt} />}</div>}
   <div class="post-details">
     <a class="tag" href={`/${post.data.section}/`}>{post.data.section === 'life' ? 'Life' : 'Devlog'}</a>
     <time datetime={date.toISOString().slice(0, 10)}>{formatDate(date)}</time>
     <h2><a href={postUrl(post)}>{title}</a></h2>
     {excerpt && <p class="post-excerpt">{excerpt}</p>}
-    {tags.length > 0 && <ul class="post-tags" aria-label="Tags">{tags.map((tag) => (
+    {!compact && tags.length > 0 && <ul class="post-tags" aria-label="Tags">{tags.map((tag) => (
       <li><a class="tag" href={`/${post.data.section}/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>
     ))}</ul>}
     <a class="read-post" href={postUrl(post)} aria-label={`Read ${title}`}>Read entry <Icon name="arrow" size={14} /></a>
@@ -41,4 +41,12 @@ const { title, date, excerpt, cover, coverAlt, tags } = post.data;
   .post-cover :global(figure) { margin: 0; }
   .post-cover :global(img) { width: 100%; max-height: 15rem; object-fit: contain; }
   @container window-content (min-width: 640px) { .has-cover { grid-template-columns: minmax(10rem, 31%) minmax(0, 1fr); } }
+  .post-card--compact { gap: .85rem; }
+  .post-card--compact.has-cover { grid-template-columns: 80px minmax(0, 1fr); align-items: start; }
+  .post-card--compact .post-cover :global(img) { height: 96px; object-fit: contain; }
+  .post-card--compact .post-details > .tag, .post-card--compact time { font-size: .65rem; }
+  .post-card--compact .post-details > .tag + time { display: inline; margin-left: .5rem; }
+  .post-card--compact h2 { font-size: 1rem; }
+  .post-card--compact .post-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; max-height: 4.8em; overflow: hidden; font-size: .8rem; line-height: 1.6; margin-bottom: .5rem; }
+  .post-card--compact .read-post { font-size: .7rem; }
 </style>

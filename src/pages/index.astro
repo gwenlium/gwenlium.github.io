@@ -62,7 +62,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
       <Window windowId="home-devlog" class="home-devlog">
         {featuredPost ? (
           <>
-            <PostCard post={featuredPost} />
+            <PostCard post={featuredPost} compact />
             {recentPosts.length > 0 && (
               <div class="recent-posts">
                 <h2 class="eyebrow">Recent entries</h2>
@@ -86,7 +86,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
 
     {(galleryPreview.length > 0 || hasWindowOverride('home-gallery')) && (
       <div class="home-slot home-slot--gallery">
-      <Window windowId="home-gallery" class="home-gallery">
+      <Window windowId="home-gallery" class="home-gallery" anchored>
         <div class="section-heading"><h2><Icon name="image" size={20} />Gallery</h2><a href="/gallery/">Browse gallery <Icon name="arrow" size={14} /></a></div>
         <div class="gallery-preview">
           {galleryPreview.map((item) => (

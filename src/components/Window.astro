@@ -5,14 +5,15 @@ import WindowContent from './WindowContent.astro';
 interface Props {
   windowId: string;
   class?: string;
+  anchored?: boolean;
 }
 
-const { windowId, class: className } = Astro.props;
+const { windowId, class: className, anchored = false } = Astro.props;
 const definition = getWindowDefinition(windowId);
 const title = definition?.title ?? '';
 ---
 
-{definition?.enabled && <section id={definition.id} class:list={['window', `window--${definition.tone}`, className]} aria-label={title} data-desktop-window data-window-title={title} data-window-state={definition.initiallyClosed ? 'closed' : 'normal'} data-window-default-floating={definition.floating || undefined} data-window-initial-state={definition.initiallyClosed ? 'closed' : undefined} data-window-sized={definition.height > 0 || undefined} hidden={definition.initiallyClosed} tabindex="-1" style={{ width: definition.width > 0 ? `min(${definition.width}px, 100%)` : undefined, height: definition.height > 0 ? `${definition.height}px` : undefined }}>
+{definition?.enabled && <section id={definition.id} class:list={['window', `window--${definition.tone}`, className]} aria-label={title} data-desktop-window data-window-title={title} data-window-state={definition.initiallyClosed ? 'closed' : 'normal'} data-window-anchored={anchored || undefined} data-window-default-floating={(!anchored && definition.floating) || undefined} data-window-initial-state={definition.initiallyClosed ? 'closed' : undefined} data-window-sized={definition.height > 0 || undefined} hidden={definition.initiallyClosed} tabindex="-1" style={{ width: definition.width > 0 ? `min(${definition.width}px, 100%)` : undefined, height: definition.height > 0 ? `${definition.height}px` : undefined }}>
   <div class="window-titlebar">
     <span class="window-titlebar__mark" aria-hidden="true"></span>
     <span class="window-titlebar__title" title={title}>{title}</span>

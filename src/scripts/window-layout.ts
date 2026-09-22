@@ -206,9 +206,16 @@ export function registerWindow(root: HTMLElement, options: { floating?: boolean 
   if (root.closest('#main-content')) root.querySelector(':scope > .window-body')?.setAttribute('data-typewriter', '');
   const entry: Layout = {
     root, host: root.closest<HTMLElement>('gwenlium-player') || root, titlebar,
-    defaultFloating: Boolean(options.floating), maximized: false,
+    defaultFloating: Boolean(options.floating) && !root.hasAttribute('data-window-anchored'), maximized: false,
   };
   layouts.set(root, entry);
+  if (root.hasAttribute('data-window-anchored')) {
+    // Page-anchored windows never restore or acquire a viewport-floating position.
+    // They remain registered so minimize, maximize, close and restore still work.
+    rememberLayout(entry);
+    raise(entry);
+    return;
+  }
   titlebar.tabIndex = 0;
   titlebar.setAttribute('role', 'group');
   titlebar.setAttribute('aria-label', `${root.dataset.windowTitle || 'Window'} position and size`);
