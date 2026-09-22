@@ -17,11 +17,11 @@ excerpt: >-
   A blade was chosen intentionally to ease the beginning of the game for the player as this weapon plays in a classical DMC sense; light and heavy attacks including abilities. Other weapons will have their own movesets and mechanics however.
 
 
-  Let's talk about her striking design! The weapon carries the element lightning which is green in this game, thus her outfit conveys this element. Inspiration was taken from 2B from NieR: Automata which I really liked back when I played it the first time; an open airy outfit that is also revealing to some degree. This was intentional to make her look badass and confident with the blade and she zippzzz through enemies!
+  Let's talk about her striking design! The weapon carries the element lightning which is green in this game, thus her outfit conveys this element. Inspiration was taken from 2B from NieR: Automata which I really liked back when I played it the first time; an open airy outfit that is also revealing to some degree. This was intentional to make her look badass and confident with the blade and she zippzzz through enemies! The weapon design was inspired by Xenoblade 1' Monado, mixed with the iconic design of the Master Sword from Zelda, though it has a very computerly design as well to tell the player again that they are in a computer world.
 tags: []
 featured: true
 cover: /media/image-preview-1a7c10d2e8c0a44e3a179381965eae7e.webp
-coverAlt: Lyn's character model with long dark green hair and a green outfit, standing with her arms extended.
+coverAlt: ""
 photos:
   - /media/image-preview-891a687ae6e4c6741a1466a36f858714.webp
   - /media/image-preview-7b8b096f8ca8ce125291cf3c85032e8b.webp
