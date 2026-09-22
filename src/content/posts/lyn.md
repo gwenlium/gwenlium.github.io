@@ -21,7 +21,7 @@ excerpt: >-
 tags: []
 featured: true
 cover: /media/image-preview-1a7c10d2e8c0a44e3a179381965eae7e.webp
-coverAlt: ""
+coverAlt: Lyn's character model with long dark green hair and a green outfit, standing with her arms extended.
 photos:
   - /media/image-preview-891a687ae6e4c6741a1466a36f858714.webp
   - /media/image-preview-7b8b096f8ca8ce125291cf3c85032e8b.webp
