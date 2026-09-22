@@ -45,6 +45,7 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
           loading={eager ? 'eager' : 'lazy'}
           fetchpriority={eager ? 'high' : 'auto'}
           decoding="async"
+          draggable="false"
           data-zoom
           data-full-src={image?.src || src}
           data-zoom-caption={caption}
@@ -56,6 +57,8 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
           src={src}
           poster={poster || undefined}
           controls
+          controlslist="nodownload"
+          draggable="false"
           playsinline
           preload="none"
           loop={loop}

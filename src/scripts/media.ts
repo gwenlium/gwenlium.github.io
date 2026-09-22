@@ -52,11 +52,13 @@ function openLightbox(trigger: HTMLElement, source: string, kind: 'image' | 'vid
 
   const media = document.createElement(kind === 'video' ? 'video' : 'img');
   media.src = source;
+  media.draggable = false;
   if (media instanceof HTMLImageElement) {
     media.alt = alt;
     media.decoding = 'async';
   } else {
     media.controls = true;
+    media.setAttribute('controlslist', 'nodownload');
     media.playsInline = true;
     media.preload = 'metadata';
     media.poster = poster;
@@ -124,6 +126,13 @@ function initializeMedia() {
     style.textContent = interactionStyles;
     document.head.append(style);
   }
+  // Keep text/link menus and selection usable; this is not copy protection.
+  const preventMediaSave = (event: Event) => {
+    if (event.target instanceof Element && event.target.closest('img, video, [data-media-zoom]')) event.preventDefault();
+  };
+  document.addEventListener('contextmenu', preventMediaSave, { signal });
+  document.addEventListener('dragstart', preventMediaSave, { signal });
+
 
   document.querySelectorAll<HTMLImageElement>('img[data-zoom]').forEach((image) => {
     // Authored links are navigation, not lightbox controls.

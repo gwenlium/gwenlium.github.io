@@ -120,6 +120,9 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--accent-ink); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 :target { scroll-margin-top: 1.5rem; }
 img, video { display: block; max-width: 100%; height: auto; }
+/* Saving deterrents only; rendered media can still be captured by the visitor. */
+img, video, [data-media-zoom] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+img, video { -webkit-user-drag: none; }
 audio { max-width: 100%; }
 svg { flex-shrink: 0; vertical-align: middle; }
 figure { margin: 0; }
