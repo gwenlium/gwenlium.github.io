@@ -6,6 +6,12 @@
       "width": 1600,
       "height": 1067
     },
+    "/media/image-preview-1a7c10d2e8c0a44e3a179381965eae7e.webp": {
+      "sha256": "1a7c10d2e8c0a44e3a179381965eae7e84a312f410b0b930152120c86e42f6e6",
+      "kind": "image",
+      "width": 1600,
+      "height": 1600
+    },
     "/media/image-preview-25fd6541d00bfa06d8ab245434545113.webp": {
       "sha256": "25fd6541d00bfa06d8ab245434545113e35ac379ca6fea859f7e86c0e56ff3b6",
       "kind": "image",
