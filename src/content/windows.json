@@ -137,6 +137,23 @@
       "limit": 0
     },
     {
+      "id": "post-media",
+      "page": "post",
+      "title": "Pictures & media",
+      "enabled": true,
+      "tone": "lavender",
+      "floating": false,
+      "initiallyClosed": false,
+      "width": 0,
+      "height": 0,
+      "content": "default",
+      "body": "",
+      "media": [],
+      "links": [],
+      "items": [],
+      "limit": 0
+    },
+    {
       "id": "post-related",
       "page": "post",
       "title": "related entries",

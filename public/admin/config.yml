@@ -65,8 +65,8 @@ collections:
         widget: text
         required: false
         default: ""
-        hint: Write the summary used in cards, metadata and RSS. Leave empty to omit it; no summary is
-          generated.
+        hint: Write a short introduction for cards, metadata and RSS. Put the full post in Article
+          below. Leave empty to omit it; no summary is generated.
       - name: tags
         label: Projects & topics
         widget: list
@@ -102,10 +102,10 @@ collections:
         widget: markdown
         required: false
         default: ""
-        hint: Use the Image control in the rich-text editor to insert pictures where they belong in the
-          article. Put a picture on its own line to keep it visible beside the following dialogue
-          passages until the next picture or heading. Pictures and GIFs are processed locally. Add
-          audio or video in the media fields below. Saved content is public on GitHub, including drafts.
+        hint: Write the full post here; paragraphs become dialogue steps. Pictures appear in the
+          separate Pictures & media window. Put a picture on its own line before the passages it
+          accompanies; it stays selected until the next picture or heading. Use Photo gallery below
+          for pictures readers can browse independently. Saved content is public on GitHub, including drafts.
         editor_components:
           - image
       - name: photos
@@ -119,9 +119,9 @@ collections:
             multiple: true
             kinds:
               - image
-        hint: Select several pictures together, prepare and upload them, then insert the selection. Drag
-          pictures to reorder them. Use Pictures, video & audio below for individual descriptions
-          and captions.
+        hint: Select several pictures together, prepare and upload them, then insert the selection.
+          These appear in the separate Pictures & media window. Drag pictures to reorder them.
+          Use Pictures, video & audio below for individual descriptions and captions.
       - name: media
         label: Pictures, video & audio
         widget: list
@@ -234,8 +234,8 @@ collections:
         widget: text
         required: false
         default: ""
-        hint: Write the summary used in cards, metadata and RSS. Leave empty to omit it; no summary is
-          generated.
+        hint: Write a short introduction for cards, metadata and RSS. Put the full post in Article
+          below. Leave empty to omit it; no summary is generated.
       - name: tags
         label: Topics
         widget: list
@@ -271,10 +271,10 @@ collections:
         widget: markdown
         required: false
         default: ""
-        hint: Use the Image control in the rich-text editor to insert pictures where they belong in the
-          article. Put a picture on its own line to keep it visible beside the following dialogue
-          passages until the next picture or heading. Pictures and GIFs are processed locally. Add
-          audio or video in the media fields below. Saved content is public on GitHub, including drafts.
+        hint: Write the full post here; paragraphs become dialogue steps. Pictures appear in the
+          separate Pictures & media window. Put a picture on its own line before the passages it
+          accompanies; it stays selected until the next picture or heading. Use Photo gallery below
+          for pictures readers can browse independently. Saved content is public on GitHub, including drafts.
         editor_components:
           - image
       - name: photos
@@ -288,9 +288,9 @@ collections:
             multiple: true
             kinds:
               - image
-        hint: Select several pictures together, prepare and upload them, then insert the selection. Drag
-          pictures to reorder them. Use Pictures, video & audio below for individual descriptions
-          and captions.
+        hint: Select several pictures together, prepare and upload them, then insert the selection.
+          These appear in the separate Pictures & media window. Drag pictures to reorder them.
+          Use Pictures, video & audio below for individual descriptions and captions.
       - name: media
         label: Pictures, video & audio
         widget: list

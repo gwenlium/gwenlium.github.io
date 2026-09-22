@@ -1,18 +1,41 @@
 import type { TypewriterRevealDetail } from './typewriter';
 import { animateWindow, cancelWindowAnimation } from './window-motion';
 import { playInterfaceSound } from './interface-audio';
+import { initializeEntryMedia } from './entry-media';
 
 type Reader = { setEnabled: (enabled: boolean) => void; content: HTMLElement; leave: () => void; dispose: () => void };
-type Chunk = { blocks: HTMLElement[]; scene?: HTMLElement[] };
+type Chunk = { blocks: HTMLElement[]; scene?: HTMLElement[]; mediaId?: string };
 
 const readers = new Map<HTMLElement, Reader>();
 const lifetime = new AbortController();
 const listenerOptions = { signal: lifetime.signal };
+const pairedDesktop = window.matchMedia('(min-width: 1000px)');
 
 function fragmentTarget(hash = location.hash): HTMLElement | null {
   if (!hash) return null;
   try { return document.getElementById(decodeURIComponent(hash.slice(1))); }
   catch { return null; }
+}
+
+function scrollReaderTarget(root: HTMLElement, target: HTMLElement, block: 'start' | 'nearest' = 'start') {
+  if (!root.dataset.dialogueMedia || !pairedDesktop.matches) {
+    target.scrollIntoView({ block, behavior: 'instant' });
+    return;
+  }
+  // Scroll only the target's window, including after either companion is portaled.
+  // Titlebar controls already stay visible; scrolling their ancestors moves the desktop.
+  const body = target.closest<HTMLElement>('.window-body');
+  if (!body) return;
+  const bounds = body.getBoundingClientRect();
+  const targetBounds = target.getBoundingClientRect();
+  const padding = getComputedStyle(body);
+  const margin = getComputedStyle(target);
+  const top = targetBounds.top - bounds.top - body.clientTop
+    - (parseFloat(padding.scrollPaddingTop) || 0) - (parseFloat(margin.scrollMarginTop) || 0);
+  const bottom = targetBounds.bottom - bounds.top - body.clientTop - body.clientHeight
+    + (parseFloat(padding.scrollPaddingBottom) || 0) + (parseFloat(margin.scrollMarginBottom) || 0);
+  const offset = block === 'start' || top < 0 ? top : Math.max(0, bottom);
+  if (offset) body.scrollBy({ top: offset, behavior: 'instant' });
 }
 
 function isIllustration(block: HTMLElement): boolean {
@@ -36,19 +59,30 @@ function collectChunks(sources: HTMLElement[]): Chunk[] {
   const chunks: Chunk[] = [];
   let headings: HTMLElement[] = [];
   let scene: HTMLElement[] | undefined;
+  let mediaId: string | undefined;
   for (const block of blocks) {
-    if (block.matches('h1, h2, h3, h4, h5, h6')) {
-      headings.push(block);
+    const isHeading = block.matches('h1, h2, h3, h4, h5, h6');
+    if (isHeading) {
       scene = undefined;
+      mediaId = undefined;
+    }
+    if (block.hasAttribute('data-entry-media-ref')) mediaId = block.dataset.entryMediaRef || undefined;
+    for (const marker of block.querySelectorAll<HTMLElement>('[data-entry-media-ref]')) {
+      mediaId = marker.dataset.entryMediaRef || undefined;
+    }
+    if (block.hasAttribute('data-entry-media-only')) continue;
+    if (isHeading) {
+      headings.push(block);
     } else if (block.matches('figcaption') && !headings.length && chunks.length) {
       const previous = chunks[chunks.length - 1];
       previous.blocks.push(block);
+      previous.mediaId = mediaId;
       if (previous.scene && previous.blocks.includes(previous.scene[0])) previous.scene.push(block);
     } else {
       // A standalone picture establishes the scene; mixed text/media stays one authored passage.
       if (isIllustration(block)) scene = [block];
       else if (block.querySelector('img, video, audio, iframe')) scene = undefined;
-      chunks.push({ blocks: [...headings, block], scene });
+      chunks.push({ blocks: [...headings, block], scene, mediaId });
       headings = [];
     }
   }
@@ -72,6 +106,7 @@ function createReader(root: HTMLElement): Reader | undefined {
   const nextLabel = next?.querySelector<HTMLElement>('[data-dialogue-next-label]');
   const progress = root.querySelector<HTMLElement>('[data-dialogue-progress]');
   if (!option || !enter || !heading || !exit || !content || !controls || !back || !next || !nextLabel || !progress) return;
+  const viewerId = root.dataset.dialogueMedia;
   const sources = Array.from(content.querySelectorAll<HTMLElement>('[data-dialogue-blocks]'));
   const chunks = collectChunks(sources);
   if (chunks.length <= 1) {
@@ -88,6 +123,14 @@ function createReader(root: HTMLElement): Reader | undefined {
   let index = 0;
   let finishMotion: Promise<boolean> | undefined;
   let scene: HTMLElement[] | undefined;
+  let mediaId: string | undefined;
+
+  function publishMediaScene(active: boolean, itemId?: string) {
+    if (!viewerId) return;
+    document.dispatchEvent(new CustomEvent('gwenlium:entry-media-scene', {
+      detail: { viewerId, itemId, active },
+    }));
+  }
 
   function restoreBlocks() {
     for (const block of hiddenBlocks) {
@@ -108,6 +151,8 @@ function createReader(root: HTMLElement): Reader | undefined {
     const chunk = chunks[position];
     const visibleBlocks = chunk.scene ? Array.from(new Set([...chunk.scene, ...chunk.blocks])) : chunk.blocks;
     const sceneChanged = scene !== chunk.scene;
+    const mediaChanged = !active || mediaId !== chunk.mediaId;
+    mediaId = chunk.mediaId;
     if (sceneChanged) {
       if (scene) delete scene[0].dataset.dialogueScene;
       scene = chunk.scene;
@@ -130,13 +175,14 @@ function createReader(root: HTMLElement): Reader | undefined {
     content!.querySelectorAll<HTMLMediaElement>('video, audio').forEach(media => {
       if (media.closest('[data-dialogue-hidden]')) media.pause();
     });
+    if (mediaChanged) publishMediaScene(true, mediaId);
     const last = index === chunks.length - 1;
     back!.disabled = index === 0;
     nextLabel!.textContent = last ? 'Finish' : 'Continue';
     next!.toggleAttribute('data-dialogue-finish', last);
     progress!.textContent = `${index + 1} of ${chunks.length}`;
     if (focusNext || (document.activeElement === back && back!.disabled)) next!.focus({ preventScroll: true });
-    if (scroll) root.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) scrollReaderTarget(root, root);
     content!.dispatchEvent(new CustomEvent<TypewriterRevealDetail>('gwenlium:typewriter-reveal', {
       bubbles: true, detail: { blocks: sceneChanged ? visibleBlocks : chunk.blocks },
     }));
@@ -148,6 +194,8 @@ function createReader(root: HTMLElement): Reader | undefined {
     root.inert = false;
     if (scene) delete scene[0].dataset.dialogueScene;
     scene = undefined;
+    mediaId = undefined;
+    publishMediaScene(false);
     if (!active) return;
     active = false;
     restoreBlocks();
@@ -158,7 +206,7 @@ function createReader(root: HTMLElement): Reader | undefined {
     if (focus) {
       option!.hidden = false;
       enter!.focus({ preventScroll: true });
-      option!.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+      scrollReaderTarget(root, option!, 'nearest');
     }
   }
 
@@ -177,7 +225,8 @@ function createReader(root: HTMLElement): Reader | undefined {
 
   enter.addEventListener('click', () => {
     const target = fragmentTarget();
-    const linkedChunk = target ? chunks.findIndex(chunk => chunk.blocks.some(block => block.contains(target))) : -1;
+    const linkedChunk = target ? chunks.findIndex(chunk => chunk.blocks.some(block => block.contains(target))
+      || (chunk.mediaId && document.getElementById(chunk.mediaId)?.contains(target))) : -1;
     showChunk(Math.max(0, linkedChunk), true);
   }, { signal });
   back.addEventListener('click', () => { if (active && index > 0) showChunk(index - 1); }, { signal });
@@ -211,14 +260,17 @@ function createReader(root: HTMLElement): Reader | undefined {
 
 function revealFragment(target: HTMLElement | null, scroll = false) {
   if (!target) return;
-  for (const reader of readers.values()) {
-    if (!reader.content.contains(target)) continue;
+  for (const [root, reader] of readers) {
+    const viewerId = root.dataset.dialogueMedia;
+    const viewer = viewerId ? document.getElementById(viewerId) : null;
+    if (!reader.content.contains(target) && !viewer?.contains(target)) continue;
     reader.leave();
-    if (scroll) target.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) scrollReaderTarget(root, target);
   }
 }
 
 function initializeReaders() {
+  initializeEntryMedia();
   const enabled = document.documentElement.dataset.dialogue === 'on' || new URLSearchParams(location.search).get('dialogue') === '1';
   for (const [root, reader] of readers) {
     if (!root.isConnected) { reader.dispose(); readers.delete(root); }

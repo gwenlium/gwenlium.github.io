@@ -3,7 +3,7 @@ import { render } from 'astro:content';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 import Icon from '../components/Icon.astro';
-import Media from '../components/Media.astro';
+import EntryMedia from '../components/EntryMedia.astro';
 import { getPosts, postUrl, formatDate, type Post } from '../lib/content';
 import { hasWindowOverride } from '../lib/windows';
 
@@ -18,6 +18,12 @@ const related = (await getPosts(post.data.section))
   .sort((a, b) => b.sharedTags - a.sharedTags)
   .slice(0, 3);
 const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').href;
+const mediaItems = [
+  ...(post.data.cover ? [{ src: post.data.cover, type: 'image' as const, alt: post.data.coverAlt, eager: true }] : []),
+  ...post.data.photos.map(src => ({ src, type: 'image' as const, alt: '' })),
+  ...post.data.media,
+];
+const hasEntryMedia = mediaItems.length > 0 || /!\[|<(?:img|video|audio|iframe)\b/i.test(post.rendered?.html ?? post.body ?? '') || hasWindowOverride('post-media');
 ---
 
 <SiteLayout title={post.data.title} description={post.data.excerpt} image={post.data.cover} imageAlt={post.data.coverAlt} article>
@@ -25,7 +31,7 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
   <div class="article-layout">
     <div class="article-main">
       <div class="article-window">
-    <Window windowId="post-entry">
+    <Window windowId="post-entry" class="entry-text-window">
       <div slot="titlebar-actions" class="dialogue-option" data-dialogue-option hidden>
         <button class="button button-secondary" type="button" data-dialogue-enter aria-controls="entry-content" title="Read one block at a time">Dialogue mode</button>
       </div>
@@ -33,23 +39,20 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
         <header class="entry-header">
           <p class="eyebrow"><time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time></p>
           <h1>{post.data.title}</h1>
-          {post.data.excerpt && <p class="entry-excerpt">{post.data.excerpt}</p>}
           {post.data.tags.length > 0 && <ul class="entry-tags" aria-label="Tags">{post.data.tags.map((tag) => <li><a class="tag" href={`/${post.data.section}/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>)}</ul>}
         </header>
-        {post.data.cover && <div class="entry-cover"><Media src={post.data.cover} alt={post.data.coverAlt} eager /></div>}
         {contents.length >= 2 && <nav class="contents" aria-label="On this page">
           <h2>On this page</h2>
           <ol>{contents.map((heading) => <li class:list={{ nested: heading.depth === 3 }}><a href={`#${heading.slug}`}>{heading.text}</a></li>)}</ol>
         </nav>}
-        <div class="dialogue-reader" data-dialogue-reader>
+        <div class="dialogue-reader" data-dialogue-reader data-dialogue-media={hasEntryMedia ? 'entry-media-viewer' : undefined}>
           <div class="dialogue-heading" data-dialogue-heading hidden>
             <span class="eyebrow">Dialogue mode</span>
             <button class="button button-secondary" type="button" data-dialogue-exit>Read full post</button>
           </div>
           <div id="entry-content" data-dialogue-content>
+            {post.data.excerpt && <div class="entry-summary" data-dialogue-blocks>{post.data.excerpt.split(/\n\s*\n/).map(paragraph => <p class="entry-excerpt">{paragraph}</p>)}</div>}
             <div class="prose entry-body" data-dialogue-blocks><Content /></div>
-            {post.data.photos.length > 0 && <div class="entry-media" data-dialogue-blocks>{post.data.photos.map(src => <Media src={src} alt="" />)}</div>}
-            {post.data.media.length > 0 && <div class="entry-media" data-dialogue-blocks>{post.data.media.map((media) => <Media {...media} />)}</div>}
           </div>
           <nav class="dialogue-controls" aria-label="Dialogue reading" data-dialogue-controls hidden>
             <button class="button button-secondary" type="button" data-dialogue-back disabled>Back</button>
@@ -72,7 +75,13 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
     </nav>}
     </div>
 
-    {(related.length > 0 || hasWindowOverride('post-related')) && <div class="article-companion"><Window windowId="post-related">
+    {hasEntryMedia && <div class="article-media-slot">
+      <Window windowId="post-media" class="entry-media-window">
+        <EntryMedia id="entry-media-viewer" sourceId="entry-content" items={mediaItems} />
+      </Window>
+    </div>}
+
+    {(related.length > 0 || hasWindowOverride('post-related')) && <div class="article-related-slot"><Window windowId="post-related">
       <nav aria-label="Related entries"><ul class="related-list">{related.map(({ candidate }) => <li><a href={postUrl(candidate)}>{candidate.data.title}</a><time datetime={candidate.data.date.toISOString().slice(0, 10)}>{formatDate(candidate.data.date)}</time></li>)}</ul></nav>
     </Window></div>}
   </div>
@@ -116,22 +125,19 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
   .back-link { display: inline-flex; align-items: center; gap: .65rem; font-size: .75rem; margin: 0 0 1.5rem; text-underline-offset: .25em; }
   .article-layout { display: grid; align-items: start; gap: 1.5rem; max-width: 60rem; margin-inline: auto; }
   .article-main { display: grid; gap: 1.5rem; min-width: 0; }
-  .article-window, .article-companion { min-width: 0; }
-  .article-window:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))), .article-companion:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))) { display: none; }
+  .article-window, .article-media-slot, .article-related-slot { min-width: 0; }
+  .article-window:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))), .article-media-slot:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))), .article-related-slot:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))) { display: none; }
   .entry { max-width: 48rem; margin: 0 auto; padding: clamp(.25rem, 2cqi, 1.5rem); }
   .entry-header { margin-bottom: clamp(1.25rem, 4cqi, 2rem); }
   .entry-header h1 { font-size: clamp(1.5rem, 1.1rem + 2.5cqi, 2.4rem); line-height: 1.4; overflow-wrap: anywhere; margin: .8rem 0 1.2rem; }
-  .entry-excerpt { font-family: var(--font-reading); font-size: clamp(1rem, .9rem + .5cqi, 1.15rem); line-height: 1.8; color: var(--muted); }
+  .entry-excerpt { font-family: var(--font-reading); font-size: clamp(.95rem, .9rem + .3cqi, 1.05rem); line-height: 1.8; color: var(--muted); white-space: pre-line; }
   .entry-tags { display: flex; flex-wrap: wrap; gap: .5rem; padding: 0; margin: 1.5rem 0 0; list-style: none; }
-  .entry-cover { margin: 0 0 clamp(1.25rem, 4cqi, 2rem); }
-  .entry-cover :global(figure) { margin: 0; }
   .contents { padding: clamp(.75rem, 3cqi, 1.25rem) clamp(.75rem, 3cqi, 1.5rem); margin: clamp(1.25rem, 4cqi, 2rem) 0; background: var(--page-bg); border: 1px solid var(--line); box-shadow: inset 1px 1px 2px rgb(0 0 0 / .05); }
   .contents h2 { font-size: .8rem; margin: 0 0 .8rem; }
   .contents ol { padding-left: 1.2rem; margin: 0; font-family: var(--font-reading); font-size: .95rem; line-height: 1.9; }
   .contents .nested { margin-left: 1rem; }
   .contents a { overflow-wrap: anywhere; text-underline-offset: .2em; }
   .entry-body :global(h2), .entry-body :global(h3) { scroll-margin-top: 2rem; }
-  .entry-media { display: grid; gap: clamp(.75rem, 3cqi, 1.5rem); margin-top: clamp(1.25rem, 4cqi, 2rem); }
   .dialogue-option button { min-height: 24px; padding: .25rem .4rem; font-size: .6rem; white-space: nowrap; }
   .dialogue-option[hidden], .dialogue-heading[hidden], .dialogue-controls[hidden], .dialogue-reader :global([data-dialogue-hidden]) { display: none !important; }
   .dialogue-reader[data-dialogue-active] { border: 2px solid var(--line); background: var(--surface); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
@@ -140,7 +146,6 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
   .dialogue-heading button, .dialogue-controls button { min-height: 2.5rem; font-size: .7rem; }
   .dialogue-reader[data-dialogue-active] [data-dialogue-content] { padding: clamp(.5rem, 3cqi, 1.5rem); min-height: 8rem; }
   .dialogue-reader[data-dialogue-active] .entry-body > :global(:first-child) { margin-top: 0; }
-  .dialogue-reader[data-dialogue-active] .entry-media { margin-top: 0; }
   .dialogue-controls { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: .75rem; border-top: 1px solid var(--line); background: var(--surface-raised); }
   .dialogue-progress { flex: 1; text-align: center; font-family: var(--font-reading); font-size: .9rem; color: var(--muted); }
   .dialogue-controls button:disabled { cursor: default; opacity: .5; }
@@ -153,8 +158,12 @@ const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').hr
   }
   @media screen and (min-width: 1000px) {
     .article-layout { max-width: 54rem; }
-    .article-layout:has(> .article-companion :global(:is([data-desktop-window], [data-window-placeholder]))) { grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem); gap: clamp(1.5rem, 3vw, 2.5rem); max-width: 74rem; }
-    .article-companion { margin-top: 5rem; }
+    .article-layout:has(> .article-media-slot :global(:is([data-desktop-window], [data-window-placeholder]))) { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1.5rem; max-width: 74rem; }
+    .article-related-slot { grid-column: 1 / -1; width: min(100%, 54rem); margin-inline: auto; }
+    :global(.entry-text-window), :global(.entry-media-window) { display: flex; flex-direction: column; height: clamp(26rem, calc(100dvh - var(--workspace-top) - var(--workspace-bottom) - 4rem), 48rem); min-height: 0; overflow: hidden; }
+    :global(.entry-text-window > .window-titlebar), :global(.entry-media-window > .window-titlebar) { flex-shrink: 0; }
+    :global(.entry-text-window > .window-body), :global(.entry-media-window > .window-body) { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+    .entry { padding: .4rem; }
   }
   @media print {
     :global(#post-entry) { display: block !important; position: static !important; width: auto !important; height: auto !important; max-height: none !important; overflow: visible !important; transform: none !important; break-inside: auto; }

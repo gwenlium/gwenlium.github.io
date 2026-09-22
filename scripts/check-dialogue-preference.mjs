@@ -9,6 +9,7 @@ class Node {
     if (force) this.attributes.add(name); else this.attributes.delete(name);
     return force;
   }
+  hasAttribute(name) { return this.attributes.has(name); }
   addEventListener(type, callback) { this.events.set(type, [...(this.events.get(type) || []), callback]); }
   dispatchEvent(event) { for (const callback of this.events.get(event.type) || []) callback(event); return true; }
   querySelector(selector) { return this.nodes[selector] ?? null; }
@@ -55,6 +56,7 @@ const sandbox = { document, window, localStorage, exports: {}, HTMLElement: Node
 sandbox.require = (name) => {
   if (name === './window-motion') return { cancelWindowAnimation() {}, async animateWindow() { return true; } };
   if (name === './interface-audio') return { playInterfaceSound() {} };
+  if (name === './entry-media') return { initializeEntryMedia() {} };
   throw new Error(`Unexpected module: ${name}`);
 };
 vm.createContext(sandbox);
@@ -102,4 +104,34 @@ assert(paragraphs.every(node => !node.hidden), 'same-page fragment history still
 localStorage.setItem = () => { throw new Error('storage blocked'); };
 toggle.checked = false; document.dispatchEvent({ type: 'change', target: toggle });
 assert(paragraphs.every(node => !node.hidden));
+// Relocated pictures select their companion scene without becoming empty dialogue steps.
+document.dispatchEvent({ type: 'astro:before-swap', newDocument: nextDocument });
+const firstScene = new Node(); const secondScene = new Node();
+for (const [marker, id] of [[firstScene, 'picture-one'], [secondScene, 'picture-two']]) {
+  marker.attributes.add('data-entry-media-ref');
+  marker.attributes.add('data-entry-media-only');
+  marker.dataset.entryMediaRef = id;
+}
+source.children = [firstScene, paragraphs[0], paragraphs[1], secondScene, paragraphs[2]];
+root.dataset.dialogueMedia = 'entry-media-viewer';
+const scenes = [];
+document.addEventListener('gwenlium:entry-media-scene', event => scenes.push(event.detail));
+storage.set('gwenlium:preferences', JSON.stringify({ dialogue: 'on' }));
+window.dispatchEvent({ type: 'storage', key: 'gwenlium:preferences' });
+document.dispatchEvent({ type: 'astro:page-load' });
+assert.equal(root.nodes['[data-dialogue-progress]'].textContent, '1 of 3');
+assert.deepEqual(paragraphs.map(node => node.hidden), [false, true, true]);
+assert.equal(scenes.at(-1).itemId, 'picture-one');
+root.nodes['[data-dialogue-next]'].dispatchEvent({ type: 'click' });
+assert.deepEqual(paragraphs.map(node => node.hidden), [true, false, true]);
+assert.equal(scenes.at(-1).itemId, 'picture-one');
+root.nodes['[data-dialogue-next]'].dispatchEvent({ type: 'click' });
+assert.deepEqual(paragraphs.map(node => node.hidden), [true, true, false]);
+assert.equal(scenes.at(-1).itemId, 'picture-two');
+root.nodes['[data-dialogue-back]'].dispatchEvent({ type: 'click' });
+assert.deepEqual(paragraphs.map(node => node.hidden), [true, false, true]);
+assert.equal(scenes.at(-1).itemId, 'picture-one');
+document.dispatchEvent({ type: 'astro:before-swap', newDocument: nextDocument });
+assert(paragraphs.every(node => !node.hidden));
+assert.equal(scenes.at(-1).active, false);
 console.log('Global dialogue preference verified: live toggle, saved state, navigation, cross-tab sync, no scroll jump, and blocked storage.');

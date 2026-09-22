@@ -20,7 +20,7 @@ try {
   originals.set(windowsFile, windowsRaw);
   const windows = JSON.parse(windowsRaw);
   for (const window of windows.windows) {
-    if (['home-intro', 'about-bio', 'post-entry', 'subscribe-rss', 'not-found'].includes(window.id)) {
+    if (['home-intro', 'about-bio', 'post-entry', 'post-media', 'subscribe-rss', 'not-found'].includes(window.id)) {
       window.enabled = true;
       window.content = 'default';
     }
@@ -55,7 +55,8 @@ try {
   execFileSync('npm', ['run', 'build'], { stdio: 'pipe' });
   if (photo) {
     const post = load(fs.readFileSync(`dist/devlog/${fixtureSlug}/index.html`, 'utf8'));
-    assert.equal(post('.entry-media img').length, 2);
+    assert.equal(post('#post-media img').length, 2);
+    assert.equal(post('#post-entry img').length, 0, 'Entry gallery pictures belong in the companion window, not the text window');
     assert(fs.readFileSync('dist/rss.xml', 'utf8').includes(photo));
   }
   for (const page of pages) {

@@ -12,6 +12,7 @@ export const builtinWindowPages = {
   'life-search': 'life',
   'life-entries': 'life',
   'post-entry': 'post',
+  'post-media': 'post',
   'post-related': 'post',
   'game-details': 'devlog',
   'game-trailer': 'devlog',
