@@ -42,6 +42,12 @@
       "width": 1600,
       "height": 1600
     },
+    "/media/image-preview-f59e14f6aa4cb235316eaa53e60f6749.webp": {
+      "sha256": "f59e14f6aa4cb235316eaa53e60f6749d848c5a63211fda07cd7275946c6a433",
+      "kind": "image",
+      "width": 1600,
+      "height": 1600
+    },
     "/media/proto-recompute-preview-380740e424d86df73096a30fd6ba8cde.webp": {
       "sha256": "f96994d71b996e609f4fe6eef22f57962c261a051a2b8dacf062d82215f4bee4",
       "kind": "image",
