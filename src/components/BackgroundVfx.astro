@@ -29,6 +29,7 @@
   }
 
   canvas { position: relative; display: block; width: 100%; height: 100%; opacity: .72; }
+  :global([data-background-active='weave']) .background-vfx::before { inset: 0; transform: none; background: var(--page-bg); }
 
   :global([data-background-active='off']) .background-vfx { display: none; }
   @media (forced-colors: active) { .background-vfx { display: none; } }

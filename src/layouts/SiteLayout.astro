@@ -51,15 +51,24 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
           const value = JSON.parse(localStorage.getItem('gwenlium:preferences') || '{}');
           if (value && typeof value === 'object') saved = value;
         } catch {}
+        if (saved.background === 'rain') {
+          saved.background = 'weave';
+          try { localStorage.setItem('gwenlium:preferences', JSON.stringify(saved)); } catch {}
+        }
+        try {
+          if (localStorage.getItem('gwenlium:background:last-auto') === 'rain') {
+            localStorage.setItem('gwenlium:background:last-auto', 'weave');
+          }
+        } catch {}
         const theme = ['light', 'dark', 'system'].includes(saved.theme) ? saved.theme : 'system';
         const motion = ['full', 'reduced', 'system'].includes(saved.motion) ? saved.motion : 'system';
         const reading = saved.reading === 'readable' ? 'readable' : 'pixel';
         const root = document.documentElement;
         root.dataset.dialogue = saved.dialogue === 'on' ? 'on' : 'off';
-        const backgrounds = { auto: true, dots: true, polygons: true, circuits: true, checker: true, wave: true, stars: true, rain: true, off: true };
+        const backgrounds = { auto: true, dots: true, polygons: true, circuits: true, checker: true, wave: true, stars: true, weave: true, off: true };
         const background = typeof saved.background === 'string' && Object.hasOwn(backgrounds, saved.background) ? saved.background : 'auto';
         if (!root.dataset.backgroundAuto) {
-          const presets = ['dots', 'polygons', 'circuits', 'checker', 'wave', 'stars', 'rain'];
+          const presets = ['dots', 'polygons', 'circuits', 'checker', 'wave', 'stars', 'weave'];
           let previous = -1;
           try { previous = presets.indexOf(localStorage.getItem('gwenlium:background:last-auto')); } catch {}
           const choice = previous < 0 ? Math.floor(Math.random() * presets.length) : (previous + 1 + Math.floor(Math.random() * (presets.length - 1))) % presets.length;
@@ -185,10 +194,10 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
             <label><input type="radio" name="background" value="checker" data-preference="background" />Checker</label>
             <label><input type="radio" name="background" value="wave" data-preference="background" />Wave mesh</label>
             <label><input type="radio" name="background" value="stars" data-preference="background" />Pixel stars</label>
-            <label><input type="radio" name="background" value="rain" data-preference="background" />Pixel rain</label>
+            <label><input type="radio" name="background" value="weave" data-preference="background" />Desktop weave</label>
             <label><input type="radio" name="background" value="off" data-preference="background" />Off</label>
           </div>
-          <p id="background-preference-help">Auto changes the pattern on each new visit. Reduced motion keeps it still.</p>
+          <p id="background-preference-help">Auto changes the pattern on each new visit. Desktop weave is stationary; reduced motion keeps the other patterns still.</p>
         </fieldset>
           </details>
         </section>

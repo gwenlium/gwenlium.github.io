@@ -1,8 +1,8 @@
-type BackgroundMode = 'dots' | 'polygons' | 'circuits' | 'checker' | 'wave' | 'stars' | 'rain' | 'off';
+type BackgroundMode = 'dots' | 'polygons' | 'circuits' | 'checker' | 'wave' | 'stars' | 'weave' | 'off';
 type Circuit = { points: Float32Array; distances: Float32Array; length: number };
 
 const modes: Record<string, BackgroundMode | undefined> = {
-  dots: 'dots', polygons: 'polygons', circuits: 'circuits', checker: 'checker', wave: 'wave', stars: 'stars', rain: 'rain', off: 'off',
+  dots: 'dots', polygons: 'polygons', circuits: 'circuits', checker: 'checker', wave: 'wave', stars: 'stars', weave: 'weave', off: 'off',
 };
 const root = document.documentElement;
 const lifetime = new AbortController();
@@ -47,7 +47,7 @@ class BackgroundViewport {
   private traces = new Path2D();
   private terminals = new Path2D();
   private polygonLines = new Path2D();
-  private checker: CanvasPattern | null = null;
+  private tilePattern: CanvasPattern | null = null;
   private readonly resizeObserver: ResizeObserver;
 
   constructor(readonly canvas: HTMLCanvasElement, private readonly context: CanvasRenderingContext2D) {
@@ -85,7 +85,7 @@ class BackgroundViewport {
     this.traces = new Path2D();
     this.terminals = new Path2D();
     this.polygonLines = new Path2D();
-    this.checker = null;
+    this.tilePattern = null;
 
     if (mode === 'checker') {
       const tile = document.createElement('canvas');
@@ -112,18 +112,34 @@ class BackgroundViewport {
         ctx.shadowBlur = 0;
         ctx.globalAlpha = .35;
         ctx.stroke();
-        this.checker = this.context.createPattern(tile, 'repeat');
+        this.tilePattern = this.context.createPattern(tile, 'repeat');
       }
       return;
     }
 
-    if (mode === 'stars' || mode === 'rain') {
-      const count = mode === 'stars'
-        ? Math.min(260, Math.max(40, Math.round(width * height / 8000)))
-        : Math.min(120, Math.max(16, Math.round(width / 28)));
+    if (mode === 'weave') {
+      // A fixed 16px basket-weave tile, like a classic desktop's two-tone wallpaper.
+      const tile = document.createElement('canvas');
+      tile.width = tile.height = 16;
+      const ctx = tile.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = line;
+        ctx.globalAlpha = .16;
+        for (let offset = 0; offset < 8; offset += 3) {
+          ctx.fillRect(offset, 0, 1, 8);
+          ctx.fillRect(8 + offset, 8, 1, 8);
+          ctx.fillRect(8, offset, 8, 1);
+          ctx.fillRect(0, 8 + offset, 8, 1);
+        }
+        this.tilePattern = this.context.createPattern(tile, 'repeat');
+      }
+      return;
+    }
+
+    if (mode === 'stars') {
+      const count = Math.min(260, Math.max(40, Math.round(width * height / 8000)));
       for (let index = 0; index < count; index++) {
-        if (mode === 'stars') values.push(Math.random() * width, Math.random() * (height + 128), 1 + Math.random() * 2, Math.random() * tau);
-        else values.push((index + Math.random()) * width / count, Math.random() * (height + 192), 18 + Math.random() * 24, 4 + Math.floor(Math.random() * 6));
+        values.push(Math.random() * width, Math.random() * (height + 128), 1 + Math.random() * 2, Math.random() * tau);
       }
       this.geometry = new Float32Array(values);
       return;
@@ -227,9 +243,8 @@ class BackgroundViewport {
     else if (mode === 'circuits') this.drawCircuits(time);
     else if (mode === 'wave') this.drawWave(time);
     else if (mode === 'stars') this.drawStars(time);
-    else if (mode === 'rain') this.drawRain(time);
-    else if (this.checker) {
-      ctx.fillStyle = this.checker;
+    else if (this.tilePattern) {
+      ctx.fillStyle = this.tilePattern;
       ctx.fillRect(0, -64, this.width, this.height + 128);
     }
     ctx.restore();
@@ -273,21 +288,6 @@ class BackgroundViewport {
     }
   }
 
-  private drawRain(time: number): void {
-    const ctx = this.context;
-    const drops = this.geometry;
-    const span = this.height + 192;
-    for (let index = 0; index < drops.length; index += 4) {
-      const x = Math.round(drops[index]);
-      const y = Math.round((drops[index + 1] + time * drops[index + 2]) % span - 64);
-      const length = drops[index + 3];
-      ctx.fillStyle = index % 12 === 0 ? accent : ink;
-      for (let segment = 0; segment < length; segment++) {
-        ctx.globalAlpha = .42 * (1 - segment / length);
-        ctx.fillRect(x, y - segment * 8, 2, 4);
-      }
-    }
-  }
 
   private drawPolygons(time: number): void {
     const ctx = this.context;
@@ -410,7 +410,7 @@ const visibility = new IntersectionObserver((entries) => {
 });
 
 function canAnimate(): boolean {
-  if (document.hidden || reduced || forcedColors.matches || mode === 'off' || mode === 'checker') return false;
+  if (document.hidden || reduced || forcedColors.matches || mode === 'off' || mode === 'checker' || mode === 'weave') return false;
   for (const viewport of viewports) {
     if (viewport.visible && viewport.width && viewport.height) return true;
   }
@@ -488,7 +488,7 @@ function updateParallax(): void {
     if (scrollSource) scrollResizeObserver.observe(scrollSource);
   }
   const scrollTop = scrollSource?.scrollTop ?? 0;
-  const nextParallax = reduced || mode === 'off' || forcedColors.matches ? 0 : -Math.min(Math.max(scrollTop, 0), 1600) * .028;
+  const nextParallax = reduced || mode === 'off' || mode === 'weave' || forcedColors.matches ? 0 : -Math.min(Math.max(scrollTop, 0), 1600) * .028;
   if (nextParallax === parallaxY) return;
   parallaxY = nextParallax;
   // The soft color field moves more slowly than the pattern, without extra canvases.
@@ -516,7 +516,7 @@ function applySettings(): void {
   tint = nextTint;
   updateParallax();
   for (const viewport of viewports) {
-    if (changed || (mode === 'checker' && colorsChanged)) viewport.rebuild();
+    if (changed || ((mode === 'checker' || mode === 'weave') && colorsChanged)) viewport.rebuild();
     viewport.draw(reduced ? 18 : elapsed);
   }
   schedule();

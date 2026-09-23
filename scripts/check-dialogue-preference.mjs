@@ -49,7 +49,7 @@ for (const key of ['option', 'heading', 'exit', 'controls', 'back', 'next', 'pro
 single.nodes['[data-dialogue-option]'].nodes['[data-dialogue-enter]'] = new Node();
 single.nodes['[data-dialogue-next]'].nodes['[data-dialogue-next-label]'] = new Node();
 document.nodes['[data-dialogue-reader]'] = [root, single];
-const storage = new Map();
+const storage = new Map([['gwenlium:preferences', JSON.stringify({ background: 'rain', theme: 'dark', motion: 'full', reading: 'readable', dialogue: 'off' })]]);
 const localStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) };
 const sandbox = { document, window, localStorage, exports: {}, HTMLElement: Node, Element: Node, HTMLInputElement: Input, Text: class {}, AbortController, CustomEvent, URLSearchParams, URL, location: { hash: '', search: '', href: 'https://gwenlium.dev/about/' } };
 // These preference checks isolate window motion and sound; browser smoke checks exercise both.
@@ -66,6 +66,12 @@ function run(file) {
   vm.runInContext(`(function(){${code}\n})()`, sandbox);
 }
 run('src/scripts/preferences.ts'); run('src/scripts/dialogue-reader.ts');
+assert.equal(document.documentElement.dataset.backgroundActive, 'weave', 'retired wallpaper selections migrate to the replacement');
+const migratedPreferences = JSON.parse(storage.get('gwenlium:preferences'));
+assert.equal(migratedPreferences.background, 'weave');
+assert.equal(migratedPreferences.theme, 'dark', 'wallpaper migration preserves other preferences');
+assert.equal(migratedPreferences.motion, 'full');
+assert.equal(migratedPreferences.reading, 'readable');
 assert(paragraphs.every(node => !node.hidden));
 toggle.checked = true; document.dispatchEvent({ type: 'change', target: toggle });
 assert.equal(JSON.parse(storage.get('gwenlium:preferences')).dialogue, 'on');

@@ -40,3 +40,16 @@
 .analytics-tables table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .analytics-tables th, .analytics-tables td { padding: 8px 4px; text-align: left; border-bottom: 1px solid #dce3e8; overflow-wrap: anywhere; }
 .analytics-tables th:last-child, .analytics-tables td:last-child { text-align: right; }
+
+.admin-ordered-media { min-width: 0; }
+.admin-ordering { display: grid; gap: 10px; min-width: 0; padding: 14px; margin-bottom: 12px; border: 1px solid #cbd3dc; border-radius: 5px; background: #f5f8fa; color: #17202a; font: 14px/1.5 system-ui, sans-serif; }
+.admin-ordering label { font-weight: 600; }
+.admin-ordering select { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 8px; border: 1px solid #a6adb6; border-radius: 4px; background: white; color: inherit; font: inherit; }
+.admin-ordering-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-ordering button { min-height: 44px; padding: 8px 12px; border: 1px solid #607585; border-radius: 4px; background: #edf3f7; color: #14222e; font: inherit; cursor: pointer; }
+.admin-ordering button:hover:not(:disabled) { background: #dceaf2; }
+.admin-ordering button:disabled { opacity: .5; cursor: default; }
+.admin-ordering :is(button, select):focus-visible { outline: 3px solid #2478b3; outline-offset: 2px; }
+.admin-ordering p { margin: 0; overflow-wrap: anywhere; }
+.admin-ordering-help { color: #4c5964; font-size: 13px; }
+.admin-ordering [role='status']:empty { display: none; }

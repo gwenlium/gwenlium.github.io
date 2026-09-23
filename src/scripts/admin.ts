@@ -2,9 +2,11 @@ import CMS from 'decap-cms-app';
 import './admin-analytics';
 import { PreparedGitHubBackend } from './admin-github';
 import { previewMediaLibrary } from './admin-library';
+import { registerMediaOrdering } from './admin-ordering';
 
 CMS.registerBackend('gwenlium-github', PreparedGitHubBackend);
 CMS.registerMediaLibrary(previewMediaLibrary);
+registerMediaOrdering();
 CMS.registerEventListener({
   name: 'preSave',
   handler: ({ entry }) => {

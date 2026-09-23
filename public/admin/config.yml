@@ -111,6 +111,7 @@ collections:
       - name: photos
         label: Photo gallery (upload multiple pictures)
         widget: image
+        media_ordering: true
         required: false
         default: []
         media_library:
@@ -120,11 +121,12 @@ collections:
             kinds:
               - image
         hint: Select several pictures together, prepare and upload them, then insert the selection.
-          These appear in the separate Pictures & media window. Drag pictures to reorder them.
+          These appear after the cover in Pictures & media. Use the order controls or drag to arrange them.
           Use Pictures, video & audio below for individual descriptions and captions.
       - name: media
         label: Pictures, video & audio
         widget: list
+        media_ordering: true
         required: false
         default: []
         fields:
@@ -164,8 +166,8 @@ collections:
               published; the original stays on your device.
         collapsed: true
         label_singular: Picture, video or audio
-        hint: Add as many items as you like. Each item has its own description and caption. Drag items to
-          change their order.
+        hint: Add as many items as you like. Each item keeps its description and caption when sorted or
+          moved with the order controls or drag handles. Save the entry to publish the order.
     label_singular: Devlog post
     description: Games, code and creative projects. Use project tags to group updates about the same project.
     filter:
@@ -280,6 +282,7 @@ collections:
       - name: photos
         label: Photo gallery (upload multiple pictures)
         widget: image
+        media_ordering: true
         required: false
         default: []
         media_library:
@@ -289,11 +292,12 @@ collections:
             kinds:
               - image
         hint: Select several pictures together, prepare and upload them, then insert the selection.
-          These appear in the separate Pictures & media window. Drag pictures to reorder them.
+          These appear after the cover in Pictures & media. Use the order controls or drag to arrange them.
           Use Pictures, video & audio below for individual descriptions and captions.
       - name: media
         label: Pictures, video & audio
         widget: list
+        media_ordering: true
         required: false
         default: []
         fields:
@@ -333,8 +337,8 @@ collections:
               published; the original stays on your device.
         collapsed: true
         label_singular: Picture, video or audio
-        hint: Add as many items as you like. Each item has its own description and caption. Drag items to
-          change their order.
+        hint: Add as many items as you like. Each item keeps its description and caption when sorted or
+          moved with the order controls or drag handles. Save the entry to publish the order.
     label_singular: Life post
     description: Personal stories, everyday life, photos and videos.
     filter:
@@ -569,6 +573,7 @@ collections:
           - name: photos
             label: Photo gallery (upload multiple pictures)
             widget: image
+            media_ordering: true
             required: false
             default: []
             media_library:
@@ -577,12 +582,13 @@ collections:
                 multiple: true
                 kinds:
                   - image
-            hint: Select several pictures together, prepare and upload them, then insert the selection. Drag
-              pictures to reorder them. Use Pictures, video & audio below for individual
-              descriptions and captions.
+            hint: Select several pictures together, prepare and upload them, then insert the selection.
+              Use the order controls or drag pictures to arrange them. Use Pictures, video & audio
+              below for individual descriptions and captions. Save the entry to publish the order.
           - name: media
             label: Pictures, video & audio
             widget: list
+            media_ordering: true
             required: false
             default: []
             fields:
@@ -622,8 +628,8 @@ collections:
                   published; the original stays on your device.
             collapsed: true
             label_singular: Picture, video or audio
-            hint: Add as many items as you like. Each item has its own description and caption. Drag items to
-              change their order.
+            hint: Add as many items as you like. Each item keeps its description and caption when sorted or
+              moved with the order controls or drag handles. Save the entry to publish the order.
       - name: devlog
         label: Devlog
         file: src/content/pages/devlog.json
@@ -747,8 +753,11 @@ collections:
           - name: items
             label: Gallery items
             widget: list
+            media_ordering: true
             required: false
             default: []
+            hint: Use the order controls or drag to set the public gallery order. Save to publish;
+              descriptions and captions stay attached to their pictures.
             fields:
               - name: id
                 label: Unique ID
@@ -1013,9 +1022,10 @@ collections:
               - name: media
                 label: Media previews
                 widget: list
+                media_ordering: true
                 required: false
                 default: []
-                hint: Choose media content to display these prepared previews in list order.
+                hint: Choose media content to display these prepared previews in list order. Use the order controls or drag to arrange them, then save.
                 fields:
                   - name: type
                     label: Media type
