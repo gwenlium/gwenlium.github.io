@@ -20,6 +20,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+      # Publishes from the website editor only touch content and media. Those are checked by the
+      # source and build validators below, so the slow type check (about 90 s) is skipped for them.
+      - id: scope
+        name: Detect content-only changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          content_only=false
+          if [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] && git fetch --quiet --depth=1 origin "$BEFORE"; then
+            files=$(git diff --name-only "$BEFORE" HEAD)
+            if [ -n "$files" ] && ! echo "$files" | grep -qvE '^(src/content/|public/media/)'; then content_only=true; fi
+          fi
+          echo "content_only=$content_only" >> "$GITHUB_OUTPUT"
+          echo "Content-only change: $content_only"
       - uses: actions/setup-node@v7.0.0
         with:
           node-version: '24'
@@ -30,6 +45,7 @@ jobs:
       - run: npm run test:maintenance
       - run: npm run test:auth
       - run: npm run check
+        if: steps.scope.outputs.content_only != 'true'
       - run: npm run test:archive
       - run: npm run test:topics
       - run: npm run test:pages

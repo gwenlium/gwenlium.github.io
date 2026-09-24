@@ -26,6 +26,8 @@ interface Props {
   noindex?: boolean;
   /** The owner's writing page: no custom windows, and never indexed. */
   editor?: boolean;
+  /** Colour theme when the address does not name a section (the draft preview). */
+  theme?: string;
 }
 
 const { title, description = site.description, image, imageAlt, article = false, editor = false } = Astro.props;
@@ -39,7 +41,7 @@ const section = Astro.url.pathname.split('/').filter(Boolean)[0] || 'home';
 const startWindow = getWindowDefinition('start-menu')!;
 const preferencesWindow = getWindowDefinition('site-settings')!;
 const playerWindow = getWindowDefinition('music-player')!;
-const pageTheme = editor ? 'devlog' : ['home', 'devlog', 'life', 'gallery', 'music', 'about', 'subscribe'].includes(section) ? section : 'not-found';
+const pageTheme = Astro.props.theme ?? (editor ? 'devlog' : ['home', 'devlog', 'life', 'gallery', 'music', 'about', 'subscribe'].includes(section) ? section : 'not-found');
 const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
 ---
 

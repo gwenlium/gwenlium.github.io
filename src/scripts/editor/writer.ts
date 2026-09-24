@@ -1,4 +1,6 @@
 import { Document, parseDocument } from 'yaml';
+import { navigate } from 'astro:transitions/client';
+import { storePreview } from './preview';
 import { ownerStore, writerUrl } from './session';
 import { isPostPath, markdownParts, type EntrySummary, type SiteEditorStore } from './store';
 import { createRichText, type RichTextHandle } from './rich-text';
@@ -396,7 +398,9 @@ class Writer {
     publish.dataset.writerPublish = '';
     const revert = button('Undo all changes', () => void this.revert(), 'owner-button');
     revert.dataset.writerRevert = '';
-    footer.append(revert, publish);
+    const preview = button('Preview', () => void this.preview(), 'owner-button');
+    preview.title = 'See the entry exactly as visitors will, before publishing';
+    footer.append(revert, preview, publish);
     body.append(article, footer);
 
     const side = node('div', undefined, 'writer-side');
@@ -720,6 +724,16 @@ class Writer {
       this.entries = await this.store.entries();
       if (this.store.exists(path)) await this.open(path);
     }, [path]);
+  }
+
+  /** Show the draft in the real entry layout (same tab, so pictures prepared here still show). */
+  private async preview(): Promise<void> {
+    await this.flush();
+    const model = this.model;
+    if (!model) return;
+    storePreview({ path: this.path, section: model.section, title: model.title, date: model.date, tags: model.tags, excerpt: model.excerpt,
+      body: model.body, cover: model.cover, coverAlt: model.coverAlt, media: model.media });
+    await navigate('/write/preview/');
   }
 
   private async revert(): Promise<void> {

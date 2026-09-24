@@ -5,7 +5,7 @@ export interface EditorFile { path: string; sha: string; content: string }
 export interface EditorChange { path: string; content: string }
 export interface EditorMediaEntry { sha256: string; kind: 'image' | 'video' | 'audio'; width?: number; height?: number; duration?: number }
 export interface EditorMediaUpload { path: string; content: string; entry: EditorMediaEntry }
-export interface EditorPublishRequest { baseCommit: string; changes: EditorChange[]; media: EditorMediaUpload[]; deletions?: string[] }
+export interface EditorPublishRequest { baseCommit: string; changes: EditorChange[]; media: EditorMediaUpload[]; deletions?: string[]; message?: string }
 export interface EditorPublishResult { commit: string; htmlUrl: string }
 export interface EditorBinding { file: string; field: string; format: 'text' | 'markdown' | 'image'; label: string; altField?: string }
 export interface EditorDraftFile { path: string; baseContent: string | null; content: string; deleted?: boolean }

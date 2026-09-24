@@ -10,6 +10,7 @@ export const maxTextBytes = 1024 * 1024;
 export const maxMediaBytes = 32 * 1024 * 1024;
 export const maxRequestBytes = 48 * 1024 * 1024;
 export const shaPattern = /^[a-f0-9]{40}$/;
+export const mediaFilePattern = /^public\/media\/[a-z0-9]+(?:-[a-z0-9]+)*-preview-[a-f0-9]{32}\.(?:webp|gif|mp3|mp4)$/;
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const previewPattern = /^\/media\/([a-z0-9]+(?:-[a-z0-9]+)*)-preview-([a-f0-9]{32})\.(webp|gif|mp3|mp4)$/;
 const kinds: Record<string, string> = { webp: 'image', gif: 'image', mp3: 'audio', mp4: 'video' };
@@ -228,16 +229,18 @@ function magic(bytes: Uint8Array, extension: string, entry: EditorMediaEntry): v
 }
 export async function publishPayload(value: unknown): Promise<EditorPublishRequest> {
   const request = object(value);
-  keys(request, ['baseCommit', 'changes', 'media', 'deletions']);
+  keys(request, ['baseCommit', 'changes', 'media', 'deletions', 'message']);
   requireValue(typeof request.baseCommit === 'string' && shaPattern.test(request.baseCommit), 'A full base commit SHA is required.');
   request.deletions ??= [];
   requireValue(Array.isArray(request.changes) && request.changes.length <= 100 && Array.isArray(request.media) && request.media.length <= 32
-    && Array.isArray(request.deletions) && request.deletions.length <= 20
-    && request.changes.length + request.media.length + request.deletions.length > 0, 'Publish between 1 and 100 content changes, with at most 32 media files and 20 deleted entries.');
+    && Array.isArray(request.deletions) && request.deletions.length <= 100
+    && request.changes.length + request.media.length + request.deletions.length > 0, 'Publish between 1 and 100 content changes, with at most 32 media files and 100 deletions.');
+  // The commit message is shown in the repository history; one plain line.
+  requireValue(request.message === undefined || (typeof request.message === 'string' && request.message.trim().length > 0 && request.message.length <= 200 && !/[\u0000-\u001f\u007f]/.test(request.message)), 'Invalid publish message.');
   const seen = new Set<string>();
-  // Only journal entries can be deleted; pages, windows and media stay so shared links keep working.
+  // Journal entries and unused prepared media can be deleted; pages and windows cannot.
   for (const path of request.deletions) {
-    requireValue(contentPath(path) && path.startsWith('src/content/posts/') && !seen.has(path), 'Only journal entries can be deleted, each once.');
+    requireValue(typeof path === 'string' && ((contentPath(path) && path.startsWith('src/content/posts/')) || mediaFilePattern.test(path)) && !seen.has(path), 'Only journal entries and prepared media can be deleted, each once.');
     seen.add(path);
   }
   let textBytes = 0;

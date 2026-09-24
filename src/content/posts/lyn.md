@@ -8,12 +8,23 @@ tags: []
 featured: true
 cover: /media/lyn-front-preview-6a955fa64a01e2b5356bc0b62a5212ca.webp
 coverAlt: Lyn
-photos:
-  - /media/image-preview-891a687ae6e4c6741a1466a36f858714.webp
-  - /media/image-preview-7b8b096f8ca8ce125291cf3c85032e8b.webp
-  - /media/lyn-side-preview-ed41a54fb52a017b0d84bd960729bb6c.webp
-  - /media/lyn-rear-preview-088f176c2bd1ebbc2e856012cfcb0c49.webp
-media: []
+media:
+  - type: image
+    src: /media/image-preview-891a687ae6e4c6741a1466a36f858714.webp
+    alt: ""
+    caption: ""
+  - type: image
+    src: /media/image-preview-7b8b096f8ca8ce125291cf3c85032e8b.webp
+    alt: ""
+    caption: ""
+  - type: image
+    src: /media/lyn-side-preview-ed41a54fb52a017b0d84bd960729bb6c.webp
+    alt: ""
+    caption: ""
+  - type: image
+    src: /media/lyn-rear-preview-088f176c2bd1ebbc2e856012cfcb0c49.webp
+    alt: ""
+    caption: ""
 ---
 In Proto: ReCompute, there will be 2 protagonists that you'll be able to play as and switch on the fly.
 

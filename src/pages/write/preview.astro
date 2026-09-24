@@ -1,0 +1,21 @@
+---
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import EntryView from '../../components/EntryView.astro';
+---
+
+<SiteLayout title="Preview" description="A preview of the owner's unpublished entry." article noindex theme="devlog">
+  <div class="preview-banner" role="note" data-preview-banner>
+    <span data-preview-note>Preview of your unpublished entry. Visitors cannot see this page.</span>
+    <a class="button button-secondary" href="/write/" data-preview-return>Back to writing</a>
+  </div>
+  <EntryView preview section="devlog" title="" tags={[]} excerpt="" contents={[]} mediaItems={[]} hasEntryMedia shareUrl="https://gwenlium.dev/" related={[]} />
+</SiteLayout>
+
+<script>
+  import '../../scripts/editor/preview';
+</script>
+
+<style>
+  .preview-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; max-width: 74rem; margin: 0 auto 1.2rem; padding: .55rem .6rem .55rem .9rem; border: 1px dashed var(--ink); background: var(--lavender); font-size: .72rem; line-height: 1.5; }
+  .preview-banner .button { min-height: 34px; }
+</style>

@@ -227,7 +227,7 @@ function editorFixture(options = {}) {
   }
   entries.push({ path: `public${previousPreviewPath}`, sha: createHash('sha1').update(`blob ${preparedBytes.length}\0`).update(preparedBytes).digest('hex'), size: preparedBytes.length, mode: '100644', type: 'blob' });
   if (options.symlink) entries.push({ path: options.symlink, sha: 'f'.repeat(40), size: 8, mode: '120000', type: 'blob' });
-  const writes = []; const reads = []; let headReads = 0; let head = editorHead;
+  const writes = []; const reads = []; const graphql = []; let headReads = 0; let head = editorHead;
   const handler = async request => {
     const url = new URL(request.url);
     assert.equal(url.origin, 'https://api.github.com');
@@ -257,6 +257,16 @@ function editorFixture(options = {}) {
       return Response.json(blob);
     }
     const body = await request.json();
+    if (path === '/graphql') {
+      // Answer batched blob reads the way GitHub does: one aliased object per requested SHA.
+      graphql.push(body.variables);
+      const repository = {};
+      for (const [, alias, oid] of body.query.matchAll(/(f\d+): object\(oid: "([a-f0-9]{40})"\)/g)) {
+        const blob = blobs.get(oid);
+        repository[alias] = blob ? { text: Buffer.from(blob.content, 'base64').toString('utf8'), byteSize: blob.size, isBinary: false, isTruncated: false } : null;
+      }
+      return Response.json({ data: { repository } });
+    }
     writes.push({ path, method: request.method, body });
     if (path === '/repos/owner/website/git/blobs' && request.method === 'POST') {
       const bytes = Buffer.from(body.content, body.encoding);
@@ -272,7 +282,7 @@ function editorFixture(options = {}) {
     }
     throw new Error(`Unexpected GitHub operation: ${request.method} ${path}`);
   };
-  return { handler, writes, reads, sources, get head() { return head; } };
+  return { handler, writes, reads, graphql, sources, get head() { return head; } };
 }
 
 function publishBody(overrides = {}) {
@@ -568,4 +578,63 @@ test('sign-out revokes this token or every device on GitHub, for the owner only'
   assert.deepEqual(malformed.deletes, []);
   const gone = revokeUpstream({ status: 404 }); const already = runtime(gone.handler); t.after(() => already.dispose());
   assert.equal((await already.dispatchFetch('https://auth.test/editor/revoke', { method: 'POST', headers: revokeHeaders, body: '{"everywhere":false}' })).status, 200);
+});
+
+test('editor reads many files in one request and reuses immutable GitHub data', async t => {
+  const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
+  const first = await worker.dispatchFetch('https://auth.test/editor', { headers: analyticsHeaders });
+  assert.equal(first.status, 200);
+  const readsAfterFirst = fixture.reads.length;
+  const second = await worker.dispatchFetch('https://auth.test/editor', { headers: analyticsHeaders });
+  assert.equal(second.status, 200);
+  // A warm snapshot only asks GitHub for the current branch head.
+  assert.deepEqual(fixture.reads.slice(readsAfterFirst), ['/repos/owner/website/git/ref/heads/main']);
+  const batch = await worker.dispatchFetch('https://auth.test/editor/files', { method: 'POST', headers: publishHeaders, body: JSON.stringify({ ref: editorHead, paths: ['src/content/site.json', 'src/content/gallery.json'] }) });
+  assert.equal(batch.status, 200, await batch.clone().text());
+  const { files } = await batch.json();
+  assert.deepEqual(files.map(file => [file.path, file.content]), [['src/content/site.json', fixture.sources.get('src/content/site.json')], ['src/content/gallery.json', fixture.sources.get('src/content/gallery.json')]]);
+  for (const body of [{ ref: editorHead, paths: ['src/secret.ts'] }, { ref: editorHead, paths: [] }, { ref: editorHead, paths: ['src/content/site.json', 'src/content/site.json'] }, { ref: 'main', paths: ['src/content/site.json'] }]) {
+    assert.equal((await worker.dispatchFetch('https://auth.test/editor/files', { method: 'POST', headers: publishHeaders, body: JSON.stringify(body) })).status, 400, JSON.stringify(body));
+  }
+  assert.equal((await worker.dispatchFetch('https://auth.test/editor/files', { method: 'POST', headers: publishHeaders, body: JSON.stringify({ ref: movedHead, paths: ['src/content/site.json'] }) })).status, 409);
+});
+
+test('editor commits with the described message and deletes only unused prepared media', async t => {
+  const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
+  const media = `public${previousPreviewPath}`;
+  const used = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({
+    changes: [{ path: 'src/content/gallery.json', content: JSON.stringify({ items: [{ id: 'kept', title: 'Kept', type: 'image', src: previousPreviewPath, alt: 'Kept', caption: '', poster: '' }] }) }],
+    deletions: [media],
+  }) });
+  assert.equal(used.status, 400);
+  assert.match((await used.json()).error, /still used in src\/content\/gallery\.json/);
+  for (const message of ['', 'two\nlines', 'x'.repeat(201)]) {
+    assert.equal((await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ message }) })).status, 400, JSON.stringify(message));
+  }
+  assert.deepEqual(fixture.writes, []);
+  const response = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ changes: [], deletions: [media], message: 'Delete 1 unused picture' }) });
+  assert.equal(response.status, 200, await response.clone().text());
+  const tree = fixture.writes.find(write => write.path.endsWith('/git/trees')).body.tree;
+  assert.deepEqual(tree.find(item => item.path === media), { path: media, mode: '100644', type: 'blob', sha: null });
+  assert.deepEqual(JSON.parse(tree.find(item => item.path === 'src/content/media-previews.json').content), { files: {} });
+  assert.equal(fixture.writes.find(write => write.path.endsWith('/git/commits')).body.message, 'Delete 1 unused picture');
+});
+
+test('media used only by site code (like interface sounds) is never offered or deleted', async t => {
+  const media = `public${previousPreviewPath}`;
+  const plain = editorFixture(); const plainWorker = runtime(plain.handler); t.after(() => plainWorker.dispose());
+  const listed = await plainWorker.dispatchFetch('https://auth.test/editor/unused-media', { headers: analyticsHeaders });
+  assert.equal(listed.status, 200, await listed.clone().text());
+  assert.deepEqual((await listed.json()).media.map(item => item.url), [previousPreviewPath]);
+  const code = editorFixture({ sources: [['src/scripts/sounds.ts', `const click = '${previousPreviewPath.slice(1)}';`]] });
+  const worker = runtime(code.handler); t.after(() => worker.dispose());
+  const unused = await worker.dispatchFetch('https://auth.test/editor/unused-media', { headers: analyticsHeaders });
+  assert.deepEqual((await unused.json()).media, []);
+  const denied = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ changes: [], deletions: [media] }) });
+  assert.equal(denied.status, 400);
+  assert.match((await denied.json()).error, /still used by the site itself/);
+  assert.deepEqual(code.writes, []);
+  // Content and code were read in batched GraphQL requests, not one REST call per file.
+  assert.ok(code.graphql.length >= 1);
+  assert.deepEqual(code.reads.filter(path => path.includes('/git/blobs/')), []);
 });

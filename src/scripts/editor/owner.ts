@@ -124,11 +124,22 @@ class OwnerControls {
         return;
       }
       this.connecting = false;
-      this.renderTaskbar();
-      void this.applyDraft();
-      resumeLiveCheck(this.store);
+      this.connected();
       if (interactive) toast(`Signed in. Use Edit in the taskbar to write or change the site.`);
-    } else if (interactive) this.openMenu();
+    } else {
+      // The writing page may have connected first; these controls still need their buttons.
+      if (!this.started) this.connected();
+      if (interactive) this.openMenu();
+    }
+  }
+
+  private started = false;
+
+  private connected(): void {
+    this.started = true;
+    this.renderTaskbar();
+    void this.applyDraft();
+    resumeLiveCheck(this.store);
   }
 
   private signInPrompt(): void {
@@ -213,6 +224,7 @@ class OwnerControls {
     const more = node('div', undefined, 'owner-menu__more');
     more.append(
       button('Windows', () => { close(); void this.windowList(); }, 'owner-menu__small'),
+      button('Unused media', () => { close(); void this.unusedMedia(); }, 'owner-menu__small'),
       ...(this.store.local ? [] : [button('Analytics', () => { close(); openAnalytics(() => this.store.accessToken()); }, 'owner-menu__small')]),
       button('Discard changes', () => { close(); void this.discard(); }, 'owner-menu__small'),
       button('Sign out', () => { close(); this.signOut(); }, 'owner-menu__small'),
@@ -270,6 +282,52 @@ class OwnerControls {
     document.body.append(banner);
     banner.showPopover();
     this.banner = banner;
+  }
+
+  /** Find prepared files nothing uses any more and delete the chosen ones in one publish. */
+  private async unusedMedia(): Promise<void> {
+    const { dialog, body, footer, status } = openDialog('Unused media', { wide: true });
+    status.textContent = 'Checking every entry, page and the site itself…';
+    footer.append(button('Close', () => dialog.close()));
+    let media: Awaited<ReturnType<SiteEditorStore['unusedMedia']>>;
+    try { media = await this.store.unusedMedia(); }
+    catch (error) { status.textContent = errorText(error); return; }
+    status.textContent = '';
+    if (!media.length) { body.append(node('p', 'Everything uploaded is still in use. Nothing to clean up.')); return; }
+    body.append(node('p', media.length === 1
+      ? 'This file is not used by any entry, page, unpublished change or the site itself.'
+      : `These ${media.length} files are not used by any entry, page, unpublished change or the site itself.`), node('p', 'Deleting them removes them from the website. Someone who saved a direct link to one would see it stop working; Git history keeps a copy.', 'owner-hint'));
+    const grid = node('div', undefined, 'owner-media-grid');
+    const boxes = new Map<string, HTMLInputElement>();
+    for (const item of media) {
+      const card = node('label', undefined, 'owner-media-card');
+      const box = node('input'); box.type = 'checkbox'; box.checked = true;
+      boxes.set(item.url, box);
+      const preview = item.entry.kind === 'image' ? Object.assign(node('img'), { src: this.store.resolveMedia(item.url), alt: '', loading: 'lazy' })
+        : item.entry.kind === 'video' ? Object.assign(node('video'), { src: this.store.resolveMedia(item.url), muted: true, preload: 'metadata' })
+        : node('span', '♪ Audio', 'owner-media-card__audio');
+      card.append(box, preview, node('small', item.url.slice(7)));
+      grid.append(card);
+    }
+    body.append(grid);
+    const remove = button('', () => void (async () => {
+      const urls = [...boxes].filter(([, box]) => box.checked).map(([url]) => url);
+      if (!urls.length) return;
+      footer.querySelectorAll('button').forEach(item => { item.disabled = true; });
+      status.textContent = 'Deleting…';
+      try {
+        await this.store.publish([], { mediaDeletions: urls, message: `Delete ${urls.length} unused media file${urls.length === 1 ? '' : 's'}` });
+        dialog.close();
+        toast(this.store.local ? `Deleted ${urls.length} from your local files.` : `Deleted ${urls.length}. The website updates in a minute or two.`);
+      } catch (error) {
+        status.textContent = errorText(error);
+        footer.querySelectorAll('button').forEach(item => { item.disabled = false; });
+      }
+    })(), 'owner-button owner-button--danger');
+    const count = () => { const selected = [...boxes.values()].filter(box => box.checked).length; remove.textContent = `Delete ${selected}`; remove.disabled = !selected; };
+    boxes.forEach(box => box.addEventListener('change', count));
+    count();
+    footer.append(remove);
   }
 
   private async discard(): Promise<void> {

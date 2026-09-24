@@ -1,4 +1,4 @@
-import { contentPath, decodeBase64, EditorError, maxRequestBytes, maxTextBytes, previewRegistry, publishPayload, registryPath, shaPattern, validateContent } from './editor-content';
+import { contentPath, decodeBase64, EditorError, maxRequestBytes, maxTextBytes, mediaFilePattern, previewRegistry, publishPayload, registryPath, shaPattern, validateContent } from './editor-content';
 import type { EditorFileInfo, EditorMediaEntry, EditorOwner } from '../../src/lib/editor-types';
 
 interface Env {
@@ -388,6 +388,41 @@ function githubHeaders(token: string): HeadersInit {
   };
 }
 
+/**
+ * Short-lived, per-isolate memory. Git objects are immutable, so trees and blobs are cached by SHA;
+ * owner checks are reused for a minute. Every GitHub call still uses the caller's own token.
+ */
+const memory = {
+  owners: new Map<string, { login: string; until: number }>(),
+  identity: undefined as { name: string; branch: string; until: number } | undefined,
+  trees: new Map<string, { treeSha: string; entries: Map<string, EditorTreeEntry> }>(),
+  blobs: new Map<string, string>(),
+  blobBytes: 0,
+};
+
+async function tokenKey(token: string): Promise<string> {
+  return base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(token))));
+}
+
+function remember<K, V>(map: Map<K, V>, key: K, value: V, limit: number): void {
+  map.delete(key);
+  map.set(key, value);
+  while (map.size > limit) map.delete(map.keys().next().value as K);
+}
+
+/** The signed-in account must be the owner, with the app installed only on the website repository. */
+async function verifiedOwner(token: string, config: Configuration): Promise<string> {
+  const key = await tokenKey(token);
+  const cached = memory.owners.get(key);
+  if (cached && cached.until > Date.now()) return cached.login;
+  const user = await githubJson(`${GITHUB_API}/user`, { headers: githubHeaders(token) });
+  if (user.id !== config.userId) throw new EditorError('This GitHub account is not allowed to edit this website.', 403);
+  await verifyRepository(token, config);
+  const login = typeof user.login === 'string' ? user.login.slice(0, 100) : '';
+  remember(memory.owners, key, { login, until: Date.now() + 60_000 }, 20);
+  return login;
+}
+
 async function verifyRepository(token: string, config: Configuration): Promise<void> {
   const options = { headers: githubHeaders(token) };
   const result = await githubJson(`${GITHUB_API}/user/installations?per_page=100`, options);
@@ -626,18 +661,13 @@ async function branchHead(repository: Pick<EditorRepository, 'api' | 'ref'>, tok
 }
 
 async function editorRepository(token: string, config: Configuration): Promise<EditorRepository> {
-  const response = await githubJson(`${GITHUB_API}/repositories/${config.repositoryId}`, { headers: githubHeaders(token) });
-  const name = response.full_name;
-  const branch = response.default_branch;
-  if (response.id !== config.repositoryId || record(response.owner)?.id !== config.userId || typeof name !== 'string' ||
-    !/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(name) || typeof branch !== 'string' ||
-    !branch || branch.length > 255 || /[\u0000-\u0020\u007f~^:?*\[\\]/.test(branch) || branch.includes('..') || branch.includes('@{') ||
-    branch.split('/').some(part => !part || part.startsWith('.') || part.endsWith('.') || part.endsWith('.lock'))) {
-    throw new EditorError('GitHub returned an unexpected website repository.', 403);
-  }
+  const { name, branch } = memory.identity && memory.identity.until > Date.now() ? memory.identity : await repositoryIdentity(token, config);
   const api = `${GITHUB_API}/repos/${name}`;
   const ref = branch.split('/').map(encodeURIComponent).join('/');
+  // The branch head is always read fresh; everything below it is immutable.
   const head = await branchHead({ api, ref }, token);
+  const known = memory.trees.get(head);
+  if (known) return { api, name, branch, ref, head, treeSha: known.treeSha, entries: known.entries };
   const commit = await githubJson(`${api}/git/commits/${head}`, { headers: githubHeaders(token) });
   const treeSha = record(commit.tree)?.sha;
   if (commit.sha !== head || typeof treeSha !== 'string' || !shaPattern.test(treeSha)) throw new EditorError('GitHub returned an invalid commit tree.', 502);
@@ -652,13 +682,30 @@ async function editorRepository(token: string, config: Configuration): Promise<E
     }
     entries.set(entry.path, { path: entry.path, sha: entry.sha, mode: entry.mode, type: entry.type, size: Number(entry.size ?? 0) });
   }
+  remember(memory.trees, head, { treeSha, entries }, 4);
   return { api, name, branch, ref, head, treeSha, entries };
+}
+
+async function repositoryIdentity(token: string, config: Configuration): Promise<{ name: string; branch: string; until: number }> {
+  const response = await githubJson(`${GITHUB_API}/repositories/${config.repositoryId}`, { headers: githubHeaders(token) });
+  const name = response.full_name;
+  const branch = response.default_branch;
+  if (response.id !== config.repositoryId || record(response.owner)?.id !== config.userId || typeof name !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(name) || typeof branch !== 'string' ||
+    !branch || branch.length > 255 || /[\u0000-\u0020\u007f~^:?*\[\\]/.test(branch) || branch.includes('..') || branch.includes('@{') ||
+    branch.split('/').some(part => !part || part.startsWith('.') || part.endsWith('.') || part.endsWith('.lock'))) {
+    throw new EditorError('GitHub returned an unexpected website repository.', 403);
+  }
+  memory.identity = { name, branch, until: Date.now() + 5 * 60_000 };
+  return memory.identity;
 }
 
 async function editorFile(repository: EditorRepository, path: string, token: string): Promise<{ path: string; sha: string; content: string }> {
   const entry = regularFile(repository, path);
   if (!entry) throw new EditorError('The requested content file does not exist as a normal file.', 404);
   if (entry.size > maxTextBytes) throw new EditorError('The requested content file is too large.', 413);
+  const cached = memory.blobs.get(entry.sha);
+  if (cached !== undefined) return { path, sha: entry.sha, content: cached };
   const blob = await githubJson(`${repository.api}/git/blobs/${entry.sha}`, { headers: githubHeaders(token) });
   if (blob.sha !== entry.sha || blob.encoding !== 'base64' || typeof blob.content !== 'string' || blob.size !== entry.size) throw new EditorError('GitHub returned an invalid content blob.', 502);
   let content: string;
@@ -667,7 +714,79 @@ async function editorFile(repository: EditorRepository, path: string, token: str
     if (bytes.length !== entry.size) throw new Error('Incorrect size');
     content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch { throw new EditorError('The repository content is not valid UTF-8 text.', 502); }
+  // Bounded to a few megabytes: plenty for every content file of this site.
+  if (memory.blobBytes + entry.size > 6 * 1024 * 1024) { memory.blobs.clear(); memory.blobBytes = 0; }
+  remember(memory.blobs, entry.sha, content, 400);
+  memory.blobBytes += entry.size;
   return { path, sha: entry.sha, content };
+}
+
+async function gitBlobSha(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  const header = encoder.encode(`blob ${bytes.length}\0`);
+  const joined = new Uint8Array(header.length + bytes.length);
+  joined.set(header);
+  joined.set(bytes, header.length);
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-1', joined)), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Read many text files with one GitHub GraphQL request per hundred files instead of one REST
+ * request each; Workers allow only a limited number of outgoing requests per call. Every text is
+ * checked against its tree SHA, and anything GraphQL cannot return exactly is read over REST.
+ */
+async function editorFiles(repository: EditorRepository, paths: string[], token: string): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const pending: EditorTreeEntry[] = [];
+  for (const path of paths) {
+    const entry = regularFile(repository, path);
+    if (!entry) throw new EditorError('The requested content file does not exist as a normal file.', 404);
+    if (entry.size > maxTextBytes) throw new EditorError('The requested content file is too large.', 413);
+    const cached = memory.blobs.get(entry.sha);
+    if (cached !== undefined) result.set(path, cached);
+    else pending.push(entry);
+  }
+  const [owner, name] = repository.name.split('/');
+  for (let start = 0; start < pending.length; start += 100) {
+    const chunk = pending.slice(start, start + 100);
+    // SHAs are validated hex, so interpolating them into the query is safe.
+    const fields = chunk.map((entry, index) => `f${index}: object(oid: "${entry.sha}") { ... on Blob { text byteSize isBinary isTruncated } }`).join(' ');
+    let objects: Record<string, unknown> | undefined;
+    try {
+      const response = await githubJson(`${GITHUB_API}/graphql`, {
+        method: 'POST', headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: `query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { ${fields} } }`, variables: { owner, name } }),
+      });
+      objects = record(record(response.data)?.repository);
+    } catch { objects = undefined; }
+    await Promise.all(chunk.map(async (entry, index) => {
+      const blob = record(objects?.[`f${index}`]);
+      if (blob && blob.isBinary === false && blob.isTruncated === false && typeof blob.text === 'string' && blob.byteSize === entry.size) {
+        const bytes = encoder.encode(blob.text);
+        if (bytes.length === entry.size && await gitBlobSha(bytes) === entry.sha) {
+          if (memory.blobBytes + entry.size > 6 * 1024 * 1024) { memory.blobs.clear(); memory.blobBytes = 0; }
+          remember(memory.blobs, entry.sha, blob.text, 400);
+          memory.blobBytes += entry.size;
+          result.set(entry.path, blob.text);
+          return;
+        }
+      }
+      result.set(entry.path, (await editorFile(repository, entry.path, token)).content);
+    }));
+  }
+  return result;
+}
+
+const mediaReference = /\/?media\/[a-z0-9]+(?:-[a-z0-9]+)*-preview-[a-f0-9]{32}\.(?:webp|gif|mp4|mp3)/g;
+
+/** Prepared media that content or site code still points at (code such as the interface sounds counts too). */
+async function mediaInUse(repository: EditorRepository, token: string, content: Map<string, string>): Promise<Set<string>> {
+  const code = [...repository.entries.values()].filter(entry => entry.type === 'blob' && !contentPath(String(entry.path), true) && !entry.path.startsWith('public/media/')
+    && entry.path !== 'package-lock.json' && /\.(?:astro|ts|mts|js|mjs|cjs|css|json|html|md|svg|xml|ya?ml)$/.test(entry.path) && entry.size <= maxTextBytes);
+  if (code.length > 400) throw new EditorError('The repository has too many code files to check media safely.', 413);
+  const texts = [...content.values(), ...(await editorFiles(repository, code.map(entry => entry.path), token)).values()];
+  const used = new Set<string>();
+  for (const text of texts) for (const match of text.matchAll(mediaReference)) used.add(`/${match[0].replace(/^\//, '')}`);
+  return used;
 }
 
 async function requestJson(request: Request, limit = maxRequestBytes): Promise<unknown> {
@@ -701,12 +820,14 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
   for (const change of payload.changes) writablePath(repository, change.path);
   const deletions = new Set(payload.deletions ?? []);
   for (const path of deletions) {
-    if (!regularFile(repository, path)) throw new EditorError('The entry you deleted no longer exists. Refresh before publishing.', 409);
+    if (!regularFile(repository, path)) throw new EditorError('Something you deleted no longer exists. Refresh before publishing.', 409);
     if (payload.changes.some(change => change.path === path)) throw new EditorError('An entry cannot be both changed and deleted.');
   }
   writablePath(repository, registryPath);
   const registryFile = regularFile(repository, registryPath);
   const previews: Record<string, EditorMediaEntry> = registryFile ? previewRegistry((await editorFile(repository, registryPath, token)).content) : Object.create(null);
+  const removedMedia = [...deletions].filter(path => mediaFilePattern.test(path));
+  for (const path of removedMedia) delete previews[path.slice(6)];
   const uploads = new Map(payload.media.map(upload => [upload.path, upload]));
   for (const upload of payload.media) {
     writablePath(repository, upload.path);
@@ -715,7 +836,7 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
     if (previous) throw new EditorError('This preview path is already registered.');
     previews[upload.path.slice(6)] = upload.entry;
   }
-  const exists = (path: string) => uploads.has(path) || Boolean(regularFile(repository, path));
+  const exists = (path: string) => uploads.has(path) || (!deletions.has(path) && Boolean(regularFile(repository, path)));
   for (const path of Object.keys(previews)) if (!exists(`public${path}`)) throw new EditorError('The preview registry contains a missing or unsafe file.');
   const files = new Map<string, string>();
   const changes = new Map(payload.changes.map(change => [change.path, change.content]));
@@ -723,12 +844,19 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
   if (contentEntries.length > 250 || contentEntries.reduce((total, entry) => total + entry.size, 0) > 8 * maxTextBytes) throw new EditorError('The content catalogue is too large to publish safely.', 413);
   // Resolve the whole catalogue before any Git writes: cross-file IDs, media and
   // post slugs must agree with the final tree, not only with each changed file.
-  for (const entry of contentEntries) {
-    if (!regularFile(repository, entry.path)) throw new EditorError('Editable content contains an unsafe file.');
-    if (deletions.has(entry.path)) continue;
-    files.set(entry.path, changes.get(entry.path) ?? (await editorFile(repository, entry.path, token)).content);
-  }
+  for (const entry of contentEntries) if (!regularFile(repository, entry.path)) throw new EditorError('Editable content contains an unsafe file.');
+  const unchanged = contentEntries.map(entry => entry.path).filter(path => !deletions.has(path) && !changes.has(path));
+  for (const [path, content] of await editorFiles(repository, unchanged, token)) files.set(path, content);
   for (const change of payload.changes) files.set(change.path, change.content);
+  if (removedMedia.length) {
+    const used = await mediaInUse(repository, token, files);
+    for (const path of removedMedia) {
+      const url = path.slice(6);
+      if (!used.has(url)) continue;
+      const user = [...files].find(([, content]) => content.includes(url));
+      throw new EditorError(`${url.slice(7)} is still used${user ? ` in ${user[0]}` : ' by the site itself'}, so it cannot be deleted.`);
+    }
+  }
   validateContent(files, previews, exists, config.siteOrigin);
   if (await branchHead(repository, token) !== payload.baseCommit) throw conflict();
   const writeHeaders = new Headers(githubHeaders(token));
@@ -740,11 +868,14 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
     if (typeof blob.sha !== 'string' || !shaPattern.test(blob.sha)) throw new EditorError('GitHub did not confirm the prepared media upload.', 502);
     tree.push({ path: upload.path, mode: '100644', type: 'blob', sha: blob.sha });
   }
-  if (payload.media.length) tree.push({ path: registryPath, mode: '100644', type: 'blob', content: `${JSON.stringify({ files: previews }, null, 2)}\n` });
+  if (payload.media.length || removedMedia.length) {
+    const sorted = Object.fromEntries(Object.entries(previews).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+    tree.push({ path: registryPath, mode: '100644', type: 'blob', content: `${JSON.stringify({ files: sorted }, null, 2)}\n` });
+  }
   const nextTree = await githubJson(`${repository.api}/git/trees`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ base_tree: repository.treeSha, tree }) });
   if (typeof nextTree.sha !== 'string' || !shaPattern.test(nextTree.sha)) throw new EditorError('GitHub did not confirm the publication tree.', 502);
   if (await branchHead(repository, token) !== payload.baseCommit) throw conflict();
-  const commit = await githubJson(`${repository.api}/git/commits`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ message: 'Publish website edits', tree: nextTree.sha, parents: [payload.baseCommit] }) });
+  const commit = await githubJson(`${repository.api}/git/commits`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ message: payload.message?.trim() || 'Publish website edits', tree: nextTree.sha, parents: [payload.baseCommit] }) });
   if (typeof commit.sha !== 'string' || !shaPattern.test(commit.sha)) throw new EditorError('GitHub did not confirm the publication commit.', 502);
   if (await branchHead(repository, token) !== payload.baseCommit) throw conflict();
   // Non-force is the final concurrency guard: a competing descendant commit
@@ -782,7 +913,7 @@ async function revokeEditor(request: Request, url: URL, token: string, config: C
 async function editor(request: Request, url: URL, config: Configuration): Promise<Response> {
   if (request.headers.get('Origin') !== config.siteOrigin) return textResponse('Origin not allowed.', 403);
   const renewal = url.pathname === '/editor/session';
-  const method = ['/editor/publish', '/editor/session', '/editor/revoke'].includes(url.pathname) ? 'POST' : 'GET';
+  const method = ['/editor/publish', '/editor/session', '/editor/revoke', '/editor/files'].includes(url.pathname) ? 'POST' : 'GET';
   if (request.method === 'OPTIONS') {
     const requestedHeaders = (request.headers.get('Access-Control-Request-Headers') ?? '').toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
     const allowedHeaders = renewal ? ['content-type'] : method === 'POST' ? ['authorization', 'content-type'] : ['authorization'];
@@ -808,13 +939,43 @@ async function editor(request: Request, url: URL, config: Configuration): Promis
   if (!/^Bearer ghu_[A-Za-z0-9]{1,508}$/.test(authorization)) return analyticsJson({ error: 'Sign in to the editor.' }, 401, config);
   try {
     const token = authorization.slice(7);
-    const user = await githubJson(`${GITHUB_API}/user`, { headers: githubHeaders(token) });
-    if (user.id !== config.userId) throw new EditorError('This GitHub account is not allowed to edit this website.', 403);
-    // Signing out must work even if the app installation changed, so it skips the repository check.
-    if (url.pathname === '/editor/revoke') return await revokeEditor(request, url, token, config);
-    await verifyRepository(token, config);
-    const owner: EditorOwner = { id: config.userId, login: typeof user.login === 'string' ? user.login.slice(0, 100) : '' };
+    if (url.pathname === '/editor/revoke') {
+      // Signing out must work even if the app installation changed, so it skips the repository check.
+      const user = await githubJson(`${GITHUB_API}/user`, { headers: githubHeaders(token) });
+      if (user.id !== config.userId) throw new EditorError('This GitHub account is not allowed to edit this website.', 403);
+      memory.owners.delete(await tokenKey(token));
+      return await revokeEditor(request, url, token, config);
+    }
+    const owner: EditorOwner = { id: config.userId, login: await verifiedOwner(token, config) };
     const parameters = [...url.searchParams.keys()];
+    if (url.pathname === '/editor/files') {
+      // Many files in one request: one owner check and one tree instead of one per file.
+      if (parameters.length) throw new EditorError('This endpoint does not accept query parameters.');
+      const body = record(await requestJson(request, 64 * 1024));
+      const paths = body?.paths;
+      if (!body || Object.keys(body).some(key => key !== 'ref' && key !== 'paths') || typeof body.ref !== 'string' || !shaPattern.test(body.ref)
+        || !Array.isArray(paths) || !paths.length || paths.length > 250 || new Set(paths).size !== paths.length || paths.some(path => !contentPath(path, true))) {
+        throw new EditorError('Provide one full commit SHA and up to 250 distinct allowed content paths.');
+      }
+      const repository = await editorRepository(token, config);
+      if (body.ref !== repository.head) throw new EditorError('This content snapshot is stale. Refresh the editor before loading more files.', 409);
+      const contents = await editorFiles(repository, paths as string[], token);
+      return analyticsJson({ files: (paths as string[]).map(path => ({ path, sha: regularFile(repository, path)!.sha, content: contents.get(path)! })) }, 200, config);
+    }
+    if (url.pathname === '/editor/unused-media') {
+      // Registered media that no content and no site code refers to. Drafts are the browser's to check.
+      if (parameters.length) throw new EditorError('This endpoint does not accept query parameters.');
+      const repository = await editorRepository(token, config);
+      const registryFile = regularFile(repository, registryPath);
+      if (!registryFile) return analyticsJson({ head: repository.head, media: [] }, 200, config);
+      const contentPaths = [...repository.entries.values()].filter(entry => contentPath(entry.path) && regularFile(repository, entry.path)).map(entry => entry.path);
+      const contents = await editorFiles(repository, [...contentPaths, registryPath], token);
+      const previews = previewRegistry(contents.get(registryPath)!);
+      contents.delete(registryPath);
+      const used = await mediaInUse(repository, token, contents);
+      const media = Object.entries(previews).filter(([url]) => !used.has(url) && regularFile(repository, `public${url}`)).map(([url, entry]) => ({ url, entry }));
+      return analyticsJson({ head: repository.head, media }, 200, config);
+    }
     if (url.pathname === '/editor/file') {
       const path = singleParameter(url, 'path'); const ref = singleParameter(url, 'ref');
       if (parameters.length !== 2 || !contentPath(path, true) || !ref || !shaPattern.test(ref)) throw new EditorError('Provide one allowed content path and one full commit SHA.');
@@ -836,7 +997,7 @@ async function editor(request: Request, url: URL, config: Configuration): Promis
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (['/editor', '/editor/file', '/editor/publish', '/editor/session', '/editor/revoke'].includes(url.pathname)) {
+    if (['/editor', '/editor/file', '/editor/files', '/editor/unused-media', '/editor/publish', '/editor/session', '/editor/revoke'].includes(url.pathname)) {
       const config = configuration(env);
       if (!config) return textResponse('Editor configuration is unavailable.', 503);
       if (url.protocol !== 'https:' || url.origin !== config.authOrigin) return textResponse('Invalid editor origin.', 400);

@@ -1,5 +1,5 @@
 ---
-import SiteLayout from '../layouts/SiteLayout.astro';
+import SiteLayout from '../../layouts/SiteLayout.astro';
 ---
 
 <SiteLayout title="Write" description="The site owner's writing desk." editor>
@@ -9,7 +9,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 </SiteLayout>
 
 <script>
-  import { mountWriter, unmountWriter } from '../scripts/editor/writer';
+  import { mountWriter, unmountWriter } from '../../scripts/editor/writer';
 
   document.addEventListener('astro:page-load', () => {
     const root = document.querySelector<HTMLElement>('[data-writer]');

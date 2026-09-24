@@ -9,7 +9,7 @@ export default defineConfig({
   output: 'static',
   trailingSlash: 'always',
   integrations: [
-    sitemap({ filter: (page) => !/\/(?:game|404|admin|write)\/$/.test(page) }),
+    sitemap({ filter: (page) => !/\/(?:game|404|admin)\/$|\/write\//.test(page) }),
     devEditor(),
   ],
   markdown: { processor: unified({ rehypePlugins: [rehypeMedia] }) },

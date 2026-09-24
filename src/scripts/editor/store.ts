@@ -313,7 +313,7 @@ export class SiteEditorStore {
     return result;
   }
 
-  private async api(controller: AbortController, path: string, body?: EditorPublishRequest, retried = false): Promise<unknown> {
+  private async api(controller: AbortController, path: string, body?: EditorPublishRequest | Record<string, unknown>, retried = false): Promise<unknown> {
     const token = await this.auth.token(retried);
     const response = await fetch(`${this.authOrigin}${path}`, {
       method: body ? 'POST' : 'GET', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error',
@@ -444,6 +444,30 @@ export class SiteEditorStore {
     return pending;
   }
 
+  /** Load many published files in one request (one owner check and one tree on the worker). */
+  private async prefetch(session: Session, paths: string[]): Promise<void> {
+    const snapshot = session.snapshot;
+    const cache = session.cache;
+    const missing = paths.filter(path => !cache.has(path) && !session.files.has(path) && snapshot.files.some(file => file.path === path));
+    if (missing.length < 2) return;
+    const loading = this.api(session.controller, '/editor/files', { ref: snapshot.head, paths: missing }).then(value => {
+      this.active(session);
+      const files = new Map(((value as { files?: EditorFile[] })?.files ?? []).map(file => [file.path, file]));
+      return files;
+    });
+    for (const path of missing) {
+      const expected = snapshot.files.find(file => file.path === path)!;
+      const pending = loading.then(files => {
+        const file = files.get(path);
+        if (!file || typeof file.content !== 'string' || file.sha !== expected.sha) throw new Error('The editor returned a source file that does not match the draft base.');
+        return file.content;
+      });
+      cache.set(path, pending);
+      void pending.catch(() => { if (cache.get(path) === pending) cache.delete(path); });
+    }
+    await loading.catch(() => undefined);
+  }
+
   private source(session: Session, path: string): Promise<string> {
     assertPath(path);
     const draft = session.files.get(path);
@@ -559,6 +583,7 @@ export class SiteEditorStore {
       if (!isPostPath(path)) continue;
       if (file.deleted) paths.delete(path); else paths.add(path);
     }
+    await this.prefetch(session, [...paths]);
     const entries = await Promise.all([...paths].map(async path => {
       const draft = session.files.get(path);
       return entryFrom(path, await this.source(session, path), Boolean(draft), draft?.baseContent === null);
@@ -625,12 +650,18 @@ export class SiteEditorStore {
     return url;
   }
 
-  /** Publish all changes, or only the listed files (and the new media they use). */
-  publish(paths?: string[]): Promise<EditorPublishResult> {
+  /**
+   * Publish all changes, or only the listed files (and the new media they use).
+   * `mediaDeletions` removes unused prepared media files (as /media/... URLs) in the same commit.
+   */
+  publish(paths?: string[], options: { message?: string; mediaDeletions?: string[] } = {}): Promise<EditorPublishResult> {
     return this.enqueue(async session => {
       const selected = Array.from(session.files.values()).filter(file => !paths || paths.includes(file.path));
       const changes = selected.filter(file => !file.deleted).map(({ path, content }) => ({ path, content }));
-      const deletions = selected.filter(file => file.deleted && file.baseContent !== null).map(file => file.path);
+      const deletions = [
+        ...selected.filter(file => file.deleted && file.baseContent !== null).map(file => file.path),
+        ...(options.mediaDeletions ?? []).filter(url => previewPath.test(url)).map(url => `public${url}`),
+      ];
       if (!changes.length && !deletions.length) throw new Error('There is nothing selected to publish.');
       const references = new Set<string>();
       for (const change of changes) {
@@ -641,7 +672,8 @@ export class SiteEditorStore {
       const referenced = Array.from(session.media.values()).filter(media => references.has(media.url));
       const media = await Promise.all(referenced.map(async item => ({ path: `public${item.url}`, content: await base64(item.file), entry: item.entry })));
       this.active(session);
-      const value = await this.api(session.controller, '/editor/publish', { baseCommit: session.snapshot.head, changes, media, deletions });
+      const message = options.message?.replace(/\s+/g, ' ').trim().slice(0, 200) || undefined;
+      const value = await this.api(session.controller, '/editor/publish', { baseCommit: session.snapshot.head, changes, media, deletions, ...(message ? { message } : {}) });
       this.active(session);
       const result = value as EditorPublishResult;
       if (!result || !/^[a-f0-9]{40}$/.test(result.commit) || typeof result.htmlUrl !== 'string'
@@ -667,10 +699,16 @@ export class SiteEditorStore {
       const keep = new Map(Array.from(session.media).filter(([url]) => !references.has(url)));
       await this.save(session, snapshot, remaining, keep);
       this.active(session);
+      // Files the publish did not touch keep their loaded content.
+      const unchanged = new Map<string, Promise<string>>();
+      for (const [path, pending] of session.cache) {
+        const before = session.snapshot.files.find(file => file.path === path)?.sha;
+        if (before && snapshot.files.find(file => file.path === path)?.sha === before) unchanged.set(path, pending);
+      }
       session.snapshot = snapshot;
       session.files = remaining;
       session.media = keep;
-      session.cache.clear();
+      session.cache = unchanged;
       for (const [url, objectURL] of this.objectURLs) {
         if (!keep.has(url)) { URL.revokeObjectURL(objectURL); this.objectURLs.delete(url); }
       }
@@ -787,6 +825,17 @@ export class SiteEditorStore {
       });
       if (this.warning) { this.warning = undefined; this.emit(); }
     } catch (error) { if (this.session === session) this.storageFailure(error); throw error; }
+  }
+
+  /** Prepared media nothing uses: not published content, not site code, and not your unpublished changes. */
+  async unusedMedia(): Promise<Array<{ url: string; entry: EditorMediaEntry }>> {
+    const session = this.active();
+    await this.writes;
+    const value = await this.api(session.controller, '/editor/unused-media') as { head?: string; media?: Array<{ url: string; entry: EditorMediaEntry }> };
+    this.active(session);
+    const drafts = new Set<string>();
+    for (const file of session.files.values()) if (!file.deleted) collectMediaReferences(file.content, drafts);
+    return (value.media ?? []).filter(item => previewPath.test(item.url) && !drafts.has(item.url));
   }
 
   /** For owner-only services outside the editor API (analytics). */

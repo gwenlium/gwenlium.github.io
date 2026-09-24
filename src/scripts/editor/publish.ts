@@ -9,7 +9,7 @@ const pageNames: Record<string, string> = {
   subscribe: 'Subscribe page', 'not-found': 'Page not found',
 };
 
-type Change = { file: EditorDraftFile; label: string; detail: string; problems: string[]; fix?: string };
+type Change = { file: EditorDraftFile; label: string; detail: string; problems: string[]; fix?: string; summary: string };
 
 function missingPictureDescriptions(markdown: string): number {
   return [...markdown.matchAll(/!\[([^\]]*)\]\(/g)].filter(match => !match[1].trim()).length;
@@ -29,7 +29,7 @@ function describe(file: EditorDraftFile): Change {
     let wasPublic = false;
     try { wasPublic = file.baseContent !== null && (bindingDocument(file.baseContent, true).value as Record<string, unknown>).draft === false; } catch { /* Unknown. */ }
     const isPublic = data.draft === false;
-    if (file.deleted) return { file, label: `Delete “${title}”`, detail: `${journal} entry${wasPublic ? ', removed from the website' : ''}`, problems: [] };
+    if (file.deleted) return { file, label: `Delete “${title}”`, detail: `${journal} entry${wasPublic ? ', removed from the website' : ''}`, problems: [], summary: `Delete ${journal} entry: ${title}` };
     const detail = [
       `${journal}`,
       file.baseContent === null ? (isPublic ? 'new, public' : 'new, hidden draft') : isPublic && !wasPublic ? 'now public' : !isPublic && wasPublic ? 'now hidden' : isPublic ? 'public' : 'hidden draft',
@@ -38,7 +38,8 @@ function describe(file: EditorDraftFile): Change {
     const missing = missingPictureDescriptions(body);
     if (missing) problems.push(missing === 1 ? 'A picture in the text needs a description.' : `${missing} pictures in the text need descriptions.`);
     if (typeof data.cover === 'string' && data.cover && !String(data.coverAlt ?? '').trim()) problems.push('The cover picture needs a description.');
-    return { file, label: `${file.baseContent === null ? 'New entry' : 'Entry'} “${title}”`, detail, problems, fix: writerUrl({ entry: file.path }) };
+    const verb = file.baseContent === null ? `New ${journal} entry` : isPublic && !wasPublic ? `Publish ${journal} entry` : !isPublic && wasPublic ? `Hide ${journal} entry` : `Edit ${journal} entry`;
+    return { file, label: `${file.baseContent === null ? 'New entry' : 'Entry'} “${title}”`, detail, problems, fix: writerUrl({ entry: file.path }), summary: `${verb}: ${title}` };
   }
   const page = /^src\/content\/pages\/([^/]+)\.json$/.exec(file.path)?.[1];
   const label = page ? pageNames[page] ?? `${page} page` : ({
@@ -56,7 +57,15 @@ function describe(file: EditorDraftFile): Change {
     visit(JSON.parse(file.content));
   } catch { problems.push('This file could not be read.'); }
   if (missing) problems.push(missing === 1 ? 'A picture in the text needs a description.' : `${missing} pictures in the text need descriptions.`);
-  return { file, label, detail: file.baseContent === null ? 'new' : 'changed', problems };
+  return { file, label, detail: file.baseContent === null ? 'new' : 'changed', problems, summary: `Edit ${label}` };
+}
+
+/** A commit message a person can read in the repository history. */
+export function commitMessage(summaries: string[]): string {
+  const all = summaries.join('; ');
+  if (all.length <= 200) return all;
+  const first = summaries[0].length > 150 ? `${summaries[0].slice(0, 147)}...` : summaries[0];
+  return `${first}; and ${summaries.length - 1} more`;
 }
 
 /** Review what will go live, choose what to include, and publish it in one step. */
@@ -122,7 +131,7 @@ export async function openPublish(store: SiteEditorStore, onPublished: () => Pro
     boxes.forEach(box => { box.disabled = true; });
     status.textContent = store.local ? 'Saving…' : 'Publishing… keep this page open for a moment.';
     try {
-      const result = await store.publish(paths);
+      const result = await store.publish(paths, { message: commitMessage(changes.filter(change => paths.includes(change.file.path)).map(change => change.summary)) });
       await onPublished();
       body.replaceChildren();
       footer.replaceChildren(button('Done', () => dialog.close(), 'owner-button owner-button--primary'));
@@ -131,7 +140,7 @@ export async function openPublish(store: SiteEditorStore, onPublished: () => Pro
         body.append(node('p', 'Saved to your local files. The dev server shows the change right away.'));
         return;
       }
-      body.append(node('p', 'Published. The website rebuilds itself, which usually takes 3 to 4 minutes. You will get a note here when it is live.'));
+      body.append(node('p', 'Published. The website rebuilds itself, which usually takes a minute or two. You will get a note here when it is live.'));
       const commit = node('a', 'See the change on GitHub', 'owner-link');
       commit.href = result.htmlUrl; commit.target = '_blank'; commit.rel = 'noopener noreferrer';
       body.append(commit);
