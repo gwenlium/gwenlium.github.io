@@ -754,10 +754,35 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
   return analyticsJson({ commit: commit.sha, htmlUrl: `https://github.com/${repository.name}/commit/${commit.sha}` }, 200, config);
 }
 
+/** Sign out on GitHub's side: this token only, or every device's authorization at once. */
+async function revokeEditor(request: Request, url: URL, token: string, config: Configuration): Promise<Response> {
+  if (url.search) throw new EditorError('This endpoint does not accept query parameters.');
+  const body = record(await requestJson(request, 256));
+  if (!body || Object.keys(body).some(key => key !== 'everywhere') || typeof body.everywhere !== 'boolean') throw new EditorError('Invalid sign-out request.');
+  const scope = body.everywhere ? 'grant' : 'token';
+  let response: Response;
+  try {
+    response = await fetch(`${GITHUB_API}/applications/${encodeURIComponent(config.clientId)}/${scope}`, {
+      method: 'DELETE', redirect: 'manual', signal: AbortSignal.timeout(15000),
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Basic ${btoa(`${config.clientId}:${config.clientSecret}`)}`,
+        'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': '2026-03-10',
+        'User-Agent': 'gwenlium-cms-auth',
+      },
+      body: JSON.stringify({ access_token: token }),
+    });
+  } catch { throw new OAuthError('GitHub could not be reached to sign out. Your sign-in on this browser was still removed.', 502); }
+  // 404: GitHub no longer knows the token, which is the goal.
+  if (response.status !== 204 && response.status !== 404) throw new OAuthError(`GitHub sign-out failed (HTTP ${response.status}). Your sign-in on this browser was still removed.`, 502);
+  return analyticsJson({ revoked: scope }, 200, config);
+}
+
 async function editor(request: Request, url: URL, config: Configuration): Promise<Response> {
   if (request.headers.get('Origin') !== config.siteOrigin) return textResponse('Origin not allowed.', 403);
   const renewal = url.pathname === '/editor/session';
-  const method = url.pathname === '/editor/publish' || renewal ? 'POST' : 'GET';
+  const method = ['/editor/publish', '/editor/session', '/editor/revoke'].includes(url.pathname) ? 'POST' : 'GET';
   if (request.method === 'OPTIONS') {
     const requestedHeaders = (request.headers.get('Access-Control-Request-Headers') ?? '').toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
     const allowedHeaders = renewal ? ['content-type'] : method === 'POST' ? ['authorization', 'content-type'] : ['authorization'];
@@ -785,6 +810,8 @@ async function editor(request: Request, url: URL, config: Configuration): Promis
     const token = authorization.slice(7);
     const user = await githubJson(`${GITHUB_API}/user`, { headers: githubHeaders(token) });
     if (user.id !== config.userId) throw new EditorError('This GitHub account is not allowed to edit this website.', 403);
+    // Signing out must work even if the app installation changed, so it skips the repository check.
+    if (url.pathname === '/editor/revoke') return await revokeEditor(request, url, token, config);
     await verifyRepository(token, config);
     const owner: EditorOwner = { id: config.userId, login: typeof user.login === 'string' ? user.login.slice(0, 100) : '' };
     const parameters = [...url.searchParams.keys()];
@@ -809,7 +836,7 @@ async function editor(request: Request, url: URL, config: Configuration): Promis
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (['/editor', '/editor/file', '/editor/publish', '/editor/session'].includes(url.pathname)) {
+    if (['/editor', '/editor/file', '/editor/publish', '/editor/session', '/editor/revoke'].includes(url.pathname)) {
       const config = configuration(env);
       if (!config) return textResponse('Editor configuration is unavailable.', 503);
       if (url.protocol !== 'https:' || url.origin !== config.authOrigin) return textResponse('Invalid editor origin.', 400);

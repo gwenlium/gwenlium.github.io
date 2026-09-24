@@ -286,6 +286,8 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
 .taskbar { position: relative; z-index: 60; display: flex; align-items: center; gap: .5rem; min-width: 0; min-height: 48px; padding: .35rem; border: 1px solid var(--line); border-radius: 3px; background: linear-gradient(180deg, var(--surface-raised), var(--surface)); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
 .taskbar .button, .taskbar .button-secondary { flex-shrink: 0; min-height: 35px; padding: .4rem .65rem; font-size: 11px; }
 .taskbar [aria-expanded='true'] { background: var(--sage); }
+/* Owner buttons stay hidden until the editor confirms a sign-in; the editor's own styles load only for the owner. */
+[data-owner-editor][hidden], [data-owner-publish][hidden] { display: none !important; }
 .taskbar-restore { margin-left: auto; }
 .brand-avatar { width: 100%; height: 100%; object-fit: cover; }
 .start-trigger img { flex-shrink: 0; border: 1px solid var(--line); }

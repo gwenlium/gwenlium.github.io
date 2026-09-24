@@ -418,11 +418,12 @@ export class SiteEditorStore {
     this.warning = undefined;
   }
 
-  /** Forget the sign-in on this device. Unpublished drafts stay saved for the next sign-in. */
-  async signOut(): Promise<void> {
+  /** Sign out on this device (or everywhere). Unpublished drafts stay saved for the next sign-in. */
+  async signOut(everywhere = false): Promise<string | undefined> {
     this.close();
-    await this.auth.signOut();
+    const warning = await this.auth.signOut(everywhere);
     this.emit();
+    return warning;
   }
 
   private async remote(session: Session, snapshot: EditorSnapshot, path: string, cache: Map<string, Promise<string>>): Promise<string> {

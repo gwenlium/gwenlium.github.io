@@ -29,7 +29,8 @@ export interface OwnerAuth {
   token(force?: boolean): Promise<string>;
   /** Must be called directly from a click: it opens the GitHub popup before any await. */
   signIn(): Promise<void>;
-  signOut(): Promise<void>;
+  /** Forget this browser's sign-in and revoke it on GitHub; `everywhere` ends every device's sign-in. Resolves with a warning if GitHub could not be told. */
+  signOut(everywhere?: boolean): Promise<string | undefined>;
 }
 
 function setHint(value: boolean): void {
@@ -177,9 +178,23 @@ export class BrowserOwnerAuth implements OwnerAuth {
     try { await writeRecord('auth', undefined, 'owner'); } catch { /* Nothing saved. */ }
   }
 
-  async signOut(): Promise<void> {
+  async signOut(everywhere = false): Promise<string | undefined> {
     this.popup?.();
+    let warning: string | undefined;
+    try {
+      const token = await this.token();
+      const response = await fetch(`${this.authOrigin}/editor/revoke`, {
+        method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ everywhere }),
+      });
+      if (!response.ok) warning = ((await response.json().catch(() => ({}))) as { error?: string }).error ?? 'GitHub could not be told about the sign-out.';
+    } catch (error) {
+      // An expired sign-in has nothing left to revoke; anything else is worth saying.
+      if ((error as { status?: number }).status !== 401) warning = 'GitHub could not be reached, so the sign-in was only removed from this browser.';
+    }
     await this.forget();
+    return warning;
   }
 }
 
@@ -188,5 +203,5 @@ export class DevOwnerAuth implements OwnerAuth {
   readonly remembered = true;
   async token(): Promise<string> { setHint(true); return 'ghu_localdevelopment'; }
   async signIn(): Promise<void> { setHint(true); }
-  async signOut(): Promise<void> { setHint(false); }
+  async signOut(): Promise<string | undefined> { setHint(false); return undefined; }
 }

@@ -140,6 +140,8 @@ class OwnerControls {
       signIn.disabled = true;
       status.textContent = 'Waiting for GitHub…';
       signing.then(() => {
+        // Analytics already running in this tab would share it with the new sign-in: start clean.
+        if ((window as { gwenliumBeacon?: boolean }).gwenliumBeacon) { location.reload(); return; }
         dialog.close();
         this.renderTaskbar();
         void this.applyDraft();
@@ -213,7 +215,7 @@ class OwnerControls {
       button('Windows', () => { close(); void this.windowList(); }, 'owner-menu__small'),
       ...(this.store.local ? [] : [button('Analytics', () => { close(); openAnalytics(() => this.store.accessToken()); }, 'owner-menu__small')]),
       button('Discard changes', () => { close(); void this.discard(); }, 'owner-menu__small'),
-      button('Sign out', () => { close(); void this.signOut(); }, 'owner-menu__small'),
+      button('Sign out', () => { close(); this.signOut(); }, 'owner-menu__small'),
     );
     panel.append(more);
     queueMicrotask(() => panel.querySelector<HTMLElement>('[role="menuitem"]')?.focus());
@@ -277,12 +279,29 @@ class OwnerControls {
     catch (error) { toast(errorText(error)); }
   }
 
-  private async signOut(): Promise<void> {
+  private signOut(): void {
+    const { dialog, body, footer, status } = openDialog('Sign out');
     const note = this.store.dirty ? ' Your unpublished changes stay saved on this browser for when you sign in again.' : '';
-    if (!await confirmAction('Sign out on this browser?', `You will need to sign in with GitHub again to edit.${note}`, 'Sign out')) return;
-    this.setEditing(false);
-    await this.store.signOut();
-    location.reload();
+    body.append(node('p', `You will need to sign in with GitHub again to edit from this browser.${note}`));
+    const everywhere = node('label', undefined, 'owner-check');
+    const box = node('input');
+    box.type = 'checkbox';
+    const text = node('span');
+    text.append(node('strong', 'Also sign out on every other device'), node('small', 'Use this if a laptop or phone that was signed in is lost or shared.'));
+    everywhere.append(box, text);
+    if (!this.store.local) body.append(everywhere);
+    const confirm = button('Sign out', () => void (async () => {
+      footer.querySelectorAll('button').forEach(item => { item.disabled = true; });
+      status.textContent = 'Signing out…';
+      this.setEditing(false);
+      const warning = await this.store.signOut(box.checked);
+      if (warning) {
+        status.textContent = warning;
+        footer.replaceChildren(button('Close', () => location.reload(), 'owner-button owner-button--primary'));
+      } else location.reload();
+    })(), 'owner-button owner-button--primary');
+    footer.append(button('Cancel', () => dialog.close()), confirm);
+    confirm.focus();
   }
 
   // Editing in place

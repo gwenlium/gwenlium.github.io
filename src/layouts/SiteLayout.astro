@@ -120,7 +120,19 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
     <meta name="twitter:image" content={socialImage} />
     <meta name="twitter:image:alt" content={socialImageAlt} />
     <ClientRouter />
-    {import.meta.env.PROD && !editor && Astro.url.hostname === siteUrl.hostname && /^[a-f0-9]{32}$/i.test(analytics.cloudflareBeaconToken) && <script is:inline type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon={JSON.stringify({ token: analytics.cloudflareBeaconToken })}></script>}
+    {import.meta.env.PROD && !editor && Astro.url.hostname === siteUrl.hostname && /^[a-f0-9]{32}$/i.test(analytics.cloudflareBeaconToken) && <script is:inline data-beacon={JSON.stringify({ token: analytics.cloudflareBeaconToken })}>
+      (() => {
+        // A browser that holds the owner's editor sign-in (ownerHintKey in src/lib/editor-config.ts) runs no outside scripts.
+        try { if (localStorage.getItem('gwenlium:owner') === '1') return; } catch {}
+        if (window.gwenliumBeacon) return;
+        window.gwenliumBeacon = true;
+        const beacon = document.createElement('script');
+        beacon.defer = true;
+        beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+        beacon.dataset.cfBeacon = document.currentScript.dataset.beacon;
+        document.head.append(beacon);
+      })();
+    </script>}
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>

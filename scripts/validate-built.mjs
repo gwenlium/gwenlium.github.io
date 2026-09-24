@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { load } from 'cheerio';
+import { inlineScripts } from './apply-csp.mjs';
 import {
   containedFile, isPublishedPost, mediaFilePattern, previewReferenceIssue, publicBranding, readMediaPreviews,
   readPosts, resolvePublicUrl, siteOrigin, srcsetUrls, validatePreviewFiles, walkFiles,
@@ -187,6 +189,13 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
     const route = routeForFile(directory, file);
     if (unpublished.has(route)) report(name, 'route', `Unpublished source ${unpublished.get(route)} generated a public page. Exclude drafts and future posts from getStaticPaths().`);
     const { $ } = documentFor(file);
+    // Every page carries the site policy, and it must allow each of the page's inline scripts.
+    const csp = $('head > meta[http-equiv="Content-Security-Policy"]').attr('content') ?? '';
+    if (!csp.includes("script-src 'self'")) report(name, 'Content-Security-Policy', 'Missing the site policy. Run scripts/apply-csp.mjs after astro build.');
+    else for (const script of inlineScripts(fs.readFileSync(file, 'utf8'))) {
+      const hash = `'sha256-${createHash('sha256').update(script, 'utf8').digest('base64')}'`;
+      if (!csp.includes(hash)) report(name, 'Content-Security-Policy', `An inline script is not allowed by the policy: ${script.trim().slice(0, 60)}…`);
+    }
     if (!/^\/(?:admin|write)(?:\/|$)/.test(route)) {
       $('a[href]').each((_, element) => {
         const href = $(element).attr('href');

@@ -531,3 +531,41 @@ test('editor deletes journal entries in the same atomic commit and nothing else'
   const treeWrites = fixture.writes.filter(write => write.path.endsWith('/git/trees'));
   assert.deepEqual(treeWrites[0].body.tree, [{ path: post, mode: '100644', type: 'blob', sha: null }]);
 });
+
+function revokeUpstream(options = {}) {
+  const deletes = [];
+  const handler = async request => {
+    const url = new URL(request.url);
+    if (url.pathname === '/user') return Response.json({ id: options.userId ?? 1, login: 'owner' });
+    if (request.method === 'DELETE' && url.pathname.startsWith('/applications/test-client/')) {
+      deletes.push({ path: url.pathname, authorization: request.headers.get('authorization'), body: await request.json() });
+      return new Response(null, { status: options.status ?? 204 });
+    }
+    throw new Error(`Unexpected upstream request ${request.method} ${url.pathname}`);
+  };
+  return { handler, deletes };
+}
+
+const revokeHeaders = { ...analyticsHeaders, 'Content-Type': 'application/json' };
+
+test('sign-out revokes this token or every device on GitHub, for the owner only', async t => {
+  for (const everywhere of [false, true]) {
+    const upstream = revokeUpstream(); const worker = runtime(upstream.handler); t.after(() => worker.dispose());
+    const response = await worker.dispatchFetch('https://auth.test/editor/revoke', { method: 'POST', headers: revokeHeaders, body: JSON.stringify({ everywhere }) });
+    assert.equal(response.status, 200, await response.clone().text());
+    assert.deepEqual(upstream.deletes, [{
+      path: `/applications/test-client/${everywhere ? 'grant' : 'token'}`,
+      authorization: `Basic ${Buffer.from('test-client:test-secret').toString('base64')}`,
+      body: { access_token: token },
+    }]);
+  }
+  const stranger = revokeUpstream({ userId: 999 }); const denied = runtime(stranger.handler); t.after(() => denied.dispose());
+  assert.equal((await denied.dispatchFetch('https://auth.test/editor/revoke', { method: 'POST', headers: revokeHeaders, body: '{"everywhere":true}' })).status, 403);
+  assert.deepEqual(stranger.deletes, []);
+  const malformed = revokeUpstream(); const strict = runtime(malformed.handler); t.after(() => strict.dispose());
+  assert.equal((await strict.dispatchFetch('https://auth.test/editor/revoke', { method: 'POST', headers: revokeHeaders, body: '{"everywhere":"yes"}' })).status, 400);
+  assert.equal((await strict.dispatchFetch('https://auth.test/editor/revoke', { method: 'POST', headers: { ...revokeHeaders, Origin: 'https://attacker.test' }, body: '{"everywhere":true}' })).status, 403);
+  assert.deepEqual(malformed.deletes, []);
+  const gone = revokeUpstream({ status: 404 }); const already = runtime(gone.handler); t.after(() => already.dispose());
+  assert.equal((await already.dispatchFetch('https://auth.test/editor/revoke', { method: 'POST', headers: revokeHeaders, body: '{"everywhere":false}' })).status, 200);
+});

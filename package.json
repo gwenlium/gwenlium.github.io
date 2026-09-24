@@ -10,7 +10,7 @@
     "predev": "node scripts/validate-source.mjs && node scripts/prepare-media.mjs",
     "dev": "astro dev --host 127.0.0.1",
     "prebuild": "node scripts/validate-source.mjs && node scripts/prepare-media.mjs",
-    "build": "astro build && node scripts/validate-built.mjs",
+    "build": "astro build && node scripts/apply-csp.mjs && node scripts/validate-built.mjs",
     "preview": "astro preview --host 127.0.0.1",
     "precheck": "node scripts/validate-source.mjs && node scripts/prepare-media.mjs",
     "media:import": "node scripts/import-media.mjs",
