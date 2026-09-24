@@ -2,6 +2,7 @@ import classWorkerURL from '@ffmpeg/ffmpeg/worker?worker&url';
 import coreURL from '@ffmpeg/core?url';
 import wasmURL from '@ffmpeg/core/wasm?url';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { normalizeWatermarkCredit, watermarkCreditError, watermarkLayout } from '../lib/watermark.mjs';
 
 type PreviewMetadata =
   | { kind: 'image'; width: number; height: number; duration?: number }
@@ -323,18 +324,50 @@ function encodeCanvas(element: HTMLCanvasElement, type: string, signal?: AbortSi
   return abortable(promise, signal);
 }
 
-function watermark(creator: string, size: Dimensions): HTMLCanvasElement {
-  const nominalWidth = Math.max(180, [...creator].length * 17 + 64);
-  const fitted = bounded(nominalWidth, 76, Math.min(460, Math.max(1, Math.floor(size.width * 0.38))));
-  const scale = Math.min(1, size.height / fitted.height);
-  const mark = canvas({ width: Math.max(1, Math.floor(fitted.width * scale)), height: Math.max(1, Math.floor(fitted.height * scale)) });
-  mark.context.scale(mark.element.width / nominalWidth, mark.element.height / 76);
-  mark.context.font = '500 28px sans-serif';
+function stripWebpMetadata(data: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  if (data.length < 12 || view.getUint32(0, true) !== 0x46464952 || view.getUint32(8, true) !== 0x50424557 || view.getUint32(4, true) + 8 !== data.length) fail('The browser produced an invalid WebP image.');
+  let output = 12;
+  for (let offset = 12; offset < data.length;) {
+    if (offset + 8 > data.length) fail('The browser produced a truncated WebP image.');
+    const kind = view.getUint32(offset, true);
+    const length = view.getUint32(offset + 4, true);
+    const end = offset + 8 + length + (length & 1);
+    if (end > data.length) fail('The browser produced a truncated WebP chunk.');
+    // Canvas is sRGB. Its optional ICC profile is redundant; no EXIF or XMP
+    // belongs in a public preview, even if a browser encoder adds it.
+    if (kind !== 0x50434349 && kind !== 0x46495845 && kind !== 0x20504d58) {
+      if (kind === 0x58385056) {
+        if (length !== 10) fail('The browser produced an invalid extended WebP header.');
+        data[offset + 8] &= ~0x2c;
+      }
+      data.copyWithin(output, offset, end);
+      output += end - offset;
+    }
+    offset = end;
+  }
+  view.setUint32(4, output - 8, true);
+  return data.subarray(0, output);
+}
+
+async function watermark(creator: string, size: Dimensions): Promise<HTMLCanvasElement> {
+  const mark = canvas({ width: 1, height: 1 });
+  const layout = await watermarkLayout(creator, size.width, size.height, (label, fontSize) => {
+    mark.context.font = `500 ${fontSize}px sans-serif`;
+    const metrics = mark.context.measureText(label);
+    return Math.max(metrics.width, metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight);
+  });
+  mark.element.width = layout.width;
+  mark.element.height = layout.height;
+  mark.context.scale(layout.scale, layout.scale);
   mark.context.lineWidth = 2;
   mark.context.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-  mark.context.strokeText(creator, 24, 40, nominalWidth - 64);
   mark.context.fillStyle = 'rgba(255, 255, 255, 0.65)';
-  mark.context.fillText(creator, 24, 40, nominalWidth - 64);
+  for (const line of layout.lines) {
+    mark.context.font = `500 ${line.fontSize}px sans-serif`;
+    mark.context.strokeText(line.text, line.x, line.y);
+    mark.context.fillText(line.text, line.x, line.y);
+  }
   return mark.element;
 }
 
@@ -352,9 +385,10 @@ async function still(blob: Blob, options: Settings, source: Dimensions): Promise
     const size = bounded(bitmap.width, bitmap.height, 1600);
     surface = canvas(size);
     surface.context.drawImage(bitmap, 0, 0, size.width, size.height);
-    mark = watermark(options.creator, size);
+    mark = await watermark(options.creator, size);
     surface.context.drawImage(mark, size.width - mark.width, size.height - mark.height);
-    const output = await encodeCanvas(surface.element, 'image/webp', options.signal);
+    const encoded = await encodeCanvas(surface.element, 'image/webp', options.signal);
+    const output = new Blob([stripWebpMetadata(new Uint8Array(await bytes(encoded, options.signal)))], { type: 'image/webp' });
     const verified = await decodeBitmap(output, options.signal);
     try {
       if (verified.width !== size.width || verified.height !== size.height) fail('The generated image has unexpected dimensions. Nothing was prepared.');
@@ -531,7 +565,7 @@ async function video(file: File, options: Settings): Promise<Generated> {
     const frame = await binary(ffmpeg, 'frame.png');
     const size = inspectRaster(frame);
     if (size.width > 1280 || size.width < 2 || size.height < 2) fail('The selected frame cannot meet the video preview dimensions.');
-    const mark = watermark(options.creator, size);
+    const mark = await watermark(options.creator, size);
     try { await ffmpeg.writeFile('watermark.png', new Uint8Array(await bytes(await encodeCanvas(mark, 'image/png', options.signal), options.signal))); }
     finally { mark.width = mark.height = 1; }
     await ffmpeg.deleteFile('frame.png');
@@ -601,7 +635,7 @@ async function animation(data: ArrayBuffer, raster: Raster, options: Settings): 
           if (!surfaces.frame) {
             size = bounded(decoded.image.displayWidth, decoded.image.displayHeight, 1600);
             surfaces.frame = canvas(size);
-            surfaces.mark = watermark(options.creator, size);
+            surfaces.mark = await watermark(options.creator, size);
           }
           const { frame: surface, mark } = surfaces;
           surface.context.clearRect(0, 0, surface.element.width, surface.element.height);
@@ -690,7 +724,10 @@ export async function preparePreview(file: File, options: PreviewOptions): Promi
   if (!globalThis.isSecureContext || !globalThis.crypto?.subtle || typeof document === 'undefined' || typeof FileReader === 'undefined' || typeof Promise.withResolvers !== 'function') fail('Safe preview preparation needs a current HTTPS browser with Canvas, FileReader, Web Crypto and Promise.withResolvers support.');
   if (typeof File === 'undefined' || !(file instanceof File) || !file.size) fail('Choose a nonempty local media file in a supported browser.');
   if (file.size > videoBytes) fail('Originals must be at most 128 MiB (32 MiB for images). Trim or resize the original locally first.');
-  if (typeof options.creator !== 'string' || !options.creator.trim() || options.creator.length > 200 || /[\u0000-\u001f\u007f]/.test(options.creator)) fail('Set a creator name of 1–200 characters without control characters before preparing previews.');
+  let creator: string;
+  try { creator = normalizeWatermarkCredit(options.creator); }
+  catch { fail(watermarkCreditError); }
+  if (!creator) fail(watermarkCreditError);
   if (options.name !== undefined && options.name !== '' && (typeof options.name !== 'string' || options.name.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(options.name))) fail('The public name must be 1–64 lowercase letters or numbers separated by single hyphens, without an extension.');
   if (options.fullLength !== undefined && typeof options.fullLength !== 'boolean') fail('Choose short preview or full length.');
   if (options.fullLength && (options.start !== undefined || options.duration !== undefined)) fail('Full-length publishing cannot also specify excerpt settings.');
@@ -698,7 +735,7 @@ export async function preparePreview(file: File, options: PreviewOptions): Promi
   const duration = options.duration ?? 30;
   if (!Number.isFinite(start) || start < 0 || start > Number.MAX_SAFE_INTEGER / 1000) fail('The excerpt offset must be a finite, nonnegative number of seconds.');
   if (!Number.isFinite(duration) || duration <= 0 || duration > 60) fail('The excerpt duration must be greater than zero and at most 60 seconds.');
-  const settings: Settings = { ...options, creator: options.creator.trim(), start, duration };
+  const settings: Settings = { ...options, creator, start, duration };
   const hasTiming = options.start !== undefined || options.duration !== undefined;
   // Queue whole jobs, not just exec(), so concurrent originals cannot exhaust the WASM heap.
   // Cancelling a queued job does not terminate the currently active user's conversion.

@@ -385,14 +385,17 @@ collections:
             default: Gwenlium
           - name: watermarkText
             label: Watermark credit
-            widget: string
+            widget: text
             required: false
-            default: © Gwendolyn Ural Erkut gwenlium.dev
-            hint: A small translucent credit on new image and video uploads. Existing uploads keep their
-              original watermark.
+            default: |-
+              © Gwendolyn Ural Erkut
+              gwenlium.dev
+            hint: Put the copyright and name on the first line and your website on the second (up to 200
+              characters total). Leave blank to use the display name. New image and video uploads receive
+              this translucent credit; existing uploads keep their original watermark until re-imported.
             pattern:
-              - ^.{1,200}$
-              - Use 1 to 200 characters.
+              - '^(?=[\s\S]{0,200}$)(?:[^\x00-\x1F\x7F-\x9F\u2028\u2029\uFFFE\uFFFF]+(?:\n[^\x00-\x1F\x7F-\x9F\u2028\u2029\uFFFE\uFFFF]+)?)?$'
+              - Use up to 200 characters on one or two nonempty lines, without control characters.
           - name: description
             label: Site description
             widget: text
@@ -956,7 +959,7 @@ collections:
                   - pink
                   - lavender
               - name: floating
-                label: Start as a floating window
+                label: Use custom default placement
                 widget: boolean
                 required: false
                 default: false
@@ -970,6 +973,18 @@ collections:
                 hint: Visitors can reopen ordinary windows from Start. Keep this on for start-menu so it opens only
                   when requested; site-settings and music-player can start open or closed. The
                   player's saved visibility takes precedence.
+              - name: x
+                label: Initial horizontal offset (pixels)
+                widget: number
+                required: false
+                value_type: float
+                hint: Optional offset from the workspace's left edge when custom placement is enabled. Existing visitor arrangements take precedence.
+              - name: y
+                label: Initial vertical offset (pixels)
+                widget: number
+                required: false
+                value_type: float
+                hint: Optional offset from the workspace's top edge when custom placement is enabled. Every window stays pinned inside the visible workspace.
               - name: width
                 label: Initial width (pixels)
                 widget: number
@@ -985,8 +1000,7 @@ collections:
                 widget: number
                 required: true
                 default: 0
-                hint: 0 keeps the existing automatic height. Use a whole number of pixels. Floating windows fit the
-                  workspace; in-page windows scroll their content within this height.
+                hint: 0 uses automatic height. Every window fits the workspace and scrolls its content internally.
                 value_type: int
                 min: 0
                 step: 1

@@ -1,8 +1,8 @@
-type BackgroundMode = 'dots' | 'polygons' | 'circuits' | 'checker' | 'wave' | 'stars' | 'weave' | 'off';
+type BackgroundMode = 'dots' | 'polygons' | 'circuits' | 'hills' | 'wave' | 'stars' | 'weave' | 'off';
 type Circuit = { points: Float32Array; distances: Float32Array; length: number };
 
 const modes: Record<string, BackgroundMode | undefined> = {
-  dots: 'dots', polygons: 'polygons', circuits: 'circuits', checker: 'checker', wave: 'wave', stars: 'stars', weave: 'weave', off: 'off',
+  dots: 'dots', polygons: 'polygons', circuits: 'circuits', hills: 'hills', wave: 'wave', stars: 'stars', weave: 'weave', off: 'off',
 };
 const root = document.documentElement;
 const lifetime = new AbortController();
@@ -14,6 +14,7 @@ const frameInterval = 1000 / 30;
 const tau = Math.PI * 2;
 let mode: BackgroundMode = 'off';
 let reduced = true;
+let dark = false;
 let ink = '';
 let line = '';
 let accent = '';
@@ -48,6 +49,8 @@ class BackgroundViewport {
   private terminals = new Path2D();
   private polygonLines = new Path2D();
   private tilePattern: CanvasPattern | null = null;
+  private landscape: HTMLCanvasElement | null = null;
+  private landscapePixel = 1;
   private readonly resizeObserver: ResizeObserver;
 
   constructor(readonly canvas: HTMLCanvasElement, private readonly context: CanvasRenderingContext2D) {
@@ -86,34 +89,10 @@ class BackgroundViewport {
     this.terminals = new Path2D();
     this.polygonLines = new Path2D();
     this.tilePattern = null;
+    if (mode !== 'hills') this.landscape = null;
 
-    if (mode === 'checker') {
-      const tile = document.createElement('canvas');
-      tile.width = tile.height = 48;
-      const ctx = tile.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = tint;
-        ctx.globalAlpha = .2;
-        ctx.fillRect(0, 0, 24, 24);
-        ctx.fillRect(24, 24, 24, 24);
-        // Bake the glow into the repeated tile, including neighboring edges so it stays seamless.
-        ctx.strokeStyle = accent;
-        ctx.shadowColor = accent;
-        ctx.shadowBlur = 8;
-        ctx.globalAlpha = .6;
-        ctx.beginPath();
-        for (let offset = -23.5; offset <= 72.5; offset += 24) {
-          ctx.moveTo(offset, -24);
-          ctx.lineTo(offset, 72);
-          ctx.moveTo(-24, offset);
-          ctx.lineTo(72, offset);
-        }
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = .35;
-        ctx.stroke();
-        this.tilePattern = this.context.createPattern(tile, 'repeat');
-      }
+    if (mode === 'hills') {
+      this.rebuildHills();
       return;
     }
 
@@ -243,11 +222,74 @@ class BackgroundViewport {
     else if (mode === 'circuits') this.drawCircuits(time);
     else if (mode === 'wave') this.drawWave(time);
     else if (mode === 'stars') this.drawStars(time);
+    else if (mode === 'hills' && this.landscape) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(this.landscape, 0, -64, this.landscape.width * this.landscapePixel, this.landscape.height * this.landscapePixel);
+    }
     else if (this.tilePattern) {
       ctx.fillStyle = this.tilePattern;
       ctx.fillRect(0, -64, this.width, this.height + 128);
     }
     ctx.restore();
+  }
+
+  private rebuildHills(): void {
+    // An original low-resolution landscape; its overscan follows the existing scroll parallax.
+    // Cache the complete scene, so stationary hills need no animation clock or per-frame geometry.
+    const pixel = this.landscapePixel = Math.max(3, Math.min(6, Math.floor(this.width / 240)));
+    const scene = this.landscape ??= document.createElement('canvas');
+    const width = scene.width = Math.ceil(this.width / pixel);
+    const height = scene.height = Math.ceil((this.height + 128) / pixel);
+    const ctx = scene.getContext('2d');
+    if (!ctx) return;
+    const top = 64 / pixel;
+    const span = this.height / pixel;
+    const sky = dark
+      ? ['#17283e', '#203550', '#2a435c', '#35556b']
+      : ['#639eca', '#7db1d6', '#9ac6df', '#b9dbe7'];
+    for (let band = 0; band < sky.length; band++) {
+      ctx.fillStyle = sky[band];
+      const y = band === 0 ? 0 : Math.round(top + span * (band * .18 - .06));
+      ctx.fillRect(0, y, width, height - y);
+    }
+
+    const cloud = Math.max(1, Math.min(5, Math.round(width / 70)));
+    for (let index = 0; index < 4; index++) {
+      const unit = index === 3 ? Math.max(1, cloud - 1) : cloud;
+      const x = Math.round(width * (.13 + index * .25) - unit * 6);
+      const y = Math.round(top + span * (.14 + (index * 7 % 3) * .095));
+      ctx.fillStyle = dark ? '#5a7180' : '#edf3ed';
+      ctx.fillRect(x + unit * 4, y, unit * 5, unit);
+      ctx.fillRect(x + unit * 2, y + unit, unit * 9, unit * 2);
+      ctx.fillRect(x + unit, y + unit * 2, unit * 12, unit * 2);
+      ctx.fillRect(x, y + unit * 4, unit * 15, unit * 2);
+      ctx.fillStyle = dark ? '#465f71' : '#d2e3e8';
+      ctx.fillRect(x + unit, y + unit * 6, unit * 13, unit);
+      ctx.fillRect(x + unit * 3, y + unit * 7, unit * 9, unit);
+      ctx.fillStyle = dark ? '#6b808a' : '#f7f8ef';
+      ctx.fillRect(x + unit * 4, y + unit, unit * 4, unit);
+      ctx.fillRect(x + unit * 2, y + unit * 3, unit * 2, unit);
+    }
+
+    const hills = dark ? ['#3d5b4a', '#2d4c3b', '#203c2e'] : ['#8cac67', '#75a34e', '#52843b'];
+    const crests = dark ? ['#4b6752', '#395941', '#2d4833'] : ['#a1bd77', '#8eb65d', '#689749'];
+    for (let layer = 0; layer < hills.length; layer++) {
+      const horizon = top + span * (.56 + layer * .15);
+      const rise = Math.max(3, span * (.052 + layer * .018));
+      for (let x = 0; x < width; x++) {
+        const position = x / width;
+        const y = Math.round(horizon + Math.sin(position * 5.2 + layer * 2.1) * rise
+          + Math.sin(position * 9.1 + layer) * rise * .22);
+        ctx.fillStyle = hills[layer];
+        ctx.fillRect(x, y, 1, height - y);
+        ctx.fillStyle = crests[layer];
+        ctx.fillRect(x, y, 1, Math.max(1, Math.round(rise * (.2 + .12 * Math.sin(position * 4 + layer)))));
+      }
+    }
+    // Blend subtly with each page's palette without turning the green hills into a themed pattern.
+    ctx.globalAlpha = .07;
+    ctx.fillStyle = tint;
+    ctx.fillRect(0, 0, width, height);
   }
 
   private drawDots(time: number): void {
@@ -410,7 +452,7 @@ const visibility = new IntersectionObserver((entries) => {
 });
 
 function canAnimate(): boolean {
-  if (document.hidden || reduced || forcedColors.matches || mode === 'off' || mode === 'checker' || mode === 'weave') return false;
+  if (document.hidden || reduced || forcedColors.matches || mode === 'off' || mode === 'hills' || mode === 'weave') return false;
   for (const viewport of viewports) {
     if (viewport.visible && viewport.width && viewport.height) return true;
   }
@@ -493,7 +535,7 @@ function updateParallax(): void {
   parallaxY = nextParallax;
   // The soft color field moves more slowly than the pattern, without extra canvases.
   root.style.setProperty('--background-parallax-y', `${parallaxY}px`);
-  if (mode === 'checker' && !document.hidden) {
+  if (mode === 'hills' && !document.hidden) {
     for (const viewport of viewports) viewport.draw(elapsed);
   }
 }
@@ -509,14 +551,16 @@ function applySettings(): void {
   const nextLine = styles.getPropertyValue('--line').trim();
   const nextAccent = styles.getPropertyValue('--focus').trim();
   const nextTint = styles.getPropertyValue('--sage').trim();
-  const colorsChanged = ink !== nextInk || line !== nextLine || accent !== nextAccent || tint !== nextTint;
+  const nextDark = root.dataset.theme === 'dark' || (root.dataset.theme !== 'light' && darkScheme.matches);
+  const colorsChanged = ink !== nextInk || line !== nextLine || accent !== nextAccent || tint !== nextTint || dark !== nextDark;
   ink = nextInk;
   line = nextLine;
   accent = nextAccent;
   tint = nextTint;
+  dark = nextDark;
   updateParallax();
   for (const viewport of viewports) {
-    if (changed || ((mode === 'checker' || mode === 'weave') && colorsChanged)) viewport.rebuild();
+    if (changed || ((mode === 'hills' || mode === 'weave') && colorsChanged)) viewport.rebuild();
     viewport.draw(reduced ? 18 : elapsed);
   }
   schedule();

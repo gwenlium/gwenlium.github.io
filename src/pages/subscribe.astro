@@ -13,16 +13,16 @@ const feedUrl = new URL('/rss.xml', Astro.site || 'https://gwenlium.dev').href;
 
 <SiteLayout title={pages.subscribe.title}>
   <header class="page-heading">
-    <span class="eyebrow">{pages.subscribe.eyebrow}</span>
-    <h1>{pages.subscribe.title}</h1>
-    {pages.subscribe.intro && <p class="page-intro">{pages.subscribe.intro}</p>}
+    <span class="eyebrow" data-site-edit-file="src/content/pages/subscribe.json" data-site-edit-field="/eyebrow" data-site-edit-format="text" data-site-edit-label="Page eyebrow">{pages.subscribe.eyebrow}</span>
+    <h1 data-site-edit-file="src/content/pages/subscribe.json" data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Page title">{pages.subscribe.title}</h1>
+    {pages.subscribe.intro && <p class="page-intro" data-site-edit-file="src/content/pages/subscribe.json" data-site-edit-field="/intro" data-site-edit-format="text" data-site-edit-label="Page introduction">{pages.subscribe.intro}</p>}
   </header>
   <div class:list={['subscribe-grid', { 'subscribe-grid--paired': showRss && showEmail }]}>
-    {showRss && <div class="subscribe-rss-slot">
+    <div class="subscribe-rss-slot" hidden={!showRss}>
     <Window windowId="subscribe-rss">
       <div class="option-heading"><Icon name="rss" size={30} /><span class="tag">No account needed</span></div>
       <h2>RSS</h2>
-      <p class="option-description">{pages.subscribe.rssDescription}</p>
+      <p class="option-description" data-site-edit-file="src/content/pages/subscribe.json" data-site-edit-field="/rssDescription" data-site-edit-format="text" data-site-edit-label="RSS description">{pages.subscribe.rssDescription}</p>
       <div class="feed-actions">
         <button type="button" class="button-secondary" data-copy-feed={feedUrl}>Copy feed address</button>
         <a class="button-secondary" href={feedUrl} data-astro-reload>Open RSS XML</a>
@@ -31,14 +31,14 @@ const feedUrl = new URL('/rss.xml', Astro.site || 'https://gwenlium.dev').href;
       <label class="feed-label" for="feed-address">Feed address</label>
       <input id="feed-address" class="feed-address" type="url" value={feedUrl} readonly data-feed-address aria-label="RSS feed address" />
     </Window>
-    </div>}
-    {showEmail && <div class="subscribe-email-slot">
+    </div>
+    <div class="subscribe-email-slot" hidden={!showEmail}>
     <Window windowId="subscribe-email">
       <div class="option-heading"><Icon name="mail" size={30} /><span class="tag">follow.it</span></div>
       <SubscribeForm idPrefix="subscribe-form" />
       <FollowAttribution />
     </Window>
-    </div>}
+    </div>
   </div>
 </SiteLayout>
 
@@ -61,7 +61,7 @@ const feedUrl = new URL('/rss.xml', Astro.site || 'https://gwenlium.dev').href;
     .subscribe-grid { width: min(100%, 58rem); margin-inline: auto; gap: clamp(1.8rem, 3vw, 3rem); }
     .subscribe-grid--paired { grid-template-columns: minmax(17rem, 21rem) minmax(0, 34rem); }
     .subscribe-grid--paired .subscribe-email-slot { margin-top: 4rem; }
-    .subscribe-rss-slot:only-child { width: min(100%, 24rem); }
-    .subscribe-email-slot:only-child { width: min(100%, 34rem); margin-inline: auto; }
+    .subscribe-grid:not(.subscribe-grid--paired) .subscribe-rss-slot { width: min(100%, 24rem); }
+    .subscribe-grid:not(.subscribe-grid--paired) .subscribe-email-slot { width: min(100%, 34rem); margin-inline: auto; }
   }
 </style>

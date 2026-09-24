@@ -67,16 +67,16 @@ const galleryItems = definition.content === 'gallery' ? selectItems(gallery, (it
 const musicTracks = definition.content === 'music' ? selectItems(tracks, (track) => track.id) : [];
 ---
 
-{definition.content === 'text' && <DialogueReader id={`reading-${definition.id}`}><div class="prose window-text" data-dialogue-blocks set:html={body} /></DialogueReader>}
+{definition.content === 'text' && <DialogueReader id={`reading-${definition.id}`}><div class="prose window-text" data-dialogue-blocks data-site-edit-file="src/content/windows.json" data-site-edit-field={`/windows/@${definition.id}/body`} data-site-edit-format="markdown" data-site-edit-label="Window body" set:html={body} /></DialogueReader>}
 
 {definition.content === 'media' && (
-  definition.media.length ? <div class="window-media-list">{limitItems(definition.media).map((media) => <Media {...media} />)}</div>
+  definition.media.length ? <div class="window-media-list">{limitItems(definition.media).map((media, index) => <Media {...media} editFile="src/content/windows.json" editField={`/windows/@${definition.id}/media/${index}/src`} editAltField={`/windows/@${definition.id}/media/${index}/alt`} editCaptionField={`/windows/@${definition.id}/media/${index}/caption`} />)}</div>
     : <p class="empty-state">No media published yet.</p>
 )}
 
 {definition.content === 'links' && (
-  definition.links.length ? <ul class="window-links">{limitItems(definition.links).map((link) => (
-    <li><a href={link.url}>{link.label}</a></li>
+  definition.links.length ? <ul class="window-links">{limitItems(definition.links).map((link, index) => (
+    <li><a href={link.url} data-site-edit-file="src/content/windows.json" data-site-edit-field={`/windows/@${definition.id}/links/${index}/label`} data-site-edit-format="text" data-site-edit-label="Link label">{link.label}</a></li>
   ))}</ul> : <p class="empty-state">No links published yet.</p>
 )}
 
@@ -88,8 +88,8 @@ const musicTracks = definition.content === 'music' ? selectItems(tracks, (track)
 {definition.content === 'gallery' && (
   galleryItems.length ? <div class="window-gallery">{galleryItems.map((item) => (
     <article class="window-gallery-item">
-      <h2>{item.title}</h2>
-      <Media src={item.src} alt={item.alt} caption={item.caption} type={item.type} poster={item.poster} />
+      <h2 data-site-edit-file="src/content/gallery.json" data-site-edit-field={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/title`} data-site-edit-format="text" data-site-edit-label="Gallery title">{item.title}</h2>
+      <Media src={item.src} alt={item.alt} caption={item.caption} type={item.type} poster={item.poster} editFile="src/content/gallery.json" editField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/src`} editAltField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/alt`} editCaptionField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/caption`} />
     </article>
   ))}</div> : <p class="empty-state">No work published yet.</p>
 )}
@@ -99,10 +99,10 @@ const musicTracks = definition.content === 'music' ? selectItems(tracks, (track)
     <li class="window-track" data-track-row data-track-id={track.id}>
       <span class="window-track-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
       <div class:list={['window-track-cover', { 'window-track-cover--empty': !track.cover }]}>
-        {track.cover ? <Media src={track.cover} alt={track.coverAlt} sizes="56px" /> : <Icon name="music" size={24} />}
+        {track.cover ? <Media src={track.cover} alt={track.coverAlt} sizes="56px" editFile="src/content/music.json" editField={`/tracks/@${track.id.replaceAll('~', '~0').replaceAll('/', '~1')}/cover`} editAltField={`/tracks/@${track.id.replaceAll('~', '~0').replaceAll('/', '~1')}/coverAlt`} editLabel="Track cover" /> : <Icon name="music" size={24} />}
       </div>
       <div class="window-track-meta">
-        <h2>{track.title}</h2>
+        <h2 data-site-edit-file="src/content/music.json" data-site-edit-field={`/tracks/@${track.id.replaceAll('~', '~0').replaceAll('/', '~1')}/title`} data-site-edit-format="text" data-site-edit-label="Track title">{track.title}</h2>
         <p data-track-state>{track.src ? 'Ready' : 'Audio unavailable'}</p>
       </div>
       <button type="button" class="button window-track-play" data-play-track={track.id} aria-label={`Play ${track.title}`} aria-pressed="false" disabled={!track.src}>

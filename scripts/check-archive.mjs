@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { paginateArchive, pageNumbers } from '../src/lib/archive-pagination.mjs';
+import { previewText } from '../src/lib/preview-text.mjs';
 const entries = Array.from({ length: 125 }, (_, i) => ({ id: String(i), date: new Date(Date.UTC(2025, 0, i + 1)).toISOString() }));
 entries.push({ id: 'new-year', date: '2026-01-01T00:00:00.000Z' });
 assert.equal(paginateArchive(entries).entries[0].id, 'new-year');
@@ -18,3 +19,11 @@ assert.deepEqual(pageNumbers(50, 100), [1, null, 49, 50, 51, null, 100]);
 assert.deepEqual(pageNumbers(1, 1), [1]);
 assert.deepEqual(pageNumbers(1, 4), [1, 2, 3, 4]);
 console.log('Archive navigation: chronology, years, 126 entries, page boundaries, and compact page links passed.');
+const longSummary = 'This is an entry preview. '.repeat(30);
+const preview = previewText(longSummary);
+assert.ok(preview.length <= 201);
+assert.ok(preview.endsWith('…'));
+assert.ok(longSummary.startsWith(preview.slice(0, -1)));
+assert.equal(previewText('Short\n\nsummary'), 'Short summary');
+assert.equal(previewText('A'.repeat(199) + '\u{1f469}\u200d\u{1f4bb}x'), 'A'.repeat(199) + '…');
+console.log('Entry previews are bounded, word-aware, and preserve grapheme boundaries.');

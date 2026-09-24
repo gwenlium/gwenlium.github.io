@@ -15,13 +15,13 @@ const showCatalogue = Boolean(getWindowDefinition('music-catalogue')?.enabled);
 
 <SiteLayout title={pages.music.title}>
   <header class="page-heading">
-    <span class="eyebrow">{pages.music.eyebrow}</span>
-    <h1>{pages.music.title}</h1>
-    {pages.music.intro && <p class="page-intro">{pages.music.intro}</p>}
+    <span class="eyebrow" data-site-edit-file="src/content/pages/music.json" data-site-edit-field="/eyebrow" data-site-edit-format="text" data-site-edit-label="Page eyebrow">{pages.music.eyebrow}</span>
+    <h1 data-site-edit-file="src/content/pages/music.json" data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Page title">{pages.music.title}</h1>
+    {pages.music.intro && <p class="page-intro" data-site-edit-file="src/content/pages/music.json" data-site-edit-field="/intro" data-site-edit-format="text" data-site-edit-label="Page introduction">{pages.music.intro}</p>}
   </header>
   <div class:list={['music-workspace', { 'music-workspace--paired': showLibrary && showCatalogue }]}>
-    {showLibrary && <div class="music-library-slot"><MusicLibrary /></div>}
-    {showCatalogue && <div class="music-catalogue-slot">
+    <div class="music-library-slot" hidden={!showLibrary}><MusicLibrary /></div>
+    <div class="music-catalogue-slot" hidden={!showCatalogue}>
   <Window windowId="music-catalogue">
     {tracks.length ? (
       <section data-topic-catalogue="music" aria-label="Music catalogue">
@@ -31,9 +31,9 @@ const showCatalogue = Boolean(getWindowDefinition('music-catalogue')?.enabled);
           <li class="track" data-item-topics={JSON.stringify(track.topics)} id={`track-${track.id}`} data-track-row data-track-id={track.id}>
             <span class="track-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
             <div class:list={['track-cover', { 'track-cover--empty': !track.cover }]}>
-              {track.cover ? <Media src={track.cover} alt={track.coverAlt} sizes="68px" /> : <Icon name="music" size={24} />}
+              {track.cover ? <Media src={track.cover} alt={track.coverAlt} sizes="68px" editFile="src/content/music.json" editField={`/tracks/@${track.id.replaceAll('~', '~0').replaceAll('/', '~1')}/cover`} editAltField={`/tracks/@${track.id.replaceAll('~', '~0').replaceAll('/', '~1')}/coverAlt`} editLabel="Track cover" /> : <Icon name="music" size={24} />}
             </div>
-            <div class="track-meta"><h2>{track.title}</h2>{track.topics.length > 0 && <div class="topic-tags">{track.topics.map(topic => <button type="button" class="tag" data-topic-pick={topic}>{topic}</button>)}</div>}<p data-track-state>{track.src ? 'Ready' : 'Audio unavailable'}</p></div>
+            <div class="track-meta"><h2 data-site-edit-file="src/content/music.json" data-site-edit-field={`/tracks/@${track.id.replaceAll('~', '~0').replaceAll('/', '~1')}/title`} data-site-edit-format="text" data-site-edit-label="Track title">{track.title}</h2>{track.topics.length > 0 && <div class="topic-tags">{track.topics.map(topic => <button type="button" class="tag" data-topic-pick={topic}>{topic}</button>)}</div>}<p data-track-state>{track.src ? 'Ready' : 'Audio unavailable'}</p></div>
             <div class="track-actions" role="group" aria-label={`Actions for ${track.title}`}>
               <button type="button" class="button track-play" data-play-track={track.id} aria-label={`Play ${track.title}`} aria-pressed="false" disabled={!track.src}>
                 <span data-track-button-label>Play</span>
@@ -54,7 +54,7 @@ const showCatalogue = Boolean(getWindowDefinition('music-catalogue')?.enabled);
       </div>
     )}
   </Window>
-    </div>}
+    </div>
   </div>
 </SiteLayout>
 
@@ -66,7 +66,7 @@ const showCatalogue = Boolean(getWindowDefinition('music-catalogue')?.enabled);
     .music-workspace { gap: clamp(1.4rem, 2.5vw, 2.25rem); }
     .music-workspace--paired { grid-template-columns: minmax(17rem, .78fr) minmax(0, 2fr); }
     .music-workspace--paired .music-library-slot { margin-top: 2.5rem; }
-    .music-library-slot:only-child { width: min(100%, 32rem); }
+    .music-workspace:not(.music-workspace--paired) .music-library-slot { width: min(100%, 32rem); }
   }
   .track-list { list-style: none; margin: 0; padding: 0; }
   .track { display: grid; grid-template-columns: 2ch 68px minmax(0, 1fr); align-items: center; gap: clamp(.75rem, 2cqi, 1rem); padding: clamp(1rem, 3cqi, 1.2rem) .6rem; border-bottom: 1px solid var(--line); }

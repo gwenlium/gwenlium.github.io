@@ -4,7 +4,7 @@ import Window from '../components/Window.astro';
 import Media from '../components/Media.astro';
 import Icon from '../components/Icon.astro';
 import { site } from '../lib/settings';
-import { hasWindowOverride } from '../lib/windows';
+import { getWindowDefinition, hasWindowOverride } from '../lib/windows';
 
 const game = site.game;
 const links = game.links.filter((link) => link.label && /^(https?:\/\/|mailto:|\/(?!\/))/.test(link.url));
@@ -34,23 +34,23 @@ if (game.trailerUrl) {
 ---
 
 <div class="game-overview">
-  {(game.title || game.status || game.cover || game.description || links.length > 0 || hasWindowOverride('game-details')) && (
+  {(game.title || game.status || game.cover || game.description || links.length > 0 || hasWindowOverride('game-details') || getWindowDefinition('game-details')?.enabled === false) && (
     <div class="game-slot">
       <Window windowId="game-details">
         <header class="game-heading">
           <span class="eyebrow">Game development</span>
-          <h2>{game.title || 'Game'}</h2>
-          {game.status && <p class="game-status"><span aria-hidden="true">◆</span> {game.status}</p>}
+          <h2 data-site-edit-file={game.title ? 'src/content/site.json' : undefined} data-site-edit-field={game.title ? '/game/title' : undefined} data-site-edit-format={game.title ? 'text' : undefined} data-site-edit-label={game.title ? 'Game title' : undefined}>{game.title || 'Game'}</h2>
+          {game.status && <p class="game-status"><span aria-hidden="true">◆</span> <span data-site-edit-file="src/content/site.json" data-site-edit-field="/game/status" data-site-edit-format="text" data-site-edit-label="Game status">{game.status}</span></p>}
         </header>
-          {game.cover && <div class="game-cover"><Media src={game.cover} alt={game.coverAlt} eager /></div>}
-          {game.description && <DialogueReader id="game-reading"><div class="game-description prose" data-dialogue-blocks>{game.description.split(/\n\s*\n/).map(paragraph => <p>{paragraph}</p>)}</div></DialogueReader>}
+          {game.cover && <div class="game-cover"><Media src={game.cover} alt={game.coverAlt} eager editFile="src/content/site.json" editField="/game/cover" editAltField="/game/coverAlt" editLabel="Game cover" /></div>}
+          {game.description && <DialogueReader id="game-reading"><div class="game-description prose" data-dialogue-blocks data-site-edit-file="src/content/site.json" data-site-edit-field="/game/description" data-site-edit-format="text" data-site-edit-label="Game description">{game.description.split(/\n\s*\n/).map(paragraph => <p>{paragraph}</p>)}</div></DialogueReader>}
           {links.length > 0 && <nav class="game-links" aria-label="Game links">
-            {links.map((link) => <a class="button" href={link.url}>{link.label}<Icon name="external" size={14} /></a>)}
+            {links.map((link) => <a class="button" href={link.url}><span data-site-edit-file="src/content/site.json" data-site-edit-field={`/game/links/${game.links.indexOf(link)}/label`} data-site-edit-format="text" data-site-edit-label="Game link label">{link.label}</span><Icon name="external" size={14} /></a>)}
           </nav>}
       </Window>
     </div>
   )}
-  {(trailer || hasWindowOverride('game-trailer')) && <div class="game-slot">
+  {(trailer || hasWindowOverride('game-trailer') || getWindowDefinition('game-trailer')?.enabled === false) && <div class="game-slot">
     <Window windowId="game-trailer">
       {directVideo ? <Media src={game.trailerUrl} type="video" alt={`${game.title || 'Game'} trailer`} poster={game.cover} /> : embed ? (
           <div class="trailer-frame"><iframe src={embed} title={`${game.title || 'Game'} trailer`} loading="lazy" allow="fullscreen; picture-in-picture; encrypted-media" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
@@ -69,7 +69,7 @@ if (game.trailerUrl) {
   .game-cover :global(figure) { margin: 0; }
   .game-cover :global(img) { width: 100%; max-height: 320px; object-fit: contain; }
   .game-status { display: inline-flex; align-items: center; gap: .6rem; max-width: 100%; margin: 0; padding: .5rem .7rem; border: 1px solid var(--line); background: var(--sage); color: var(--ink); font-size: .75rem; overflow-wrap: anywhere; }
-  .game-status span { font-size: .6rem; }
+  .game-status span[aria-hidden] { font-size: .6rem; }
   .game-description p { white-space: pre-line; margin-top: 0; }
   .game-links { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.5rem; }
   .trailer-frame { position: relative; aspect-ratio: 16 / 9; background: var(--ink); }

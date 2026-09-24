@@ -1,20 +1,22 @@
 ---
 import Media from './Media.astro';
 import Icon from './Icon.astro';
-import { formatDate, postUrl, type Post } from '../lib/content';
+import { formatDate, postUrl, postSourceFile, postPreview, type Post } from '../lib/content';
 
 interface Props { post: Post; compact?: boolean }
 const { post, compact = false } = Astro.props;
-const { title, date, excerpt, cover, coverAlt, tags } = post.data;
+const { title, date, cover, coverAlt, tags } = post.data;
+const sourceFile = postSourceFile(post);
+const preview = postPreview(post);
 ---
 
 <article class:list={['post-card', { 'has-cover': cover, 'post-card--compact': compact }]}>
-  {cover && <div class="post-cover">{compact ? <a href={postUrl(post)} aria-label={`Read ${title}`}><Media src={cover} alt={coverAlt} sizes="80px" /></a> : <Media src={cover} alt={coverAlt} />}</div>}
+  {cover && <div class="post-cover">{compact ? <a href={postUrl(post)} aria-label={`Read ${title}`}><Media src={cover} alt={coverAlt} sizes="80px" editFile={sourceFile} editField="/cover" editAltField="/coverAlt" editLabel="Post cover" /></a> : <Media src={cover} alt={coverAlt} editFile={sourceFile} editField="/cover" editAltField="/coverAlt" editLabel="Post cover" />}</div>}
   <div class="post-details">
     <a class="tag" href={`/${post.data.section}/`}>{post.data.section === 'life' ? 'Life' : 'Devlog'}</a>
     <time datetime={date.toISOString().slice(0, 10)}>{formatDate(date)}</time>
-    <h2><a href={postUrl(post)}>{title}</a></h2>
-    {excerpt && <p class="post-excerpt">{excerpt}</p>}
+    <h2><a href={postUrl(post)} data-site-edit-file={sourceFile} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{title}</a></h2>
+    {preview && <p class="post-excerpt" data-site-edit-file={sourceFile} data-site-edit-field="/excerpt" data-site-edit-format="text" data-site-edit-label="Post excerpt" data-site-edit-template="post-preview">{preview}</p>}
     {!compact && tags.length > 0 && <ul class="post-tags" aria-label="Tags">{tags.map((tag) => (
       <li><a class="tag" href={`/${post.data.section}/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>
     ))}</ul>}
@@ -32,7 +34,7 @@ const { title, date, excerpt, cover, coverAlt, tags } = post.data;
   h2 { margin: .65rem 0; font-size: clamp(1rem, .8rem + 1.5cqi, 1.35rem); line-height: 1.45; }
   h2 a { text-decoration: none; }
   h2 a:hover { text-decoration: underline; text-underline-offset: .2em; }
-  .post-excerpt { font-family: var(--font-reading); margin: 0 0 1rem; line-height: 1.8; color: var(--muted); }
+  .post-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; max-height: 5.4em; overflow: hidden; font-family: var(--font-reading); margin: 0 0 1rem; line-height: 1.8; color: var(--muted); }
   .post-tags { display: flex; flex-wrap: wrap; gap: .4rem; padding: 0; margin: .8rem 0; list-style: none; }
   .post-tags li { min-width: 0; max-width: 100%; }
   .read-post { display: inline-flex; align-items: center; gap: .5rem; margin-top: .5rem; font-size: .75rem; text-underline-offset: .25em; }

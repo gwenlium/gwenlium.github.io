@@ -1,5 +1,7 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { load } from 'cheerio';
+import { relative, resolve, sep } from 'node:path';
+import { previewText } from './preview-text.mjs';
 
 export type Post = CollectionEntry<'posts'>;
 
@@ -28,7 +30,14 @@ export function postUrl(post: Post): string {
   return `/${post.data.section}/${post.data.permalink}/`;
 }
 
-export function postSearchText(post: Post): string {
+export function postSourceFile(post: Post): string {
+  if (!post.filePath) throw new Error(`Missing source filepath for post ${post.id}.`);
+  const path = relative(resolve('src/content/posts'), resolve(post.filePath)).split(sep).join('/');
+  if (path.startsWith('../') || !path.endsWith('.md')) throw new Error(`Invalid source filepath for post ${post.id}.`);
+  return `src/content/posts/${path}`;
+}
+
+function postBodyText(post: Post): string {
   const html = post.rendered?.html;
   let body = post.body ?? '';
   if (html) {
@@ -37,7 +46,15 @@ export function postSearchText(post: Post): string {
     $('p, li, pre, blockquote, h1, h2, h3, h4, h5, h6, br').append(' ');
     body = $.root().text();
   }
-  return [post.data.title, post.data.excerpt, ...post.data.tags, body].join(' ').replace(/\s+/g, ' ');
+  return body;
+}
+
+export function postSearchText(post: Post): string {
+  return [post.data.title, post.data.excerpt, ...post.data.tags, postBodyText(post)].join(' ').replace(/\s+/g, ' ');
+}
+
+export function postPreview(post: Post): string {
+  return previewText(post.data.excerpt.trim() || postBodyText(post));
 }
 
 const dateFormat = new Intl.DateTimeFormat('en', {

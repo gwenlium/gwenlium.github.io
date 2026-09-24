@@ -7,6 +7,7 @@ import { parse as parseYaml } from 'yaml';
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import { load } from 'cheerio';
 import { builtinWindowPages, systemWindowIds, windowContents, windowPages, windowTones } from '../src/lib/window-catalogue.mjs';
+import { normalizeWatermarkCredit, watermarkCreditError } from '../src/lib/watermark.mjs';
 
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 export const siteOrigin = 'https://gwenlium.dev';
@@ -387,7 +388,9 @@ export function validateSource(root = projectRoot, now = new Date()) {
     text(value.name, file, 'name', true);
     if (value.maintenanceEnabled !== undefined && typeof value.maintenanceEnabled !== 'boolean') report(file, 'maintenanceEnabled', 'Use a boolean maintenance toggle.');
     optionalStrings(value, ['maintenanceHeading', 'maintenanceMessage'], file);
-    optionalStrings(value, ['watermarkText', 'description', 'intro', 'status', 'featuredPost', 'newsletterHeading', 'newsletterButtonLabel'], file);
+    optionalStrings(value, ['description', 'intro', 'status', 'featuredPost', 'newsletterHeading', 'newsletterButtonLabel'], file);
+    try { normalizeWatermarkCredit(value.watermarkText) || normalizeWatermarkCredit(`© ${typeof value.name === 'string' ? value.name.trim() : ''}`); }
+    catch { report(file, 'watermarkText', watermarkCreditError); }
     url(value.githubUrl, file, 'githubUrl');
     if (text(value.newsletterUrl, file, 'newsletterUrl')) {
       try {
@@ -499,6 +502,9 @@ export function validateSource(root = projectRoot, now = new Date()) {
         if (!windowTones.includes(window.tone)) report(file, `${field}.tone`, `Choose one of: ${windowTones.join(', ')}.`);
         for (const key of ['width', 'height', 'limit']) {
           if (!Number.isSafeInteger(window[key]) || window[key] < 0) report(file, `${field}.${key}`, `Provide a nonnegative whole number; 0 means ${key === 'limit' ? 'all items' : 'automatic size'}.`);
+        }
+        for (const key of ['x', 'y']) {
+          if (window[key] !== undefined && (typeof window[key] !== 'number' || !Number.isFinite(window[key]))) report(file, `${field}.${key}`, 'Provide a finite pixel offset from the workspace origin, or omit for automatic placement.');
         }
         if (!windowContents.includes(window.content)) report(file, `${field}.content`, `Choose one of: ${windowContents.join(', ')}.`);
         if (!builtin && window.content === 'default') report(file, `${field}.content`, 'Custom windows have no built-in content. Choose text, media, links, devlog, life, gallery, music or subscribe.');

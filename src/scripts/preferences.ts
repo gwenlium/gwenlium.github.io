@@ -1,10 +1,10 @@
 type ThemePreference = 'light' | 'dark' | 'system';
 type MotionPreference = 'full' | 'reduced' | 'system';
 type ReadingPreference = 'pixel' | 'readable';
-type BackgroundPreference = 'auto' | 'dots' | 'polygons' | 'circuits' | 'checker' | 'wave' | 'stars' | 'weave' | 'off';
+type BackgroundPreference = 'auto' | 'dots' | 'polygons' | 'circuits' | 'hills' | 'wave' | 'stars' | 'weave' | 'off';
 
 const backgroundOptions: Record<string, BackgroundPreference | undefined> = {
-  auto: 'auto', dots: 'dots', polygons: 'polygons', circuits: 'circuits', checker: 'checker', wave: 'wave', stars: 'stars', weave: 'weave', off: 'off',
+  auto: 'auto', dots: 'dots', polygons: 'polygons', circuits: 'circuits', hills: 'hills', wave: 'wave', stars: 'stars', weave: 'weave', off: 'off',
 };
 
 type Preferences = {
@@ -45,8 +45,8 @@ function readPreferences(fallback: Preferences): Preferences {
   }
   if (!saved || typeof saved !== 'object') return { ...defaults };
   const value = saved as Record<string, unknown>;
-  if (value.background === 'rain') {
-    value.background = 'weave';
+  if (value.background === 'rain' || value.background === 'checker') {
+    value.background = value.background === 'checker' ? 'hills' : 'weave';
     try { localStorage.setItem(storageKey, JSON.stringify(value)); }
     catch { storageAvailable = false; }
   }

@@ -6,9 +6,9 @@ import Window from '../components/Window.astro';
 <SiteLayout title={pages['not-found'].title} noindex>
   <Window windowId="not-found">
     <div class="empty-state">
-      <span class="eyebrow">{pages['not-found'].eyebrow}</span>
-      <h1 class="page-heading">{pages['not-found'].title}</h1>
-      {pages['not-found'].intro && <p class="page-intro">{pages['not-found'].intro}</p>}
+      <span class="eyebrow" data-site-edit-file="src/content/pages/not-found.json" data-site-edit-field="/eyebrow" data-site-edit-format="text" data-site-edit-label="Page eyebrow">{pages['not-found'].eyebrow}</span>
+      <h1 class="page-heading" data-site-edit-file="src/content/pages/not-found.json" data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Page title">{pages['not-found'].title}</h1>
+      {pages['not-found'].intro && <p class="page-intro" data-site-edit-file="src/content/pages/not-found.json" data-site-edit-field="/intro" data-site-edit-format="text" data-site-edit-label="Page introduction">{pages['not-found'].intro}</p>}
     </div>
   </Window>
 </SiteLayout>

@@ -254,17 +254,57 @@ function cleanupWindows() {
   pageBody = undefined;
 }
 
-function initializeWindows() {
-  if (pageBody === document.body) return;
-  cleanupWindows();
-  pageBody = document.body;
-  pageEvents = new AbortController();
-  const { signal } = pageEvents;
-  const taskbar = document.querySelector<HTMLElement>('[data-taskbar-windows]')!;
-
+function discoverWindows() {
+  const taskbar = document.querySelector<HTMLElement>('[data-taskbar-windows]');
+  if (!taskbar) return;
+  const controlsTemplate = document.querySelector<HTMLElement>('#site-settings [data-window-controls]');
+  if (controlsTemplate) document.querySelectorAll<HTMLElement>('.window:not([data-desktop-window])').forEach((root, index) => {
+    const titlebar = root.querySelector<HTMLElement>(':scope > .window-titlebar');
+    const body = root.querySelector<HTMLElement>(':scope > .window-body, :scope > .gallery-item-body');
+    if (!titlebar || !body || root.closest('dialog, template')) return;
+    root.dataset.desktopWindow = '';
+    root.id ||= `desktop-${document.documentElement.dataset.pageTheme || 'page'}-${index + 1}`;
+    root.dataset.windowTitle ||= root.getAttribute('aria-label') || titlebar.textContent?.trim() || 'Window';
+    body.classList.add('window-body');
+    const controls = controlsTemplate.cloneNode(true) as HTMLElement;
+    for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-window-action]')) {
+      const action = button.dataset.windowAction || '';
+      const label = `${action.charAt(0).toUpperCase() + action.slice(1)} ${root.dataset.windowTitle}`;
+      button.title = label; button.setAttribute('aria-label', label);
+    }
+    titlebar.append(controls);
+  });
+  for (const [id, entry] of desktopWindows) {
+    if (entry.root.isConnected) continue;
+    entry.request++;
+    cancelWindowAnimation(entry.root);
+    unregisterWindow(entry.root);
+    if (!entry.pinned) entry.taskbarButton.remove();
+    if (maximizedWindow === entry) maximizedWindow = undefined;
+    desktopWindows.delete(id);
+  }
   document.querySelectorAll<HTMLElement>('[data-desktop-window]:not([data-persistent-window])').forEach((root, index) => {
     const id = root.dataset.windowId ||= root.id || `desktop-window-${index + 1}`;
     const title = root.dataset.windowTitle || root.getAttribute('aria-label') || 'Window';
+    const existing = desktopWindows.get(id);
+    if (existing) {
+      if (existing.root !== root) return;
+      existing.title = title;
+      root.setAttribute('aria-label', title);
+      existing.taskbarButton.setAttribute('aria-label', title);
+      existing.taskbarButton.title = title;
+      const label = existing.taskbarButton.querySelector('.taskbar-window-label');
+      if (label) label.textContent = title;
+      for (const button of existing.controls.querySelectorAll<HTMLButtonElement>('[data-window-action]')) {
+        const action = button.dataset.windowAction || '';
+        button.title = `${action.charAt(0).toUpperCase() + action.slice(1)} ${title}`;
+        button.setAttribute('aria-label', button.title);
+      }
+      const titlebar = root.querySelector<HTMLElement>('[data-window-drag]');
+      if (titlebar) titlebar.setAttribute('aria-label', `${title} position and size`);
+      return;
+    }
+    if (!root.querySelector(':scope > .window-body') || !root.querySelector(':scope > .window-titlebar > [data-window-controls]') || !root.querySelector(':scope > .window-titlebar [data-window-maximize]')) return;
     const pinnedButton = id === 'site-settings' ? document.querySelector<HTMLButtonElement>('[data-open-settings]') : null;
     const entry: DesktopWindow = {
       id,
@@ -285,6 +325,19 @@ function initializeWindows() {
     entry.controls.hidden = false;
     if (!root.hidden) void animateWindow(root, 'open');
   });
+}
+
+function initializeWindows() {
+  if (pageBody === document.body) {
+    discoverWindows();
+    windowsChanged();
+    return;
+  }
+  cleanupWindows();
+  pageBody = document.body;
+  pageEvents = new AbortController();
+  const { signal } = pageEvents;
+  discoverWindows();
   createNotice();
 
   document.addEventListener('click', (event) => {
@@ -345,6 +398,7 @@ document.addEventListener('astro:before-swap', cleanupWindows);
 window.addEventListener('pagehide', cleanupWindows);
 window.addEventListener('pageshow', initializeWindows);
 document.addEventListener('astro:page-load', initializeWindows);
+document.addEventListener('gwenlium:editor-windows-changed', initializeWindows);
 initializeWindows();
 
 export {};

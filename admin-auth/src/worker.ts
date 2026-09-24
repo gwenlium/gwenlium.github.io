@@ -1,3 +1,6 @@
+import { contentPath, decodeBase64, EditorError, maxRequestBytes, maxTextBytes, previewRegistry, publishPayload, registryPath, shaPattern, validateContent } from './editor-content';
+import type { EditorFileInfo, EditorMediaEntry, EditorOwner } from '../../src/lib/site-editor-types';
+
 interface Env {
   SITE_ORIGIN: string;
   AUTH_ORIGIN?: string;
@@ -282,19 +285,23 @@ async function startAuthorization(request: Request, url: URL, config: Configurat
   return new Response(null, { status: 302, headers: responseHeaders });
 }
 
-async function githubJson(url: string, options: RequestInit): Promise<Record<string, unknown>> {
+async function githubJson(url: string, options: RequestInit, refUpdate = false): Promise<Record<string, unknown>> {
   const path = new URL(url).pathname;
   const step = path === '/login/oauth/access_token' ? 'token exchange'
     : path === '/user' ? 'account verification'
     : path === '/user/installations' ? 'installation verification' : 'repository verification';
   try {
     const response = await fetch(url, { ...options, redirect: 'manual', signal: AbortSignal.timeout(15000) });
-    if (!response.ok) throw new OAuthError(`GitHub ${step} failed (HTTP ${response.status}). Please try again from the editor.`, 502);
+    if (!response.ok) {
+      if (refUpdate && [409, 422].includes(response.status)) throw new EditorError('The branch changed or rejected this publish. Refresh and review your draft before publishing again.', 409);
+      const status = path === '/user' && [401, 403].includes(response.status) ? response.status : 502;
+      throw new OAuthError(`GitHub ${step} failed (HTTP ${response.status}). Please try again from the editor.`, status);
+    }
     const body = record(await response.json());
     if (!body) throw new OAuthError(`GitHub returned an invalid ${step} response. Please try again from the editor.`, 502);
     return body;
   } catch (error) {
-    if (error instanceof OAuthError) throw error;
+    if (error instanceof OAuthError || error instanceof EditorError) throw error;
     throw new OAuthError(`GitHub ${step} could not be reached. Please try again from the editor.`, 502);
   }
 }
@@ -475,9 +482,217 @@ async function analytics(request: Request, url: URL, env: Env, config: Configura
   }
 }
 
+interface EditorTreeEntry extends EditorFileInfo { mode: string; type: string }
+interface EditorRepository {
+  api: string;
+  name: string;
+  branch: string;
+  ref: string;
+  head: string;
+  treeSha: string;
+  entries: Map<string, EditorTreeEntry>;
+}
+
+function regularFile(repository: EditorRepository, path: string): EditorTreeEntry | undefined {
+  const entry = repository.entries.get(path);
+  if (!entry || entry.type !== 'blob' || entry.mode !== '100644') return undefined;
+  const parts = path.split('/');
+  for (let index = 1; index < parts.length; index++) {
+    const parent = repository.entries.get(parts.slice(0, index).join('/'));
+    if (parent && (parent.type !== 'tree' || parent.mode !== '040000')) return undefined;
+  }
+  return entry;
+}
+
+function writablePath(repository: EditorRepository, path: string): void {
+  if (repository.entries.has(path) && !regularFile(repository, path)) throw new EditorError('Content cannot replace a directory, executable, symlink or submodule.');
+  const parts = path.split('/');
+  for (let index = 1; index < parts.length; index++) {
+    const parent = repository.entries.get(parts.slice(0, index).join('/'));
+    if (parent && (parent.type !== 'tree' || parent.mode !== '040000')) throw new EditorError('Content paths must stay inside normal repository directories.');
+  }
+}
+
+async function branchHead(repository: Pick<EditorRepository, 'api' | 'ref'>, token: string): Promise<string> {
+  const response = await githubJson(`${repository.api}/git/ref/heads/${repository.ref}`, { headers: githubHeaders(token) });
+  const commit = record(response.object);
+  if (commit?.type !== 'commit' || typeof commit.sha !== 'string' || !shaPattern.test(commit.sha)) throw new EditorError('GitHub returned an invalid branch head.', 502);
+  return commit.sha;
+}
+
+async function editorRepository(token: string, config: Configuration): Promise<EditorRepository> {
+  const response = await githubJson(`${GITHUB_API}/repositories/${config.repositoryId}`, { headers: githubHeaders(token) });
+  const name = response.full_name;
+  const branch = response.default_branch;
+  if (response.id !== config.repositoryId || record(response.owner)?.id !== config.userId || typeof name !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(name) || typeof branch !== 'string' ||
+    !branch || branch.length > 255 || /[\u0000-\u0020\u007f~^:?*\[\\]/.test(branch) || branch.includes('..') || branch.includes('@{') ||
+    branch.split('/').some(part => !part || part.startsWith('.') || part.endsWith('.') || part.endsWith('.lock'))) {
+    throw new EditorError('GitHub returned an unexpected website repository.', 403);
+  }
+  const api = `${GITHUB_API}/repos/${name}`;
+  const ref = branch.split('/').map(encodeURIComponent).join('/');
+  const head = await branchHead({ api, ref }, token);
+  const commit = await githubJson(`${api}/git/commits/${head}`, { headers: githubHeaders(token) });
+  const treeSha = record(commit.tree)?.sha;
+  if (commit.sha !== head || typeof treeSha !== 'string' || !shaPattern.test(treeSha)) throw new EditorError('GitHub returned an invalid commit tree.', 502);
+  const tree = await githubJson(`${api}/git/trees/${treeSha}?recursive=1`, { headers: githubHeaders(token) });
+  if (tree.truncated !== false || !Array.isArray(tree.tree) || tree.tree.length > 20000) throw new EditorError('The repository tree is incomplete or too large to edit safely.', 502);
+  const entries = new Map<string, EditorTreeEntry>();
+  for (const value of tree.tree) {
+    const entry = record(value);
+    if (!entry || typeof entry.path !== 'string' || entries.has(entry.path) || typeof entry.sha !== 'string' || !shaPattern.test(entry.sha) ||
+      typeof entry.mode !== 'string' || typeof entry.type !== 'string' || (entry.type === 'blob' && (!Number.isSafeInteger(entry.size) || Number(entry.size) < 0))) {
+      throw new EditorError('GitHub returned an invalid tree entry.', 502);
+    }
+    entries.set(entry.path, { path: entry.path, sha: entry.sha, mode: entry.mode, type: entry.type, size: Number(entry.size ?? 0) });
+  }
+  return { api, name, branch, ref, head, treeSha, entries };
+}
+
+async function editorFile(repository: EditorRepository, path: string, token: string): Promise<{ path: string; sha: string; content: string }> {
+  const entry = regularFile(repository, path);
+  if (!entry) throw new EditorError('The requested content file does not exist as a normal file.', 404);
+  if (entry.size > maxTextBytes) throw new EditorError('The requested content file is too large.', 413);
+  const blob = await githubJson(`${repository.api}/git/blobs/${entry.sha}`, { headers: githubHeaders(token) });
+  if (blob.sha !== entry.sha || blob.encoding !== 'base64' || typeof blob.content !== 'string' || blob.size !== entry.size) throw new EditorError('GitHub returned an invalid content blob.', 502);
+  let content: string;
+  try {
+    const bytes = entry.size === 0 && blob.content === '' ? new Uint8Array() : decodeBase64(blob.content, maxTextBytes, true);
+    if (bytes.length !== entry.size) throw new Error('Incorrect size');
+    content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch { throw new EditorError('The repository content is not valid UTF-8 text.', 502); }
+  return { path, sha: entry.sha, content };
+}
+
+async function requestJson(request: Request): Promise<unknown> {
+  if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(request.headers.get('Content-Type') ?? '')) throw new EditorError('Publish requires application/json.', 415);
+  const length = request.headers.get('Content-Length');
+  if (length && (!/^\d+$/.test(length) || Number(length) > maxRequestBytes)) throw new EditorError('Publish request is too large.', 413);
+  if (!request.body) throw new EditorError('Publish requires a JSON body.');
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let size = 0; let source = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxRequestBytes) { await reader.cancel(); throw new EditorError('Publish request is too large.', 413); }
+      source += decoder.decode(value, { stream: true });
+    }
+    source += decoder.decode();
+    return JSON.parse(source);
+  } catch (error) {
+    if (error instanceof EditorError) throw error;
+    throw new EditorError('Publish requires valid UTF-8 JSON.');
+  } finally { reader.releaseLock(); }
+}
+
+async function publishEditor(request: Request, repository: EditorRepository, token: string, config: Configuration): Promise<Response> {
+  const payload = await publishPayload(await requestJson(request));
+  const conflict = () => new EditorError('The website changed since this draft was loaded. Refresh and review your draft before publishing.', 409);
+  if (payload.baseCommit !== repository.head) throw conflict();
+  for (const change of payload.changes) writablePath(repository, change.path);
+  writablePath(repository, registryPath);
+  const registryFile = regularFile(repository, registryPath);
+  const previews: Record<string, EditorMediaEntry> = registryFile ? previewRegistry((await editorFile(repository, registryPath, token)).content) : Object.create(null);
+  const uploads = new Map(payload.media.map(upload => [upload.path, upload]));
+  for (const upload of payload.media) {
+    writablePath(repository, upload.path);
+    const previous = previews[upload.path.slice(6)];
+    if (repository.entries.has(upload.path)) throw new EditorError('Prepared media paths are immutable. Reuse an existing preview rather than uploading over it.');
+    if (previous) throw new EditorError('This preview path is already registered.');
+    previews[upload.path.slice(6)] = upload.entry;
+  }
+  const exists = (path: string) => uploads.has(path) || Boolean(regularFile(repository, path));
+  for (const path of Object.keys(previews)) if (!exists(`public${path}`)) throw new EditorError('The preview registry contains a missing or unsafe file.');
+  const files = new Map<string, string>();
+  const changes = new Map(payload.changes.map(change => [change.path, change.content]));
+  const contentEntries = [...repository.entries.values()].filter(entry => contentPath(entry.path));
+  if (contentEntries.length > 250 || contentEntries.reduce((total, entry) => total + entry.size, 0) > 8 * maxTextBytes) throw new EditorError('The content catalogue is too large to publish safely.', 413);
+  // Resolve the whole catalogue before any Git writes: cross-file IDs, media and
+  // post slugs must agree with the final tree, not only with each changed file.
+  for (const entry of contentEntries) {
+    if (!regularFile(repository, entry.path)) throw new EditorError('Editable content contains an unsafe file.');
+    files.set(entry.path, changes.get(entry.path) ?? (await editorFile(repository, entry.path, token)).content);
+  }
+  for (const change of payload.changes) files.set(change.path, change.content);
+  validateContent(files, previews, exists, config.siteOrigin);
+  if (await branchHead(repository, token) !== payload.baseCommit) throw conflict();
+  const writeHeaders = new Headers(githubHeaders(token));
+  writeHeaders.set('Content-Type', 'application/json');
+  const tree: Array<{ path: string; mode: string; type: string; sha?: string; content?: string }> = payload.changes.map(change => ({ path: change.path, mode: '100644', type: 'blob', content: change.content }));
+  for (const upload of payload.media) {
+    const blob = await githubJson(`${repository.api}/git/blobs`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ content: upload.content, encoding: 'base64' }) });
+    if (typeof blob.sha !== 'string' || !shaPattern.test(blob.sha)) throw new EditorError('GitHub did not confirm the prepared media upload.', 502);
+    tree.push({ path: upload.path, mode: '100644', type: 'blob', sha: blob.sha });
+  }
+  if (payload.media.length) tree.push({ path: registryPath, mode: '100644', type: 'blob', content: `${JSON.stringify({ files: previews }, null, 2)}\n` });
+  const nextTree = await githubJson(`${repository.api}/git/trees`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ base_tree: repository.treeSha, tree }) });
+  if (typeof nextTree.sha !== 'string' || !shaPattern.test(nextTree.sha)) throw new EditorError('GitHub did not confirm the publication tree.', 502);
+  if (await branchHead(repository, token) !== payload.baseCommit) throw conflict();
+  const commit = await githubJson(`${repository.api}/git/commits`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ message: 'Publish website edits', tree: nextTree.sha, parents: [payload.baseCommit] }) });
+  if (typeof commit.sha !== 'string' || !shaPattern.test(commit.sha)) throw new EditorError('GitHub did not confirm the publication commit.', 502);
+  if (await branchHead(repository, token) !== payload.baseCommit) throw conflict();
+  // Non-force is the final concurrency guard: a competing descendant commit
+  // makes this sibling commit non-fast-forward and GitHub rejects the update.
+  const updated = await githubJson(`${repository.api}/git/refs/heads/${repository.ref}`, { method: 'PATCH', headers: writeHeaders, body: JSON.stringify({ sha: commit.sha, force: false }) }, true);
+  if (record(updated.object)?.sha !== commit.sha) throw new EditorError('GitHub did not confirm the branch update. Refresh before trying again.', 502);
+  return analyticsJson({ commit: commit.sha, htmlUrl: `https://github.com/${repository.name}/commit/${commit.sha}` }, 200, config);
+}
+
+async function editor(request: Request, url: URL, config: Configuration): Promise<Response> {
+  if (request.headers.get('Origin') !== config.siteOrigin) return textResponse('Origin not allowed.', 403);
+  const method = url.pathname === '/editor/publish' ? 'POST' : 'GET';
+  if (request.method === 'OPTIONS') {
+    const requestedHeaders = (request.headers.get('Access-Control-Request-Headers') ?? '').toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
+    const allowedHeaders = method === 'POST' ? ['authorization', 'content-type'] : ['authorization'];
+    if (request.headers.get('Access-Control-Request-Method') !== method || requestedHeaders.some(header => !allowedHeaders.includes(header))) return analyticsJson({ error: 'Invalid preflight.' }, 403, config);
+    const responseHeaders = headers();
+    responseHeaders.set('Access-Control-Allow-Origin', config.siteOrigin);
+    responseHeaders.set('Access-Control-Allow-Methods', method);
+    responseHeaders.set('Access-Control-Allow-Headers', allowedHeaders.join(', '));
+    responseHeaders.set('Vary', 'Origin');
+    return new Response(null, { status: 204, headers: responseHeaders });
+  }
+  if (request.method !== method) return analyticsJson({ error: 'Method not allowed.' }, 405, config);
+  const authorization = request.headers.get('Authorization') ?? '';
+  if (!/^Bearer ghu_[A-Za-z0-9]{1,508}$/.test(authorization)) return analyticsJson({ error: 'Sign in to the editor.' }, 401, config);
+  try {
+    const token = authorization.slice(7);
+    const user = await githubJson(`${GITHUB_API}/user`, { headers: githubHeaders(token) });
+    if (user.id !== config.userId) throw new EditorError('This GitHub account is not allowed to edit this website.', 403);
+    await verifyRepository(token, config);
+    const owner: EditorOwner = { id: config.userId, login: typeof user.login === 'string' ? user.login.slice(0, 100) : '' };
+    const parameters = [...url.searchParams.keys()];
+    if (url.pathname === '/editor/file') {
+      const path = singleParameter(url, 'path'); const ref = singleParameter(url, 'ref');
+      if (parameters.length !== 2 || !contentPath(path, true) || !ref || !shaPattern.test(ref)) throw new EditorError('Provide one allowed content path and one full commit SHA.');
+      const repository = await editorRepository(token, config);
+      if (ref !== repository.head) throw new EditorError('This content snapshot is stale. Refresh the editor before loading more files.', 409);
+      return analyticsJson(await editorFile(repository, path, token), 200, config);
+    }
+    if (parameters.length) throw new EditorError('This endpoint does not accept query parameters.');
+    const repository = await editorRepository(token, config);
+    if (url.pathname === '/editor/publish') return await publishEditor(request, repository, token, config);
+    const files: EditorFileInfo[] = [...repository.entries.values()].filter(entry => contentPath(entry.path, true) && regularFile(repository, entry.path)).map(({ path, sha, size }) => ({ path, sha, size }));
+    return analyticsJson({ head: repository.head, branch: repository.branch, repository: repository.name, owner, files }, 200, config);
+  } catch (error) {
+    const known = error instanceof EditorError || error instanceof OAuthError;
+    return analyticsJson({ error: known ? error.message.slice(0, 400) : 'The editor request could not be completed. Nothing was confirmed published; refresh before retrying.' }, known ? error.status : 502, config);
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (['/editor', '/editor/file', '/editor/publish'].includes(url.pathname)) {
+      const config = configuration(env);
+      if (!config) return textResponse('Editor configuration is unavailable.', 503);
+      if (url.protocol !== 'https:' || url.origin !== config.authOrigin) return textResponse('Invalid editor origin.', 400);
+      return editor(request, url, config);
+    }
     if (url.pathname === '/analytics') {
       const config = configuration(env);
       if (!config) return textResponse('Editor configuration is unavailable.', 503);

@@ -4,8 +4,8 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 import Icon from '../components/Icon.astro';
 import EntryMedia from '../components/EntryMedia.astro';
-import { getPosts, postUrl, formatDate, type Post } from '../lib/content';
-import { hasWindowOverride } from '../lib/windows';
+import { getPosts, postUrl, postSourceFile, formatDate, type Post } from '../lib/content';
+import { getWindowDefinition, hasWindowOverride } from '../lib/windows';
 
 interface Props { post: Post; newer?: Post; older?: Post }
 const { post, newer, older } = Astro.props;
@@ -18,10 +18,11 @@ const related = (await getPosts(post.data.section))
   .sort((a, b) => b.sharedTags - a.sharedTags)
   .slice(0, 3);
 const shareUrl = new URL(postUrl(post), Astro.site ?? 'https://gwenlium.dev').href;
+const sourceFile = postSourceFile(post);
 const mediaItems = [
-  ...(post.data.cover ? [{ src: post.data.cover, type: 'image' as const, alt: post.data.coverAlt, eager: true }] : []),
-  ...post.data.photos.map(src => ({ src, type: 'image' as const, alt: '' })),
-  ...post.data.media,
+  ...(post.data.cover ? [{ src: post.data.cover, type: 'image' as const, alt: post.data.coverAlt, eager: true, editFile: sourceFile, editField: '/cover', editAltField: '/coverAlt', editLabel: 'Post cover' }] : []),
+  ...post.data.photos.map((src, index) => ({ src, type: 'image' as const, alt: '', editFile: sourceFile, editField: `/photos/${index}`, editLabel: 'Post photo' })),
+  ...post.data.media.map((item, index) => ({ ...item, editFile: sourceFile, editField: `/media/${index}/src`, editAltField: `/media/${index}/alt`, editCaptionField: `/media/${index}/caption` })),
 ];
 const hasEntryMedia = mediaItems.length > 0 || /!\[|<(?:img|video|audio|iframe)\b/i.test(post.rendered?.html ?? post.body ?? '') || hasWindowOverride('post-media');
 ---
@@ -38,7 +39,7 @@ const hasEntryMedia = mediaItems.length > 0 || /!\[|<(?:img|video|audio|iframe)\
       <article class="entry">
         <header class="entry-header">
           <p class="eyebrow"><time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time></p>
-          <h1>{post.data.title}</h1>
+          <h1 data-site-edit-file={sourceFile} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{post.data.title}</h1>
           {post.data.tags.length > 0 && <ul class="entry-tags" aria-label="Tags">{post.data.tags.map((tag) => <li><a class="tag" href={`/${post.data.section}/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>)}</ul>}
         </header>
         {contents.length >= 2 && <nav class="contents" aria-label="On this page">
@@ -51,8 +52,8 @@ const hasEntryMedia = mediaItems.length > 0 || /!\[|<(?:img|video|audio|iframe)\
             <button class="button button-secondary" type="button" data-dialogue-exit>Read full post</button>
           </div>
           <div id="entry-content" data-dialogue-content>
-            {post.data.excerpt && <div class="entry-summary" data-dialogue-blocks>{post.data.excerpt.split(/\n\s*\n/).map(paragraph => <p class="entry-excerpt">{paragraph}</p>)}</div>}
-            <div class="prose entry-body" data-dialogue-blocks><Content /></div>
+            {post.data.excerpt && <div class="entry-summary" data-dialogue-blocks data-site-edit-file={sourceFile} data-site-edit-field="/excerpt" data-site-edit-format="text" data-site-edit-label="Post excerpt" data-site-edit-template="post-summary">{post.data.excerpt.split(/\n\s*\n/).map(paragraph => <p class="entry-excerpt">{paragraph}</p>)}</div>}
+            <div class="prose entry-body" data-dialogue-blocks data-site-edit-file={sourceFile} data-site-edit-field="/body" data-site-edit-format="markdown" data-site-edit-label="Post body"><Content /></div>
           </div>
           <nav class="dialogue-controls" aria-label="Dialogue reading" data-dialogue-controls hidden>
             <button class="button button-secondary" type="button" data-dialogue-back disabled>Back</button>
@@ -70,19 +71,19 @@ const hasEntryMedia = mediaItems.length > 0 || /!\[|<(?:img|video|audio|iframe)\
       </div>
 
     {(older || newer) && <nav class="entry-pagination" aria-label="Other journal entries">
-      {older ? <a href={postUrl(older)} rel="prev"><span class="eyebrow">← Older entry</span><span>{older.data.title}</span></a> : <span />}
-      {newer && <a href={postUrl(newer)} rel="next"><span class="eyebrow">Newer entry →</span><span>{newer.data.title}</span></a>}
+      {older ? <a href={postUrl(older)} rel="prev"><span class="eyebrow">← Older entry</span><span data-site-edit-file={postSourceFile(older)} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{older.data.title}</span></a> : <span />}
+      {newer && <a href={postUrl(newer)} rel="next"><span class="eyebrow">Newer entry →</span><span data-site-edit-file={postSourceFile(newer)} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{newer.data.title}</span></a>}
     </nav>}
     </div>
 
-    {hasEntryMedia && <div class="article-media-slot">
+    {(hasEntryMedia || getWindowDefinition('post-media')?.enabled === false) && <div class="article-media-slot" hidden={!hasEntryMedia}>
       <Window windowId="post-media" class="entry-media-window">
         <EntryMedia id="entry-media-viewer" sourceId="entry-content" items={mediaItems} />
       </Window>
     </div>}
 
-    {(related.length > 0 || hasWindowOverride('post-related')) && <div class="article-related-slot"><Window windowId="post-related">
-      <nav aria-label="Related entries"><ul class="related-list">{related.map(({ candidate }) => <li><a href={postUrl(candidate)}>{candidate.data.title}</a><time datetime={candidate.data.date.toISOString().slice(0, 10)}>{formatDate(candidate.data.date)}</time></li>)}</ul></nav>
+    {(related.length > 0 || hasWindowOverride('post-related') || getWindowDefinition('post-related')?.enabled === false) && <div class="article-related-slot"><Window windowId="post-related">
+      <nav aria-label="Related entries"><ul class="related-list">{related.map(({ candidate }) => <li><a href={postUrl(candidate)} data-site-edit-file={postSourceFile(candidate)} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{candidate.data.title}</a><time datetime={candidate.data.date.toISOString().slice(0, 10)}>{formatDate(candidate.data.date)}</time></li>)}</ul></nav>
     </Window></div>}
   </div>
 </SiteLayout>

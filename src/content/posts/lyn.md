@@ -17,12 +17,12 @@ excerpt: >-
   Let's talk about her striking design! The weapon carries the element lightning which is green in this game, thus her outfit conveys this element. Inspiration was taken from 2B from NieR: Automata which I really liked back when I played it the first time; an open airy outfit that is also revealing to some degree, including some tattoos which will play a big role in the HUD later. This was intentional to make her look badass and confident with the blade and she zippzzz through enemies! The weapon design was inspired by Xenoblade 1's Monado, mixed with the iconic design of the Master Sword from Zelda, though it has a very computerly design as well to tell the player again that they are in a computer world.
 tags: []
 featured: true
-cover: /media/image-preview-1a7c10d2e8c0a44e3a179381965eae7e.webp
+cover: /media/lyn-front-preview-6a955fa64a01e2b5356bc0b62a5212ca.webp
 coverAlt: Lyn
 photos:
   - /media/image-preview-891a687ae6e4c6741a1466a36f858714.webp
   - /media/image-preview-7b8b096f8ca8ce125291cf3c85032e8b.webp
-  - /media/image-preview-9313428dbfa2384fcfa7524a0cdd48e9.webp
-  - /media/image-preview-f59e14f6aa4cb235316eaa53e60f6749.webp
+  - /media/lyn-side-preview-ed41a54fb52a017b0d84bd960729bb6c.webp
+  - /media/lyn-rear-preview-088f176c2bd1ebbc2e856012cfcb0c49.webp
 media: []
 ---

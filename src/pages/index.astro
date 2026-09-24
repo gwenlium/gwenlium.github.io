@@ -6,8 +6,8 @@ import Icon from '../components/Icon.astro';
 import Media from '../components/Media.astro';
 import PostCard from '../components/PostCard.astro';
 import { site, gallery, tracks } from '../lib/settings';
-import { getPosts, postUrl, formatDate } from '../lib/content';
-import { hasWindowOverride } from '../lib/windows';
+import { getPosts, postUrl, postSourceFile, formatDate } from '../lib/content';
+import { getWindowDefinition, hasWindowOverride } from '../lib/windows';
 
 const posts = await getPosts();
 const homeIntro = site.intro || site.description;
@@ -29,23 +29,23 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
       <div class="hero-inner">
         <div class="hero-copy">
           <span class="hero-location"><span aria-hidden="true"></span>Home</span>
-          <h1>{site.name}<span class="text-caret" aria-hidden="true">|</span></h1>
-          {homeIntro && <DialogueReader id="home-reading"><div data-dialogue-blocks>{homeIntro.split(/\n\s*\n/).map(paragraph => <p class="hero-intro">{paragraph}</p>)}</div></DialogueReader>}
+          <h1><span data-site-edit-file="src/content/site.json" data-site-edit-field="/name" data-site-edit-format="text" data-site-edit-label="Site name">{site.name}</span><span class="text-caret" aria-hidden="true">|</span></h1>
+          {homeIntro && <DialogueReader id="home-reading"><div data-dialogue-blocks data-site-edit-file="src/content/site.json" data-site-edit-field={site.intro ? '/intro' : '/description'} data-site-edit-format="text" data-site-edit-label="Home introduction">{homeIntro.split(/\n\s*\n/).map(paragraph => <p class="hero-intro">{paragraph}</p>)}</div></DialogueReader>}
         </div>
       </div>
       <div class="hero-statusbar"><span><img src="/avatar.webp" alt="" width="16" height="16" />gwenlium.dev</span><span aria-hidden="true">◆ &nbsp; ◇ &nbsp; ◇</span></div>
     </Window>
     </div>
 
-    {(hasGame || hasWindowOverride('home-game')) && (
+    {(hasGame || hasWindowOverride('home-game') || getWindowDefinition('home-game')?.enabled === false) && (
       <div class="home-slot home-slot--game">
       <Window windowId="home-game" class="featured-game">
         <div class="game-preview">
           <div class="game-preview__copy">
             <p class="eyebrow"><Icon name="game" size={15} />Game development</p>
-            <h2>{game.title || 'Game'}</h2>
-            {game.status && <p class="game-status"><span aria-hidden="true"></span>{game.status}</p>}
-            {game.description && <p class="game-description">{game.description}</p>}
+            <h2 data-site-edit-file={game.title ? 'src/content/site.json' : undefined} data-site-edit-field={game.title ? '/game/title' : undefined} data-site-edit-format={game.title ? 'text' : undefined} data-site-edit-label={game.title ? 'Game title' : undefined}>{game.title || 'Game'}</h2>
+            {game.status && <p class="game-status"><span aria-hidden="true"></span><span data-site-edit-file="src/content/site.json" data-site-edit-field="/game/status" data-site-edit-format="text" data-site-edit-label="Game status">{game.status}</span></p>}
+            {game.description && <p class="game-description" data-site-edit-file="src/content/site.json" data-site-edit-field="/game/description" data-site-edit-format="text" data-site-edit-label="Game description">{game.description}</p>}
             <div class="game-actions">
               <a href="/devlog/">Devlog <Icon name="arrow" size={14} /></a>
               {game.trailerUrl && <a class="game-trailer" href={game.trailerUrl}><Icon name="play" size={14} />Watch trailer</a>}
@@ -68,7 +68,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
                 <h2 class="eyebrow">Recent entries</h2>
                 <ul>
                   {recentPosts.map((post) => (
-                    <li><a href={postUrl(post)}><span>{post.data.title}</span><time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time><Icon name="arrow" size={14} /></a></li>
+                    <li><a href={postUrl(post)}><span data-site-edit-file={postSourceFile(post)} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{post.data.title}</span><time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time><Icon name="arrow" size={14} /></a></li>
                   ))}
                 </ul>
               </div>
@@ -84,15 +84,15 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
 
     </div>
 
-    {(galleryPreview.length > 0 || hasWindowOverride('home-gallery')) && (
+    {(galleryPreview.length > 0 || hasWindowOverride('home-gallery') || getWindowDefinition('home-gallery')?.enabled === false) && (
       <div class="home-slot home-slot--gallery">
-      <Window windowId="home-gallery" class="home-gallery" anchored>
+      <Window windowId="home-gallery" class="home-gallery">
         <div class="section-heading"><h2><Icon name="image" size={20} />Gallery</h2><a href="/gallery/">Browse gallery <Icon name="arrow" size={14} /></a></div>
         <div class="gallery-preview">
           {galleryPreview.map((item) => (
             <div class="gallery-preview__item">
-              {item.title && <h3><a href={`/gallery/#work-${item.id}`}>{item.title}</a></h3>}
-              <Media src={item.src} type={item.type} alt={item.alt} caption={item.caption} poster={item.poster} sizes="(min-width: 1000px) 480px, (max-width: 640px) 90vw, 600px" />
+              {item.title && <h3><a href={`/gallery/#work-${item.id}`} data-site-edit-file="src/content/gallery.json" data-site-edit-field={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/title`} data-site-edit-format="text" data-site-edit-label="Gallery title">{item.title}</a></h3>}
+              <Media src={item.src} type={item.type} alt={item.alt} caption={item.caption} poster={item.poster} sizes="(min-width: 1000px) 480px, (max-width: 640px) 90vw, 600px" editFile="src/content/gallery.json" editField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/src`} editAltField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/alt`} editCaptionField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/caption`} />
             </div>
           ))}
         </div>
@@ -100,7 +100,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
       </div>
     )}
 
-    {(musicPreview.length > 0 || hasWindowOverride('home-music')) && (
+    {(musicPreview.length > 0 || hasWindowOverride('home-music') || getWindowDefinition('home-music')?.enabled === false) && (
       <div class="home-slot home-slot--music">
       <Window windowId="home-music" class="home-music">
         <div class="section-heading"><h2><Icon name="music" size={20} />Music</h2></div>
@@ -109,8 +109,8 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
             <li>
               <button type="button" data-play-track={track.id} aria-label={`Play ${track.title}`}>
                 <span class="track-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
-                <span class="track-cover">{track.cover ? <img src={track.cover} alt={track.coverAlt} width="40" height="40" loading="lazy" decoding="async" /> : <Icon name="music" size={19} />}</span>
-                <span class="track-title">{track.title}</span>
+                <span class="track-cover">{track.cover ? <img src={track.cover} alt={track.coverAlt} width="40" height="40" loading="lazy" decoding="async" data-site-edit-file="src/content/music.json" data-site-edit-field={`/tracks/@${track.id.replaceAll('~', '~0').replaceAll('/', '~1')}/cover`} data-site-edit-alt-field={`/tracks/@${track.id.replaceAll('~', '~0').replaceAll('/', '~1')}/coverAlt`} data-site-edit-format="image" data-site-edit-label="Track cover" /> : <Icon name="music" size={19} />}</span>
+                <span class="track-title" data-site-edit-file="src/content/music.json" data-site-edit-field={`/tracks/@${track.id.replaceAll('~', '~0').replaceAll('/', '~1')}/title`} data-site-edit-format="text" data-site-edit-label="Track title">{track.title}</span>
                 <span class="track-play"><Icon name="play" size={15} /><span>Play</span></span>
               </button>
             </li>
@@ -133,7 +133,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
   .hero-location { display: inline-flex; align-items: center; gap: .6rem; padding: .3rem .55rem; margin-bottom: 1.65rem; border: 1px solid color-mix(in srgb, var(--line) 55%, transparent); background: color-mix(in srgb, var(--surface-raised) 58%, transparent); font-size: 9px; line-height: 1.5; text-transform: uppercase; letter-spacing: .14em; }
   .hero-location > span { display: block; width: 5px; height: 5px; background: var(--accent-ink); }
   h1 { margin: 0 0 1.4rem; font-size: clamp(1.4rem, 6.8cqi, 5.35rem); line-height: 1.1; letter-spacing: -.065em; text-shadow: 2px 3px 0 color-mix(in srgb, var(--surface) 70%, transparent); }
-  h1 > span { color: var(--line); }
+  h1 > .text-caret { color: var(--line); }
   .hero-copy h1:last-child { margin-bottom: 0; }
   .hero-intro { max-width: 43ch; margin-bottom: 1.7rem; font-family: var(--font-reading); font-size: 1rem; line-height: 1.75; white-space: pre-line; }
   .hero-statusbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; min-height: 26px; padding: .3rem .7rem; border-top: 1px solid var(--line); box-shadow: inset 0 1px var(--bevel-light); color: var(--muted); font-size: 9px; }
@@ -143,7 +143,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
   .game-preview__copy { min-width: 0; }
   .game-preview h2 { font-size: clamp(1.1rem, 3cqi, 2rem); margin-bottom: .75rem; }
   .game-status { display: inline-flex; align-items: center; gap: .5rem; color: var(--muted); font-size: 10px; margin-bottom: 1rem; }
-  .game-status > span { width: 5px; height: 5px; background: var(--accent-ink); }
+  .game-status > span[aria-hidden] { width: 5px; height: 5px; background: var(--accent-ink); }
   .game-description { font-family: var(--font-reading); font-size: .95rem; line-height: 1.75; white-space: pre-line; }
   .game-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: 1.25rem; }
   .game-trailer { display: inline-flex; align-items: center; gap: .45rem; font-size: 10px; }

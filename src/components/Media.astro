@@ -11,6 +11,11 @@ interface Props {
   sizes?: string;
   loop?: boolean;
   muted?: boolean;
+  editFile?: string;
+  editField?: string;
+  editAltField?: string;
+  editCaptionField?: string;
+  editLabel?: string;
 }
 
 interface ImageVariant { src: string; width: number }
@@ -22,6 +27,7 @@ interface ImageRecord {
 }
 
 const { src, alt = '', caption = '', type = 'image', poster = '', eager = false, loop = false, muted = false } = Astro.props;
+const { editFile, editField, editAltField, editCaptionField, editLabel = 'Image' } = Astro.props;
 let sourceKey = src;
 try { sourceKey = decodeURIComponent(new URL(src, Astro.site || 'https://gwenlium.dev').pathname); }
 catch { /* Keep malformed escape sequences as authored. */ }
@@ -38,6 +44,11 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
         {image?.sources.avif.length ? <source type="image/avif" srcset={srcset(image.sources.avif)} sizes={sizes} /> : null}
         {image?.sources.webp.length ? <source type="image/webp" srcset={srcset(image.sources.webp)} sizes={sizes} /> : null}
         <img
+          data-site-edit-file={editFile}
+          data-site-edit-field={editField}
+          data-site-edit-alt-field={editAltField}
+          data-site-edit-format={editFile && editField ? 'image' : undefined}
+          data-site-edit-label={editFile && editField ? editLabel : undefined}
           src={image?.src || src}
           alt={alt}
           width={image?.width}
@@ -84,7 +95,7 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
         Your browser does not support audio. <a href={src}>Download the audio</a>.
       </audio>
     )}
-    {caption && <figcaption>{caption}</figcaption>}
+    {caption && <figcaption data-site-edit-file={editFile} data-site-edit-field={editCaptionField} data-site-edit-format={editFile && editCaptionField ? 'text' : undefined} data-site-edit-label={editFile && editCaptionField ? 'Media description' : undefined}>{caption}</figcaption>}
   </figure>
 )}
 

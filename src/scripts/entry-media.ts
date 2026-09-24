@@ -241,6 +241,10 @@ function revealFragment(target: HTMLElement | null) {
 }
 
 export function initializeEntryMedia(): void {
+  if (document.documentElement.dataset.siteEditing === 'true') {
+    disposeViewers();
+    return;
+  }
   for (const [root, viewer] of viewers) {
     if (!root.isConnected || !viewer.source.isConnected || document.getElementById(root.dataset.entryMediaSource || '') !== viewer.source) {
       viewer.dispose();
@@ -291,6 +295,7 @@ window.addEventListener('pagehide', disposeViewers, listenerOptions);
 window.addEventListener('pageshow', initializeEntryMedia, listenerOptions);
 document.addEventListener('astro:before-swap', disposeViewers, listenerOptions);
 document.addEventListener('astro:page-load', initializeEntryMedia, listenerOptions);
+document.addEventListener('gwenlium:editor-mode-changed', initializeEntryMedia, listenerOptions);
 initializeEntryMedia();
 
 if (import.meta.hot) import.meta.hot.dispose(() => {

@@ -1,0 +1,37 @@
+.site-editor-shell { position: fixed; inset: auto .6rem .6rem; margin: 0 auto; width: min(74rem, calc(100% - 1.2rem)); max-height: 35dvh; overflow: auto; padding: .7rem; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); box-shadow: 4px 4px 0 var(--line); font-family: var(--font-reading); font-size: .8rem; }
+.site-editor-bar, .site-editor-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.site-editor-bar strong { margin-right: .4rem; }
+.site-editor-shell button, .site-editor-dialog button { border: 1px solid var(--line); background: var(--surface-raised); color: var(--ink); padding: .5rem .65rem; min-height: 36px; border-radius: 0; font: inherit; cursor: pointer; }
+.site-editor-shell button:disabled, .site-editor-dialog button:disabled { opacity: .55; cursor: wait; }
+.site-editor-shell button:hover:enabled, .site-editor-dialog button:hover:enabled { background: var(--sage); }
+.site-editor-status, .site-editor-dialog-status { margin: .6rem 0 0; line-height: 1.6; white-space: pre-wrap; }
+.site-editor-dialog-status:empty { display: none; }
+.site-editor-dialog { position: fixed; margin: auto; width: min(60rem, calc(100% - 1.5rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.2rem; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font: .9rem/1.6 var(--font-reading); box-shadow: 5px 5px 0 var(--line); }
+.site-editor-dialog::backdrop { background: rgb(0 0 0 / .48); }
+.site-editor-dialog h2 { font-size: 1.2rem; margin: 0 0 1rem; }
+.site-editor-dialog h3 { font-size: 1rem; }
+.site-editor-dialog-body { display: grid; gap: .8rem; }
+.site-editor-dialog label { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; }
+.site-editor-dialog label:has(input[type='checkbox']), .site-editor-dialog label:has(input[type='radio']) { flex-direction: row-reverse; justify-content: flex-end; align-items: center; }
+.site-editor-dialog input:not([type='checkbox'], [type='radio']), .site-editor-dialog select, .site-editor-dialog textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surface-raised); box-sizing: border-box; }
+.site-editor-dialog textarea { resize: vertical; }
+.site-editor-dialog img { max-height: 45dvh; object-fit: contain; }
+.site-editor-actions { margin-top: 1rem; justify-content: flex-end; }
+.site-editor-choice-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .5rem; }
+.site-editor-choice-list button { text-align: left; }
+.site-editor-field-preview { min-height: 3rem; padding: 1rem; border: 1px dashed var(--line); overflow-wrap: anywhere; white-space: pre-wrap; }
+.site-editor-field-preview.prose { white-space: normal; }
+.site-editor-diff { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+.site-editor-dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 22rem; overflow: auto; padding: .7rem; border: 1px solid var(--line); font: .8rem/1.5 monospace; }
+html[data-site-editing='true'][data-site-preview='false'] [data-site-edit-file][data-site-edit-field] { outline: 1px dashed var(--accent-ink); outline-offset: 3px; cursor: text; }
+html[data-site-editing='true'][data-site-preview='false'] [data-site-edit-format='image'] { cursor: pointer; }
+html[data-site-editing='true'][data-site-preview='false'] [data-site-edit-file][data-site-edit-field]:hover { outline: 2px solid var(--accent-ink); }
+html[data-site-editing='true'][data-site-preview='false'] .window-authored-text:empty { min-height: 4rem; }
+html[data-site-editing='true'][data-site-preview='false'] .window-authored-text:empty::before { content: 'Click to add text or a picture'; opacity: .6; }
+.site-editor-created-window { max-width: 100%; }
+.site-editor-created-window .window-controls { display: flex; gap: 3px; margin-left: auto; }
+.site-editor-created-window .window-control { width: 28px; height: 28px; padding: 0; color: var(--ink); background: var(--surface-raised); border: 1px solid var(--line); }
+.site-editor-created-window .window-body { padding: 1rem; overflow: auto; }
+@media (max-width: 600px) { .site-editor-shell { max-height: 29dvh; font-size: .7rem; } .site-editor-dialog { padding: .8rem; } .site-editor-diff { grid-template-columns: 1fr; } }
+@media (forced-colors: active) { .site-editor-shell, .site-editor-dialog { border-color: CanvasText; box-shadow: none; } }
+@media print { .site-editor-shell, .site-editor-dialog { display: none !important; } }

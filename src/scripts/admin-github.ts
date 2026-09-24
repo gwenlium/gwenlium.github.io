@@ -1,5 +1,6 @@
 import { GitHubBackend, type Entry, type GitFile, type PersistOptions } from 'decap-cms-backend-github';
 import type { PreparedPreview } from './admin-media';
+import { normalizeWatermarkCredit } from '../lib/watermark.mjs';
 
 type PreviewMetadata = { sha256: string; kind: 'image' | 'video' | 'audio'; width?: number; height?: number; duration?: number };
 export type PreviewRegistry = { files: Record<string, PreviewMetadata> };
@@ -57,9 +58,10 @@ export class PreparedGitHubBackend extends GitHubBackend {
       this.api.readFile('src/content/site.json', null, { branch: head.commit.sha }),
     ]);
     const settings = typeof site === 'string' ? JSON.parse(site) : {};
-    const creator = settings.watermarkText?.trim() || (settings.name ? `© ${settings.name}` : undefined);
-    if (typeof creator !== 'string' || !creator.trim()) throw new Error('Set your display name in Pages > Home & site settings before uploading.');
-    return { registry: registryFrom(registry), creator: creator.trim() };
+    const creator = normalizeWatermarkCredit(settings.watermarkText)
+      || (typeof settings.name === 'string' && settings.name.trim() ? normalizeWatermarkCredit(`© ${settings.name}`) : '');
+    if (!creator) throw new Error('Set your display name in Pages > Home & site settings before uploading.');
+    return { registry: registryFrom(registry), creator };
   }
 
   publishPreview(preview: PreparedPreview): Promise<string> {

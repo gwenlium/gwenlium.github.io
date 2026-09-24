@@ -12,9 +12,9 @@ const videos = gallery.filter((item) => item.type === 'video').length;
 
 <SiteLayout title={pages.gallery.title}>
   <header class="page-heading">
-    <span class="eyebrow">{pages.gallery.eyebrow}</span>
-    <h1>{pages.gallery.title}</h1>
-    {pages.gallery.intro && <p class="page-intro">{pages.gallery.intro}</p>}
+    <span class="eyebrow" data-site-edit-file="src/content/pages/gallery.json" data-site-edit-field="/eyebrow" data-site-edit-format="text" data-site-edit-label="Page eyebrow">{pages.gallery.eyebrow}</span>
+    <h1 data-site-edit-file="src/content/pages/gallery.json" data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Page title">{pages.gallery.title}</h1>
+    {pages.gallery.intro && <p class="page-intro" data-site-edit-file="src/content/pages/gallery.json" data-site-edit-field="/intro" data-site-edit-format="text" data-site-edit-label="Page introduction">{pages.gallery.intro}</p>}
   </header>
   {gallery.length ? (
     <section class="gallery-workspace" data-gallery data-topic-catalogue="gallery" aria-label="Gallery">
@@ -35,9 +35,9 @@ const videos = gallery.filter((item) => item.type === 'video').length;
       <div class="gallery-grid">
         {gallery.map((item, index) => (
           <article class:list={['window', 'gallery-item', `window--${['sage', 'pink', 'lavender'][index % 3]}`]} data-gallery-type={item.type} data-item-topics={JSON.stringify(item.topics)} id={`work-${item.id}`} aria-labelledby={`work-${item.id}-title`}>
-            <div class="window-titlebar"><span aria-hidden="true"><Icon name={item.type === 'video' ? 'play' : 'image'} size={13} /></span><h2 id={`work-${item.id}-title`} class="window-titlebar__title" title={item.title}>{item.title}</h2></div>
+            <div class="window-titlebar"><span aria-hidden="true"><Icon name={item.type === 'video' ? 'play' : 'image'} size={13} /></span><h2 id={`work-${item.id}-title`} class="window-titlebar__title" title={item.title} data-site-edit-file="src/content/gallery.json" data-site-edit-field={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/title`} data-site-edit-format="text" data-site-edit-label="Gallery title">{item.title}</h2></div>
             <div class="gallery-item-body">
-              <Media src={item.src} alt={item.alt} caption={item.caption} type={item.type} poster={item.poster} sizes={index === 0 ? '(min-width: 1000px) 800px, 90vw' : '(min-width: 1000px) 400px, (min-width: 640px) 45vw, 90vw'} />
+              <Media src={item.src} alt={item.alt} caption={item.caption} type={item.type} poster={item.poster} sizes={index === 0 ? '(min-width: 1000px) 800px, 90vw' : '(min-width: 1000px) 400px, (min-width: 640px) 45vw, 90vw'} editFile="src/content/gallery.json" editField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/src`} editAltField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/alt`} editCaptionField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/caption`} />
               {item.topics.length > 0 && <div class="topic-tags">{item.topics.map(topic => <button type="button" class="tag" data-topic-pick={topic}>{topic}</button>)}</div>}
             </div>
           </article>

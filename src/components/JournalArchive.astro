@@ -29,7 +29,7 @@ const indexJson = JSON.stringify(searchIndex).replace(/</g, '\\u003c');
 
 <SiteLayout title={title}>
   <header class="page-heading archive-heading">
-    <div><p class="eyebrow">{page.eyebrow}</p><h1>{title}</h1>{page.intro && <p class="page-intro">{page.intro}</p>}</div>
+    <div><p class="eyebrow" data-site-edit-file={`src/content/pages/${section}.json`} data-site-edit-field="/eyebrow" data-site-edit-format="text" data-site-edit-label="Page eyebrow">{page.eyebrow}</p><h1 data-site-edit-file={`src/content/pages/${section}.json`} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Page title">{title}</h1>{page.intro && <p class="page-intro" data-site-edit-file={`src/content/pages/${section}.json`} data-site-edit-field="/intro" data-site-edit-format="text" data-site-edit-label="Page introduction">{page.intro}</p>}</div>
   </header>
 
   <div class:list={['journal-archive', `journal-archive--${section}`]} data-devlog data-archive-url={archiveUrl}>

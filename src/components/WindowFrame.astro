@@ -1,0 +1,71 @@
+---
+import type { WindowDefinition } from '../lib/windows';
+import WindowContent from './WindowContent.astro';
+
+interface Props {
+  definition: WindowDefinition;
+  class?: string;
+  hasTitlebarActions?: boolean;
+}
+
+const { definition, class: className, hasTitlebarActions = false } = Astro.props;
+const title = definition.title;
+---
+
+<section id={definition.id} class:list={['window', `window--${definition.tone}`, className]} aria-label={title} data-desktop-window data-window-title={title} data-window-state={definition.initiallyClosed ? 'closed' : 'normal'} data-window-default-floating={definition.floating || undefined} data-window-default-x={definition.x} data-window-default-y={definition.y} data-window-initial-state={definition.initiallyClosed ? 'closed' : undefined} data-window-sized={definition.height > 0 || undefined} hidden={definition.initiallyClosed} tabindex="-1" style={{ width: definition.width > 0 ? `min(${definition.width}px, 100%)` : undefined, height: definition.height > 0 ? `${definition.height}px` : undefined }}>
+  <div class="window-titlebar">
+    <span class="window-titlebar__mark" aria-hidden="true"></span>
+    <span class="window-titlebar__title" title={title} data-site-edit-file="src/content/windows.json" data-site-edit-field={`/windows/@${definition.id}/title`} data-site-edit-format="text" data-site-edit-label="Window title">{title}</span>
+    {definition.content === 'default' && hasTitlebarActions && <div class="window-titlebar__actions"><slot name="titlebar-actions" /></div>}
+    <div class="window-controls" data-window-controls hidden>
+      <button type="button" class="window-control" data-window-action="minimize" aria-label={`Minimize ${title}`} title={`Minimize ${title}`}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12h10" /></svg>
+      </button>
+      <button type="button" class="window-control" data-window-action="maximize" data-window-maximize aria-label={`Maximize ${title}`} title={`Maximize ${title}`}>
+        <svg class="window-control__maximize" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 3h10v10H3zM3 5.5h10" /></svg>
+        <svg class="window-control__restore" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 5V2h9v9h-3M2 5h9v9H2zM2 7.5h9M5 4.5h9" /></svg>
+      </button>
+      <button type="button" class="window-control window-control--close" data-window-action="close" aria-label={`Close ${title}`} title={`Close ${title}`}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8" /></svg>
+      </button>
+    </div>
+  </div>
+  <div class="window-body">{definition.content === 'default' ? <slot /> : <WindowContent definition={definition} />}</div>
+</section>
+
+<script>
+  import '../scripts/windows';
+</script>
+
+<style>
+  .window[hidden], .window-controls[hidden] { display: none !important; }
+  .window-controls { display: flex; flex-shrink: 0; align-items: center; gap: 3px; margin-left: auto; }
+  .window-titlebar__actions { display: flex; flex-shrink: 0; align-items: center; margin-left: auto; }
+  .window-titlebar__actions + .window-controls { margin-left: 0; }
+  .window-control { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; padding: 0; border: 1px solid var(--line); border-radius: 0; color: var(--ink); background: linear-gradient(var(--surface-raised), var(--surface)); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
+  .window-control:hover { background: var(--sage); }
+  .window-control:active { box-shadow: inset 1px 1px var(--bevel-dark), inset -1px -1px var(--bevel-light); }
+  .window-control:focus-visible { position: relative; z-index: 1; outline-offset: 2px; }
+  .window-control--close { background: color-mix(in srgb, var(--pink) 75%, var(--surface)); }
+  .window-control--close:hover { background: var(--pink); }
+  .window-control__restore { display: none; }
+  .window:is([data-window-floating], [data-window-sized]) { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .window:is([data-window-floating], [data-window-sized]) > .window-titlebar { flex-shrink: 0; }
+  .window:is([data-window-floating], [data-window-sized]) > .window-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scroll-padding-block: 1rem; }
+  .window[data-window-state='maximized'] .window-control__maximize { display: none; }
+  .window[data-window-state='maximized'] .window-control__restore { display: block; }
+  .window[data-window-floating]::backdrop { display: none; }
+  :global(.window-recovery-toast) { position: fixed; z-index: 41; right: var(--app-inset); bottom: calc(var(--workspace-bottom, 0px) + var(--app-inset)); width: min(28rem, calc(100% - var(--app-inset) * 2)); max-height: calc(100dvh - var(--workspace-top, 0px) - var(--workspace-bottom, 0px) - var(--app-inset) * 2); overflow: auto; padding: .85rem; border: 1px solid var(--line); background: var(--surface-raised); color: var(--ink); font-family: var(--font-ui); font-size: .75rem; box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark), var(--shadow); }
+  :global(.window-recovery-toast[hidden]) { display: none; }
+  :global(.window-recovery-toast p) { margin: 0 0 .7rem; }
+  :global(.window-recovery-toast__actions) { display: flex; flex-wrap: wrap; gap: .6rem; }
+  :global(.window-recovery-toast button) { min-height: 32px; padding: .35rem .65rem; border: 1px solid var(--line); background: var(--surface); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark); }
+  :global(.window-recovery-toast button:hover) { background: var(--sage); }
+  @media (pointer: coarse) { .window-control { width: 28px; height: 28px; } }
+  @media (forced-colors: active) { .window-control, :global(.window-recovery-toast), :global(.window-recovery-toast button) { border-color: ButtonText; box-shadow: none; } }
+  @media print {
+    .window-controls, :global(.window-recovery-toast), :global([data-window-placeholder]) { display: none !important; }
+    .window[data-window-floating] { display: block; overflow: visible; }
+    .window[data-window-floating] > .window-body { overflow: visible; }
+  }
+</style>

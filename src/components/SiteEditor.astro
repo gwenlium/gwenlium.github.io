@@ -1,0 +1,33 @@
+---
+import { parse } from 'yaml';
+import adminConfiguration from '../../public/admin/config.yml?raw';
+import '../styles/site-editor.css';
+import '../styles/site-editor-markdown.css';
+import '../styles/admin.css';
+const configuration = parse(adminConfiguration);
+---
+<aside id="site-editor-shell" class="site-editor-shell" popover="manual" aria-label="Owner editor" data-auth-origin={configuration.backend.base_url} data-site-origin={configuration.site_url} transition:persist="site-editor"></aside>
+<script>
+  let loading: Promise<typeof import('../scripts/site-editor')> | undefined;
+  const open = async () => {
+    const shell = document.getElementById('site-editor-shell');
+    if (!shell) return;
+    try {
+      loading ??= import('../scripts/site-editor');
+      (await loading).openSiteEditor(shell);
+    } catch {
+      loading = undefined;
+      shell.textContent = 'The editor could not load. Reload the page and try again.';
+      shell.showPopover();
+    }
+  };
+  document.addEventListener('keydown', event => {
+    if (event.ctrlKey && event.altKey && !event.metaKey && !event.shiftKey && event.code === 'KeyE') {
+      event.preventDefault();
+      void open();
+    }
+  });
+  const initialize = () => { if (new URL(location.href).searchParams.get('edit') === '1') void open(); };
+  document.addEventListener('astro:page-load', initialize);
+  initialize();
+</script>

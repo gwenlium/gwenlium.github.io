@@ -17,28 +17,28 @@ const showPortrait = Boolean(getWindowDefinition('about-portrait')?.enabled && (
 
 <SiteLayout title={pages.about.title.replaceAll('{name}', site.name)} image={about.avatar || undefined} imageAlt={about.avatarAlt || undefined}>
   <header class="page-heading">
-    <span class="eyebrow">{pages.about.eyebrow}</span>
-    <h1>{pages.about.title.replaceAll('{name}', site.name)}</h1>
-    {pages.about.intro && <p class="page-intro">{pages.about.intro}</p>}
+    <span class="eyebrow" data-site-edit-file="src/content/pages/about.json" data-site-edit-field="/eyebrow" data-site-edit-format="text" data-site-edit-label="Page eyebrow">{pages.about.eyebrow}</span>
+    <h1 data-site-edit-file="src/content/pages/about.json" data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Page title template" data-site-edit-template="site-name">{pages.about.title.replaceAll('{name}', site.name)}</h1>
+    {pages.about.intro && <p class="page-intro" data-site-edit-file="src/content/pages/about.json" data-site-edit-field="/intro" data-site-edit-format="text" data-site-edit-label="Page introduction">{pages.about.intro}</p>}
   </header>
   <div class:list={['about-grid', { 'about-grid--with-avatar': showPortrait }]}>
-    {showPortrait && <aside class="about-avatar"><Window windowId="about-portrait"><Media src={about.avatar} alt={about.avatarAlt} eager sizes="(min-width: 1000px) 240px, 280px" /></Window></aside>}
+    {(showPortrait || getWindowDefinition('about-portrait')?.enabled === false) && <aside class="about-avatar" hidden={!showPortrait}><Window windowId="about-portrait"><Media src={about.avatar} alt={about.avatarAlt} eager sizes="(min-width: 1000px) 240px, 280px" editFile="src/content/pages/about.json" editField="/avatar" editAltField="/avatarAlt" editLabel="Portrait" /></Window></aside>}
     <div class="about-main">
       <Window windowId="about-bio">
         <DialogueReader id="about-reading">
         {about.body.trim() ? (
-          <div class="prose about-body" data-dialogue-blocks set:html={biography} />
+          <div class="prose about-body" data-dialogue-blocks data-site-edit-file="src/content/pages/about.json" data-site-edit-field="/body" data-site-edit-format="markdown" data-site-edit-label="Biography" set:html={biography} />
         ) : (
           <div class="empty-state">
             <Icon name="user" size={36} />
             <h2>No bio published yet</h2>
           </div>
         )}
-        {pages.about.photos.length > 0 && <div class="about-media" data-dialogue-blocks>{pages.about.photos.map(src => <Media src={src} alt="" />)}</div>}
-        {pages.about.media.length > 0 && <div class="about-media" data-dialogue-blocks>{pages.about.media.map(media => <Media {...media} />)}</div>}
+        {pages.about.photos.length > 0 && <div class="about-media" data-dialogue-blocks>{pages.about.photos.map((src, index) => <Media src={src} alt="" editFile="src/content/pages/about.json" editField={`/photos/${index}`} editLabel="About photo" />)}</div>}
+        {pages.about.media.length > 0 && <div class="about-media" data-dialogue-blocks>{pages.about.media.map((media, index) => <Media {...media} editFile="src/content/pages/about.json" editField={`/media/${index}/src`} editAltField={`/media/${index}/alt`} editCaptionField={`/media/${index}/caption`} />)}</div>}
         </DialogueReader>
       </Window>
-      {about.links.length > 0 && <nav class="profile-links" aria-label="Profile links"><ul>{about.links.map(link => <li><a href={link.url}>{link.label}</a></li>)}</ul></nav>}
+      {about.links.length > 0 && <nav class="profile-links" aria-label="Profile links"><ul>{about.links.map((link, index) => <li><a href={link.url} data-site-edit-file="src/content/pages/about.json" data-site-edit-field={`/links/${index}/label`} data-site-edit-format="text" data-site-edit-label="Profile link label">{link.label}</a></li>)}</ul></nav>}
     </div>
   </div>
 </SiteLayout>

@@ -22,6 +22,8 @@ export interface WindowDefinition {
   initiallyClosed: boolean;
   width: number;
   height: number;
+  x?: number;
+  y?: number;
   content: WindowContent;
   body: string;
   media: WindowMedia[];

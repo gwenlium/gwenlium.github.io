@@ -33,6 +33,8 @@
     "astro": "7.3.3",
     "decap-cms-app": "3.16.2",
     "decap-cms-backend-github": "3.8.2",
+    "dompurify": "3.4.15",
+    "marked": "18.0.14",
     "minisearch": "7.2.0",
     "react": "19.3.0",
     "sharp": "0.35.4"

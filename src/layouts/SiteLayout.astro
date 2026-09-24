@@ -8,6 +8,7 @@ import Footer from '../components/Footer.astro';
 import PixelTransition from '../components/PixelTransition.astro';
 import Window from '../components/Window.astro';
 import Typewriter from '../components/Typewriter.astro';
+import SiteEditor from '../components/SiteEditor.astro';
 import { site } from '../lib/settings';
 import CustomWindows from '../components/CustomWindows.astro';
 import { getWindowDefinition, type WindowPage } from '../lib/windows';
@@ -51,13 +52,14 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
           const value = JSON.parse(localStorage.getItem('gwenlium:preferences') || '{}');
           if (value && typeof value === 'object') saved = value;
         } catch {}
-        if (saved.background === 'rain') {
-          saved.background = 'weave';
+        if (saved.background === 'rain' || saved.background === 'checker') {
+          saved.background = saved.background === 'checker' ? 'hills' : 'weave';
           try { localStorage.setItem('gwenlium:preferences', JSON.stringify(saved)); } catch {}
         }
         try {
-          if (localStorage.getItem('gwenlium:background:last-auto') === 'rain') {
-            localStorage.setItem('gwenlium:background:last-auto', 'weave');
+          const previous = localStorage.getItem('gwenlium:background:last-auto');
+          if (previous === 'rain' || previous === 'checker') {
+            localStorage.setItem('gwenlium:background:last-auto', previous === 'checker' ? 'hills' : 'weave');
           }
         } catch {}
         const theme = ['light', 'dark', 'system'].includes(saved.theme) ? saved.theme : 'system';
@@ -65,10 +67,10 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
         const reading = saved.reading === 'readable' ? 'readable' : 'pixel';
         const root = document.documentElement;
         root.dataset.dialogue = saved.dialogue === 'on' ? 'on' : 'off';
-        const backgrounds = { auto: true, dots: true, polygons: true, circuits: true, checker: true, wave: true, stars: true, weave: true, off: true };
+        const backgrounds = { auto: true, dots: true, polygons: true, circuits: true, hills: true, wave: true, stars: true, weave: true, off: true };
         const background = typeof saved.background === 'string' && Object.hasOwn(backgrounds, saved.background) ? saved.background : 'auto';
         if (!root.dataset.backgroundAuto) {
-          const presets = ['dots', 'polygons', 'circuits', 'checker', 'wave', 'stars', 'weave'];
+          const presets = ['dots', 'polygons', 'circuits', 'hills', 'wave', 'stars', 'weave'];
           let previous = -1;
           try { previous = presets.indexOf(localStorage.getItem('gwenlium:background:last-auto')); } catch {}
           const choice = previous < 0 ? Math.floor(Math.random() * presets.length) : (previous + 1 + Math.floor(Math.random() * (presets.length - 1))) % presets.length;
@@ -118,9 +120,9 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
       <header class="site-header">
         <div class="site-brand" transition:persist="site-brand">
           <span class="brand-icon"><img class="brand-avatar" src="/avatar.webp" alt="" width="43" height="43" /></span>
-          <Typewriter text={site.name} caretClass="brand-caret" />
+          <span data-site-edit-file="src/content/site.json" data-site-edit-field="/name" data-site-edit-format="text" data-site-edit-label="Site name"><Typewriter text={site.name} caretClass="brand-caret" /></span>
         </div>
-        {site.status && <span class="site-status"><i aria-hidden="true"></i>{site.status}</span>}
+        {site.status && <span class="site-status"><i aria-hidden="true"></i><span data-site-edit-file="src/content/site.json" data-site-edit-field="/status" data-site-edit-format="text" data-site-edit-label="Site status">{site.status}</span></span>}
       </header>
 
       <div id="page-scroll" tabindex="0" role="region" aria-label="Page content" transition:name="page-content" transition:animate="none">
@@ -191,13 +193,13 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
             <label><input type="radio" name="background" value="dots" data-preference="background" />Dots</label>
             <label><input type="radio" name="background" value="polygons" data-preference="background" />Polygons</label>
             <label><input type="radio" name="background" value="circuits" data-preference="background" />Circuits</label>
-            <label><input type="radio" name="background" value="checker" data-preference="background" />Checker</label>
+            <label><input type="radio" name="background" value="hills" data-preference="background" />Pixel hills</label>
             <label><input type="radio" name="background" value="wave" data-preference="background" />Wave mesh</label>
             <label><input type="radio" name="background" value="stars" data-preference="background" />Pixel stars</label>
             <label><input type="radio" name="background" value="weave" data-preference="background" />Desktop weave</label>
             <label><input type="radio" name="background" value="off" data-preference="background" />Off</label>
           </div>
-          <p id="background-preference-help">Auto changes the pattern on each new visit. Desktop weave is stationary; reduced motion keeps the other patterns still.</p>
+          <p id="background-preference-help">Auto changes the wallpaper on each new visit. Pixel hills follows your scrolling; Desktop weave is stationary. Reduced motion keeps every wallpaper still.</p>
         </fieldset>
           </details>
         </section>
@@ -219,6 +221,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
         </div>
       </div>
     </Window>
+    <SiteEditor />
     <script>
       import '../scripts/preferences';
       import '../scripts/shell';

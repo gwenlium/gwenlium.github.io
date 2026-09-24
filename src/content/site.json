@@ -12,7 +12,7 @@
     "title": "Proto:ReCompute",
     "description": "A 3D hack and slash RPG game in a computer/cyber world.\nIf you are familiar with DMC, NieR: Automata and the classic 3D Zelda games (such as OoT), you'll feel home with my game.",
     "status": "Very early development",
-    "cover": "/media/proto-recompute-preview-380740e424d86df73096a30fd6ba8cde.webp",
+    "cover": "/media/proto-recompute-preview-8439485ac350ec5b0e4c56ce4aa1da0b.webp",
     "coverAlt": "Title logo of my game",
     "trailerUrl": "",
     "links": []
@@ -21,5 +21,5 @@
   "newsletterFormAction": "https://api.follow.it/subscription-form/cjNVdmQyQWdHVWVhSjFZcDdEazZ5UG9TNU9zdTNsaWVvK3hJSTEyV3MvMzNhSW15eDRjUVpDbzRjMWF0SEhvL05UNmJSSENSUGJiS3BhWHRkcUVRVi91a1p5d2FpdEpyZlY1cDd3cE1FdEZBa0RUZGI2NGJ4QXoxTHpSMEx3T2d8dE1YcHh2T1NBb2tHUnJMUFpNMlFkcnBNVXptUENtWDA4dVN5K0ZvL1Vyaz0=/8",
   "newsletterUrl": "https://follow.it/gwenlium-devlog?leanpub",
   "description": "Welcome to my quirky website where I share things I do in life with the world!",
-  "watermarkText": "© Gwendolyn Ural Erkut gwenlium.dev"
+  "watermarkText": "© Gwendolyn Ural Erkut\ngwenlium.dev"
 }

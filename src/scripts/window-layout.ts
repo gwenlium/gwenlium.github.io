@@ -3,6 +3,17 @@ import { cancelWindowAnimation } from './window-motion';
 type Box = { x: number; y: number; width: number; height: number };
 type Snap = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 type MovingElement = HTMLElement & { moveBefore?: (node: Node, reference: Node | null) => void };
+type LayoutState = { rect?: Box; snap?: Snap; freeRect?: Box };
+type VisitorLayout = LayoutState & {
+  defaultFloating: boolean;
+  maximized: boolean;
+  x?: string;
+  y?: string;
+  width: string;
+  height: string;
+  sized: boolean;
+};
+type EditorLayout = { id: string; x?: number; y?: number; width: number; height: number; floating: boolean };
 type Layout = {
   root: HTMLElement;
   host: HTMLElement;
@@ -14,6 +25,7 @@ type Layout = {
   maximized: boolean;
   beforeMaximum?: { rect?: Box; snap?: Snap; freeRect?: Box };
   placement?: { parent: MovingElement; marker: HTMLElement; portaled: boolean };
+  visitor?: VisitorLayout;
 };
 type Gesture = {
   entry: Layout;
@@ -42,6 +54,46 @@ let resizeFrame = 0;
 let preview: HTMLElement | undefined;
 let suspended = false;
 
+function editing(): boolean { return document.documentElement.dataset.siteEditing === 'true'; }
+
+function captureVisitorLayout(entry: Layout): void {
+  if (entry.visitor) return;
+  const normal = entry.maximized ? entry.beforeMaximum : entry;
+  entry.visitor = {
+    rect: normal?.rect, snap: normal?.snap, freeRect: normal?.freeRect,
+    defaultFloating: entry.defaultFloating, width: entry.root.style.width,
+    maximized: entry.maximized, x: entry.root.dataset.windowDefaultX, y: entry.root.dataset.windowDefaultY,
+    height: entry.root.style.height, sized: entry.root.hasAttribute('data-window-sized'),
+  };
+}
+
+function synchronizeEditing(): void {
+  finishGesture(true);
+  for (const entry of layouts.values()) {
+    if (editing()) captureVisitorLayout(entry);
+    else if (entry.visitor) {
+      if (entry.maximized) command(entry, 'restore');
+      const visitor = entry.visitor;
+      entry.rect = visitor.rect;
+      entry.snap = visitor.snap;
+      entry.freeRect = visitor.freeRect;
+      entry.defaultFloating = visitor.defaultFloating;
+      entry.root.style.width = visitor.width;
+      entry.root.style.height = visitor.height;
+      entry.root.toggleAttribute('data-window-sized', visitor.sized);
+      entry.root.toggleAttribute('data-window-default-floating', visitor.defaultFloating);
+      if (visitor.x === undefined) delete entry.root.dataset.windowDefaultX;
+      else entry.root.dataset.windowDefaultX = visitor.x;
+      if (visitor.y === undefined) delete entry.root.dataset.windowDefaultY;
+      else entry.root.dataset.windowDefaultY = visitor.y;
+      entry.visitor = undefined;
+      if (visitor.maximized) command(entry, 'maximize');
+      else apply(entry);
+    }
+  }
+}
+
+document.addEventListener('gwenlium:editor-mode-changed', synchronizeEditing);
 function workspace(): Box {
   const view = document.getElementById('page-scroll');
   const rect = view?.getBoundingClientRect();
@@ -87,6 +139,15 @@ function restoreLayout(entry: Layout): boolean {
 function rememberLayout(entry: Layout): void {
   const id = entry.root.dataset.windowId;
   if (!id) return;
+  if (editing()) {
+    const normal = entry.maximized ? entry.beforeMaximum : entry;
+    const bounds = workspace();
+    const rect = normal?.rect ?? entry.root.getBoundingClientRect();
+    document.dispatchEvent(new CustomEvent('gwenlium:editor-window-layout', {
+      detail: { id, x: rect.x - bounds.x, y: rect.y - bounds.y, width: Math.round(rect.width), height: Math.round(rect.height), floating: Boolean(normal?.rect) },
+    }));
+    return;
+  }
   // Maximizing is temporary; retain the normal position rather than the full screen.
   const layout = entry.maximized ? entry.beforeMaximum : entry;
   try {
@@ -130,8 +191,9 @@ function detach(entry: Layout): void {
   if (!placement) return;
   // Clear first: custom element move callbacks may synchronously register again.
   entry.placement = undefined;
-  if (placement.portaled && placement.marker.isConnected) {
-    placement.parent.moveBefore!(entry.host, placement.marker);
+  if (placement.portaled && placement.marker.isConnected && entry.host.isConnected) {
+    if (typeof placement.parent.moveBefore === 'function') placement.parent.moveBefore(entry.host, placement.marker);
+    else placement.parent.insertBefore(entry.host, placement.marker);
   } else if (entry.root.hasAttribute('popover')) {
     if (entry.root.matches(':popover-open')) entry.root.hidePopover();
     entry.root.removeAttribute('popover');
@@ -153,10 +215,13 @@ function place(entry: Layout): void {
     marker.style.minWidth = '0';
     parent.insertBefore(marker, entry.host);
     const destination = document.body as MovingElement;
-    const portaled = typeof destination.moveBefore === 'function';
-    entry.placement = { parent, marker, portaled };
-    if (portaled) destination.moveBefore!(entry.host, null);
-    else if (typeof entry.root.showPopover === 'function') entry.root.setAttribute('popover', 'manual');
+    // The top layer pins coordinates without changing DOM ownership: catalogue
+    // filters, responsive selectors and playing media keep their original parent.
+    const topLayer = typeof entry.root.showPopover === 'function';
+    entry.placement = { parent, marker, portaled: !topLayer };
+    if (topLayer) entry.root.setAttribute('popover', 'manual');
+    else if (typeof destination.moveBefore === 'function') destination.moveBefore(entry.host, null);
+    else destination.append(entry.host);
   }
   if (entry.placement) entry.placement.marker.hidden = entry.root.hidden;
   if (entry.root.hasAttribute('popover')) {
@@ -206,16 +271,9 @@ export function registerWindow(root: HTMLElement, options: { floating?: boolean 
   if (root.closest('#main-content')) root.querySelector(':scope > .window-body')?.setAttribute('data-typewriter', '');
   const entry: Layout = {
     root, host: root.closest<HTMLElement>('gwenlium-player') || root, titlebar,
-    defaultFloating: Boolean(options.floating) && !root.hasAttribute('data-window-anchored'), maximized: false,
+    defaultFloating: Boolean(options.floating), maximized: false,
   };
   layouts.set(root, entry);
-  if (root.hasAttribute('data-window-anchored')) {
-    // Page-anchored windows never restore or acquire a viewport-floating position.
-    // They remain registered so minimize, maximize, close and restore still work.
-    rememberLayout(entry);
-    raise(entry);
-    return;
-  }
   titlebar.tabIndex = 0;
   titlebar.setAttribute('role', 'group');
   titlebar.setAttribute('aria-label', `${root.dataset.windowTitle || 'Window'} position and size`);
@@ -228,7 +286,8 @@ export function registerWindow(root: HTMLElement, options: { floating?: boolean 
     root.append(handle);
   }
   if (restoreLayout(entry)) apply(entry);
-  else if (entry.defaultFloating) resetWindowLayout(root);
+  else resetWindowLayout(root, false);
+  if (editing()) captureVisitorLayout(entry);
   raise(entry);
 }
 
@@ -248,23 +307,66 @@ export function setWindowMaximized(root: HTMLElement, maximized: boolean): void 
   apply(entry);
 }
 
-export function resetWindowLayout(root: HTMLElement): void {
+export function resetWindowLayout(root: HTMLElement, remember = true): void {
   const entry = layouts.get(root);
   if (!entry) return;
   cancelWindowAnimation(root);
   entry.rect = entry.snap = entry.freeRect = entry.beforeMaximum = undefined;
   entry.maximized = false;
   apply(entry);
-  rememberLayout(entry);
+  // Reset personal placement, then pin the authored responsive box. Content
+  // scrolls inside every window; an unpositioned window is not page-scrolling.
+  if (remember && !editing()) rememberLayout(entry);
+  const hidden = root.hidden;
+  root.hidden = false;
+  const rect = root.getBoundingClientRect();
+  root.hidden = hidden;
+  const bounds = workspace();
+  let x = rect.left;
+  let y = rect.top;
   if (entry.defaultFloating) {
-    const hidden = root.hidden;
-    root.hidden = false;
-    const rect = root.getBoundingClientRect();
-    root.hidden = hidden;
-    entry.rect = bounded({ x: rect.left, y: rect.top, width: rect.width, height: rect.height }, workspace());
-    apply(entry);
+    const authoredX = root.dataset.windowDefaultX;
+    const authoredY = root.dataset.windowDefaultY;
+    if (authoredX !== undefined && Number.isFinite(Number(authoredX))) x = bounds.x + Number(authoredX);
+    if (authoredY !== undefined && Number.isFinite(Number(authoredY))) y = bounds.y + Number(authoredY);
   }
+  if (y < bounds.y || y > bounds.y + bounds.height - 140) {
+    let slot = 0;
+    for (const candidate of layouts.values()) { if (candidate === entry) break; slot++; }
+    const offset = (slot % 7) * 24;
+    x = bounds.x + offset;
+    y = bounds.y + Math.min(80, bounds.height * .12) + offset;
+  }
+  entry.rect = bounded({ x, y, width: rect.width, height: Math.min(rect.height, Math.max(140, bounds.y + bounds.height - y)) }, bounds);
+  apply(entry, bounds);
+  if (remember && editing()) rememberLayout(entry);
 }
+
+document.addEventListener('gwenlium:editor-apply-layout', (event) => {
+  if (!editing()) return;
+  const detail = (event as CustomEvent<EditorLayout | undefined>).detail;
+  if (!detail || typeof detail.id !== 'string' || typeof detail.floating !== 'boolean'
+    || !Number.isFinite(detail.width) || detail.width < 0 || !Number.isFinite(detail.height) || detail.height < 0
+    || (detail.x !== undefined && !Number.isFinite(detail.x)) || (detail.y !== undefined && !Number.isFinite(detail.y))) return;
+  const entry = [...layouts.values()].find(candidate => candidate.root.dataset.windowId === detail.id);
+  if (!entry) return;
+  finishGesture(true);
+  captureVisitorLayout(entry);
+  if (entry.maximized) command(entry, 'restore');
+  cancelWindowAnimation(entry.root);
+  entry.rect = entry.snap = entry.freeRect = entry.beforeMaximum = undefined;
+  entry.defaultFloating = detail.floating;
+  entry.root.toggleAttribute('data-window-default-floating', entry.defaultFloating);
+  if (detail.x === undefined) delete entry.root.dataset.windowDefaultX;
+  else entry.root.dataset.windowDefaultX = String(detail.x);
+  if (detail.y === undefined) delete entry.root.dataset.windowDefaultY;
+  else entry.root.dataset.windowDefaultY = String(detail.y);
+  apply(entry);
+  entry.root.style.width = detail.width > 0 ? `min(${detail.width}px, 100%)` : '';
+  entry.root.style.height = detail.height > 0 ? `${detail.height}px` : '';
+  entry.root.toggleAttribute('data-window-sized', detail.height > 0);
+  resetWindowLayout(entry.root, false);
+});
 
 export function unregisterWindow(root: HTMLElement): void {
   const entry = layouts.get(root);
