@@ -1,15 +1,21 @@
 @keyframes workspace-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes workspace-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
-/* Keep the site chrome steady and crossfade only the loaded page content. */
+/* Keep chrome and persistent windows steady; fade page and top-layer snapshots. */
 html::view-transition-group(root),
 html::view-transition-old(root),
 html::view-transition-new(root) { animation: none !important; mix-blend-mode: normal; }
 html::view-transition-old(root) { display: none; }
 html::view-transition-new(root) { opacity: 1; }
-html::view-transition-group(page-content) { animation: none !important; overflow: clip; }
-html::view-transition-old(page-content) { animation: workspace-fade-out 160ms ease-out both !important; mix-blend-mode: normal; }
-html::view-transition-new(page-content) { animation: workspace-fade-in 160ms ease-out both !important; mix-blend-mode: normal; }
+html::view-transition-group(page-content),
+html::view-transition-group(.page-window),
+html::view-transition-group(.persistent-window) { animation: none !important; overflow: clip; }
+html::view-transition-old(page-content),
+html::view-transition-old(.page-window) { animation: workspace-fade-out 160ms ease-out both !important; mix-blend-mode: normal; }
+html::view-transition-new(page-content),
+html::view-transition-new(.page-window) { animation: workspace-fade-in 160ms ease-out both !important; mix-blend-mode: normal; }
+html::view-transition-old(.persistent-window) { display: none; }
+html::view-transition-new(.persistent-window) { animation: none !important; opacity: 1; mix-blend-mode: normal; }
 
 html[data-motion='reduced']::view-transition-old(*),
 html[data-motion='reduced']::view-transition-new(*) { animation: none !important; }

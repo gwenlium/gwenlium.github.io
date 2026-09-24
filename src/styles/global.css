@@ -354,7 +354,7 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
 html[data-motion='reduced'] *, html[data-motion='reduced'] *::before, html[data-motion='reduced'] *::after {
   animation-duration: .01ms !important;
   animation-iteration-count: 1 !important;
-  transition-duration: .01ms !important;
+  transition-duration: 0s !important;
   scroll-behavior: auto !important;
 }
 html[data-motion='reduced']::view-transition-old(*), html[data-motion='reduced']::view-transition-new(*) { animation: none !important; }
@@ -362,7 +362,7 @@ html[data-motion='reduced']::view-transition-old(*), html[data-motion='reduced']
   html:not([data-motion='full']) *, html:not([data-motion='full']) *::before, html:not([data-motion='full']) *::after {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
+    transition-duration: 0s !important;
     scroll-behavior: auto !important;
   }
   html:not([data-motion='full'])::view-transition-old(*), html:not([data-motion='full'])::view-transition-new(*) { animation: none !important; }

@@ -52,6 +52,7 @@ let gesture: Gesture | undefined;
 let moveFrame = 0;
 let resizeFrame = 0;
 let preview: HTMLElement | undefined;
+let nextTransitionId = 0;
 let suspended = false;
 
 function editing(): boolean { return document.documentElement.dataset.siteEditing === 'true'; }
@@ -267,6 +268,13 @@ export function registerWindow(root: HTMLElement, options: { floating?: boolean 
   if (existing) { apply(existing); return; }
   const titlebar = root.querySelector<HTMLElement>(':scope > .window-titlebar, :scope > .player-titlebar');
   if (!titlebar) return;
+  // Top-layer windows need their own snapshots. Page windows never share one
+  // across navigations, even when both routes contain the same window id.
+  const persistent = root.hasAttribute('data-persistent-window');
+  root.style.setProperty('view-transition-name', persistent
+    ? CSS.escape(`persistent-window-${root.dataset.windowId || root.id}`)
+    : `page-window-${++nextTransitionId}`);
+  root.style.setProperty('view-transition-class', persistent ? 'persistent-window' : 'page-window');
   // Keep page content opted into typing after its window moves outside main.
   if (root.closest('#main-content')) root.querySelector(':scope > .window-body')?.setAttribute('data-typewriter', '');
   const entry: Layout = {
@@ -380,6 +388,8 @@ export function unregisterWindow(root: HTMLElement): void {
   entry.titlebar.removeAttribute('tabindex');
   for (const handle of root.querySelectorAll(':scope > [data-window-resize]')) handle.remove();
   for (const key of ['x', 'y', 'width', 'height', 'layer']) root.style.removeProperty(`--window-${key}`);
+  root.style.removeProperty('view-transition-name');
+  root.style.removeProperty('view-transition-class');
 }
 
 function command(entry: Layout, action: 'maximize' | 'restore'): void {
@@ -625,6 +635,12 @@ document.addEventListener('astro:before-swap', () => {
   for (const entry of layouts.values()) detach(entry);
   preview?.remove();
   preview = undefined;
+});
+document.addEventListener('astro:after-swap', () => {
+  suspended = false;
+  // Restore persistent top-layer windows before the browser captures the new page.
+  const bounds = workspace();
+  for (const entry of layouts.values()) if (entry.root.isConnected) apply(entry, bounds);
 });
 document.addEventListener('astro:page-load', () => { suspended = false; reflow(); });
 window.addEventListener('beforeprint', () => { suspended = true; finishGesture(true); for (const entry of layouts.values()) detach(entry); });

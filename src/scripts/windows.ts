@@ -254,7 +254,7 @@ function cleanupWindows() {
   pageBody = undefined;
 }
 
-function discoverWindows() {
+function discoverWindows(animate = true) {
   const taskbar = document.querySelector<HTMLElement>('[data-taskbar-windows]');
   if (!taskbar) return;
   const controlsTemplate = document.querySelector<HTMLElement>('#site-settings [data-window-controls]');
@@ -323,13 +323,14 @@ function discoverWindows() {
     registerWindow(root, { floating: root.hasAttribute('data-window-default-floating') });
     setState(entry, root.dataset.windowInitialState === 'closed' ? 'closed' : 'normal');
     entry.controls.hidden = false;
-    if (!root.hidden) void animateWindow(root, 'open');
+    if (animate && !root.hidden) void animateWindow(root, 'open');
   });
 }
 
-function initializeWindows() {
+function initializeWindows(event?: Event) {
+  const animate = event?.type !== 'astro:after-swap';
   if (pageBody === document.body) {
-    discoverWindows();
+    discoverWindows(animate);
     windowsChanged();
     return;
   }
@@ -337,7 +338,7 @@ function initializeWindows() {
   pageBody = document.body;
   pageEvents = new AbortController();
   const { signal } = pageEvents;
-  discoverWindows();
+  discoverWindows(animate);
   createNotice();
 
   document.addEventListener('click', (event) => {
@@ -395,6 +396,8 @@ function initializeWindows() {
 }
 
 document.addEventListener('astro:before-swap', cleanupWindows);
+// Pin the destination before its transition snapshot; navigation owns the fade.
+document.addEventListener('astro:after-swap', initializeWindows);
 window.addEventListener('pagehide', cleanupWindows);
 window.addEventListener('pageshow', initializeWindows);
 document.addEventListener('astro:page-load', initializeWindows);
