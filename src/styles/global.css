@@ -158,7 +158,7 @@ summary { cursor: pointer; }
 
 .site-shell { position: relative; z-index: 1; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto auto; width: 100%; height: 100%; min-height: 0; padding-inline: var(--app-inset); padding-bottom: max(var(--app-inset), env(safe-area-inset-bottom)); }
 .site-header { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; min-width: 0; padding-block: clamp(.6rem, 1.8vh, 1.15rem); }
-.site-brand { display: inline-flex; align-items: center; gap: .8rem; font-size: 27px; line-height: 1; letter-spacing: -.07em; }
+.site-brand { display: inline-flex; align-items: center; gap: .8rem; font-size: 27px; line-height: 1; letter-spacing: -.07em; text-decoration: none; }
 .brand-icon {
   display: grid;
   place-items: center;
