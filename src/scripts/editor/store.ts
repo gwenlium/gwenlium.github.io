@@ -838,6 +838,23 @@ export class SiteEditorStore {
     return (value.media ?? []).filter(item => previewPath.test(item.url) && !drafts.has(item.url));
   }
 
+  /** Earlier published versions of a file, newest first. */
+  async history(path: string): Promise<Array<{ commit: string; message: string; date: string }>> {
+    const session = this.active();
+    assertPath(path, true);
+    const value = await this.api(session.controller, `/editor/history?${new URLSearchParams({ path })}`) as { versions?: Array<{ commit: string; message: string; date: string }> };
+    return (value.versions ?? []).filter(item => /^[a-f0-9]{40}$/.test(item.commit));
+  }
+
+  /** A file exactly as it was in one earlier commit. */
+  async version(path: string, commit: string): Promise<string> {
+    const session = this.active();
+    assertPath(path, true);
+    const value = await this.api(session.controller, `/editor/version?${new URLSearchParams({ path, commit })}`) as { content?: unknown };
+    if (typeof value.content !== 'string') throw new Error('That version could not be read.');
+    return value.content;
+  }
+
   /** For owner-only services outside the editor API (analytics). */
   accessToken(): Promise<string> {
     return this.auth.token();

@@ -379,6 +379,16 @@ async function githubJson(url: string, options: RequestInit, refUpdate = false):
   }
 }
 
+/** GitHub endpoints that answer with a JSON array (githubJson accepts objects only). */
+async function githubList(url: string, token: string): Promise<unknown[]> {
+  let response: Response;
+  try { response = await fetch(url, { headers: githubHeaders(token), redirect: 'manual', signal: AbortSignal.timeout(15000) }); }
+  catch { throw new EditorError('GitHub could not be reached. Try again.', 502); }
+  const value: unknown = response.ok ? await response.json().catch(() => undefined) : undefined;
+  if (!Array.isArray(value)) throw new EditorError(`GitHub did not return the list (HTTP ${response.status}).`, 502);
+  return value;
+}
+
 function githubHeaders(token: string): HeadersInit {
   return {
     'Accept': 'application/vnd.github+json',
@@ -962,6 +972,34 @@ async function editor(request: Request, url: URL, config: Configuration): Promis
       const contents = await editorFiles(repository, paths as string[], token);
       return analyticsJson({ files: (paths as string[]).map(path => ({ path, sha: regularFile(repository, path)!.sha, content: contents.get(path)! })) }, 200, config);
     }
+    if (url.pathname === '/editor/history' || url.pathname === '/editor/version') {
+      // Earlier versions of one content file, straight from Git history.
+      const path = singleParameter(url, 'path');
+      const commit = url.pathname === '/editor/version' ? singleParameter(url, 'commit') : undefined;
+      if (!contentPath(path) || parameters.length !== (commit === undefined ? 1 : 2) || (url.pathname === '/editor/version' && (!commit || !shaPattern.test(commit)))) {
+        throw new EditorError('Provide one content path (and, for a version, one full commit SHA).');
+      }
+      const identity = memory.identity && memory.identity.until > Date.now() ? memory.identity : await repositoryIdentity(token, config);
+      const api = `${GITHUB_API}/repos/${identity.name}`;
+      if (url.pathname === '/editor/history') {
+        const values = await githubList(`${api}/commits?${new URLSearchParams({ path, sha: identity.branch, per_page: '40' })}`, token);
+        const versions = values.flatMap(value => {
+          const item = record(value);
+          const details = record(item?.commit);
+          const sha = item?.sha;
+          const date = record(details?.author)?.date ?? record(details?.committer)?.date;
+          if (typeof sha !== 'string' || !shaPattern.test(sha) || typeof details?.message !== 'string' || typeof date !== 'string') return [];
+          return [{ commit: sha, message: details.message.split('\n')[0].slice(0, 200), date }];
+        });
+        return analyticsJson({ path, versions }, 200, config);
+      }
+      const file = await githubJson(`${api}/contents/${path.split('/').map(encodeURIComponent).join('/')}?${new URLSearchParams({ ref: commit! })}`, { headers: githubHeaders(token) });
+      if (file.type !== 'file' || file.encoding !== 'base64' || typeof file.content !== 'string' || !Number.isSafeInteger(file.size) || Number(file.size) > maxTextBytes) throw new EditorError('That version could not be read.', 502);
+      let content: string;
+      try { content = new TextDecoder('utf-8', { fatal: true }).decode(decodeBase64(file.content, maxTextBytes, true)); }
+      catch { throw new EditorError('That version is not readable text.', 502); }
+      return analyticsJson({ path, commit, content }, 200, config);
+    }
     if (url.pathname === '/editor/unused-media') {
       // Registered media that no content and no site code refers to. Drafts are the browser's to check.
       if (parameters.length) throw new EditorError('This endpoint does not accept query parameters.');
@@ -997,7 +1035,7 @@ async function editor(request: Request, url: URL, config: Configuration): Promis
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (['/editor', '/editor/file', '/editor/files', '/editor/unused-media', '/editor/publish', '/editor/session', '/editor/revoke'].includes(url.pathname)) {
+    if (['/editor', '/editor/file', '/editor/files', '/editor/history', '/editor/version', '/editor/unused-media', '/editor/publish', '/editor/session', '/editor/revoke'].includes(url.pathname)) {
       const config = configuration(env);
       if (!config) return textResponse('Editor configuration is unavailable.', 503);
       if (url.protocol !== 'https:' || url.origin !== config.authOrigin) return textResponse('Invalid editor origin.', 400);

@@ -1,4 +1,6 @@
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { promisify } from 'node:util';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -9,6 +11,7 @@ import path from 'node:path';
 const prefix = '/__owner-editor/editor';
 const repository = 'gwenlium/gwenlium.github.io';
 const siteOrigin = 'https://gwenlium.dev';
+const git = promisify(execFile);
 const blobSha = bytes => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
 
 async function contentFiles(root, contentPath) {
@@ -96,6 +99,19 @@ export default function devEditor() {
               const files = [];
               for (const file of paths) { const bytes = await fs.readFile(path.join(root, file)); files.push({ path: file, sha: blobSha(bytes), content: bytes.toString('utf8') }); }
               return send(response, 200, { files });
+            }
+            if ((url.pathname === `${prefix}/history` || url.pathname === `${prefix}/version`) && request.method === 'GET') {
+              const file = url.searchParams.get('path');
+              if (!content.contentPath(file)) return send(response, 400, { error: 'Not an editable content file.' });
+              if (url.pathname === `${prefix}/history`) {
+                const { stdout } = await git('git', ['log', '-n', '40', '--format=%H%x09%aI%x09%s', '--', file], { cwd: root });
+                const versions = stdout.split(/\r?\n/).filter(Boolean).map(line => { const [commit, date, ...message] = line.split(/\t/); return { commit, date, message: message.join(' ') }; });
+                return send(response, 200, { path: file, versions });
+              }
+              const commit = url.searchParams.get('commit');
+              if (!/^[a-f0-9]{40}$/.test(commit ?? '')) return send(response, 400, { error: 'Provide a full commit SHA.' });
+              const { stdout } = await git('git', ['show', `${commit}:${file}`], { cwd: root, maxBuffer: 4 * 1024 * 1024 });
+              return send(response, 200, { path: file, commit, content: stdout });
             }
             if (url.pathname === `${prefix}/unused-media` && request.method === 'GET') {
               const previews = content.previewRegistry(await fs.readFile(path.join(root, content.registryPath), 'utf8'));

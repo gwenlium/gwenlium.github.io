@@ -638,3 +638,38 @@ test('media used only by site code (like interface sounds) is never offered or d
   assert.ok(code.graphql.length >= 1);
   assert.deepEqual(code.reads.filter(path => path.includes('/git/blobs/')), []);
 });
+
+test('editor lists earlier versions of a content file and reads one back', async t => {
+  const old = '---\ntitle: Older\ndraft: false\n---\nOld text\n';
+  const base = editorFixture();
+  const handler = async request => {
+    const url = new URL(request.url);
+    if (url.pathname === '/repos/owner/website/commits') {
+      assert.equal(url.searchParams.get('path'), 'src/content/posts/lyn.md');
+      return Response.json([
+        { sha: 'a'.repeat(40), commit: { message: 'Edit Devlog entry: Lyn\n\nDetails', author: { date: '2026-09-24T10:00:00Z' } } },
+        { sha: 'b'.repeat(40), commit: { message: 'Create Devlog post', author: { date: '2026-09-22T10:00:00Z' } } },
+        { nonsense: true },
+      ]);
+    }
+    if (url.pathname === '/repos/owner/website/contents/src/content/posts/lyn.md') {
+      assert.equal(url.searchParams.get('ref'), 'b'.repeat(40));
+      return Response.json({ type: 'file', encoding: 'base64', size: Buffer.byteLength(old), content: Buffer.from(old).toString('base64') });
+    }
+    return base.handler(request);
+  };
+  const worker = runtime(handler); t.after(() => worker.dispose());
+  const history = await worker.dispatchFetch('https://auth.test/editor/history?path=src%2Fcontent%2Fposts%2Flyn.md', { headers: analyticsHeaders });
+  assert.equal(history.status, 200, await history.clone().text());
+  assert.deepEqual((await history.json()).versions, [
+    { commit: 'a'.repeat(40), message: 'Edit Devlog entry: Lyn', date: '2026-09-24T10:00:00Z' },
+    { commit: 'b'.repeat(40), message: 'Create Devlog post', date: '2026-09-22T10:00:00Z' },
+  ]);
+  const version = await worker.dispatchFetch(`https://auth.test/editor/version?path=src%2Fcontent%2Fposts%2Flyn.md&commit=${'b'.repeat(40)}`, { headers: analyticsHeaders });
+  assert.equal(version.status, 200, await version.clone().text());
+  assert.equal((await version.json()).content, old);
+  for (const query of ['path=src%2Fsecret.ts', 'path=src%2Fcontent%2Fsite.json&extra=1', `path=src%2Fcontent%2Fsite.json&commit=main`]) {
+    const endpoint = query.includes('commit') ? 'version' : 'history';
+    assert.equal((await worker.dispatchFetch(`https://auth.test/editor/${endpoint}?${query}`, { headers: analyticsHeaders })).status, 400, query);
+  }
+});

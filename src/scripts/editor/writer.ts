@@ -6,7 +6,7 @@ import { isPostPath, markdownParts, type EntrySummary, type SiteEditorStore } fr
 import { createRichText, type RichTextHandle } from './rich-text';
 import { chooseFromLibrary, stageFiles } from './media';
 import { openPublish, resolveConflicts } from './publish';
-import { button, confirmAction, errorText, node, toast } from './ui';
+import { button, confirmAction, errorText, node, openDialog, toast } from './ui';
 import '../../styles/owner-editor.css';
 
 type Section = 'devlog' | 'life';
@@ -126,6 +126,12 @@ class Writer {
     this.status.setAttribute('role', 'status');
     this.status.setAttribute('aria-live', 'polite');
     addEventListener('beforeunload', () => { void this.flush(); }, { signal: this.lifetime.signal });
+    // Ctrl+S (Cmd+S on a Mac) saves right away instead of opening the browser's save dialog.
+    addEventListener('keydown', event => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 's') return;
+      event.preventDefault();
+      if (this.model) void this.flush().then(() => { this.status.textContent = this.store.storageWarning ?? 'Saved on this browser'; });
+    }, { signal: this.lifetime.signal });
   }
 
   destroy(): void {
@@ -319,8 +325,18 @@ class Writer {
 
   // Saving
 
+  /** Words and reading time of the text (about 200 words a minute). */
+  private countWords(): void {
+    const counter = this.root.querySelector('.writer-count');
+    if (!counter) return;
+    const text = this.root.querySelector('.rt-surface .ProseMirror')?.textContent ?? '';
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    counter.textContent = words ? `${words} word${words === 1 ? '' : 's'} · ${Math.max(1, Math.round(words / 200))} min read` : '';
+  }
+
   private changed(): void {
     clearTimeout(this.saveTimer);
+    this.countWords();
     this.status.textContent = 'Saving…';
     this.saveTimer = window.setTimeout(() => void this.flush(), 450);
     this.updateHeader();
@@ -389,6 +405,7 @@ class Writer {
     const textHost = node('div', undefined, 'writer-text');
     article.append(eyebrow, title, textHost);
     const footer = node('div', undefined, 'writer-footer');
+    footer.append(node('span', '', 'writer-count'));
     const publish = button('Publish', () => void this.publish(), 'owner-button owner-button--primary');
     publish.dataset.writerPublish = '';
     const revert = button('Undo all changes', () => void this.revert(), 'owner-button');
@@ -414,6 +431,7 @@ class Writer {
       onStatus: text => { this.status.textContent = text; },
     });
     requestAnimationFrame(grow);
+    requestAnimationFrame(() => this.countWords());
     this.updateHeader();
     this.refreshChrome();
     if (focusTitle) title.focus();
@@ -683,6 +701,7 @@ class Writer {
       view.href = `/${model.section}/${this.saved?.permalink || model.permalink}/`;
       actions.append(view);
     }
+    if (this.path && !this.isNew) actions.append(button('Earlier versions', () => void this.history(), 'owner-button'));
     actions.append(button('Delete entry', () => void this.delete(), 'owner-button owner-button--danger'));
     body.append(address, summary, actions);
     this.syncAddress = () => {
@@ -752,6 +771,56 @@ class Writer {
         if (scroller && typeof place!.scroll === 'number') scroller.scrollTop = place!.scroll;
       }, 60);
     });
+  }
+
+  /** Every published version of this entry; any of them can come back as an unpublished change. */
+  private async history(): Promise<void> {
+    const path = this.path;
+    if (!path) return;
+    await this.flush();
+    const { dialog, body, footer, status } = openDialog('Earlier versions', { wide: true });
+    footer.append(button('Close', () => dialog.close()));
+    status.textContent = 'Loading the history…';
+    let versions: Awaited<ReturnType<SiteEditorStore['history']>>;
+    try { versions = await this.store.history(path); }
+    catch (error) { status.textContent = errorText(error); return; }
+    status.textContent = '';
+    if (versions.length < 2) { body.append(node('p', 'There are no earlier published versions of this entry yet.')); return; }
+    body.append(node('p', 'Each time this entry was published. Restoring one puts it back as an unpublished change; nothing goes live until you publish.', 'owner-hint'));
+    const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    const list = node('ol', undefined, 'owner-versions');
+    versions.forEach((version, index) => {
+      const item = node('li', undefined, 'owner-version');
+      const heading = node('div', undefined, 'owner-version__heading');
+      const label = node('span');
+      label.append(node('strong', when.format(new Date(version.date))), node('small', index === 0 ? `${version.message} (published now)` : version.message));
+      const preview = node('pre', undefined, 'owner-version__text');
+      preview.hidden = true;
+      const show = button('Show', () => void (async () => {
+        if (!preview.hidden) { preview.hidden = true; show.textContent = 'Show'; return; }
+        try {
+          if (!preview.textContent) {
+            const { model } = readModel(await this.store.version(path, version.commit));
+            preview.textContent = [model.title && `# ${model.title}`, model.excerpt && `Summary: ${model.excerpt}`, model.body].filter(Boolean).join('\n\n') || '(empty)';
+          }
+          preview.hidden = false; show.textContent = 'Hide';
+        } catch (error) { status.textContent = errorText(error); }
+      })(), 'writer-mini');
+      heading.append(label, show);
+      if (index > 0) heading.append(button('Restore', () => void (async () => {
+        if (!await confirmAction('Restore this version?', `The entry goes back to how it was on ${when.format(new Date(version.date))}. Your current text stays in the history, and nothing is public until you publish.`, 'Restore')) return;
+        try {
+          const content = await this.store.version(path, version.commit);
+          await this.store.write(path, content);
+          dialog.close();
+          await this.open(path);
+          toast('Earlier version restored. Publish when you are happy with it.');
+        } catch (error) { status.textContent = errorText(error); }
+      })(), 'writer-mini'));
+      item.append(heading, preview);
+      list.append(item);
+    });
+    body.append(list);
   }
 
   private async revert(): Promise<void> {
