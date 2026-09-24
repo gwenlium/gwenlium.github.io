@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import YAML from 'yaml';
 import { load } from 'cheerio';
 
-// Exercise the CMS file fields through a real build, restoring content afterwards.
-const config = YAML.parse(fs.readFileSync('public/admin/config.yml', 'utf8'));
-const pages = config.collections.find(collection => collection.name === 'pages').files;
+// Exercise every page's editable fields through a real build, restoring content afterwards.
+const pages = [
+  { name: 'site', file: 'src/content/site.json' },
+  ...fs.readdirSync('src/content/pages').filter(name => name.endsWith('.json')).map(name => ({ name: name.slice(0, -5), file: `src/content/pages/${name}` })),
+];
 const expected = ['site', 'about', 'devlog', 'life', 'gallery', 'music', 'subscribe', 'not-found'];
 assert.deepEqual(pages.map(page => page.name).sort(), expected.sort());
 const originals = new Map();
@@ -30,7 +31,6 @@ try {
     const raw = fs.readFileSync(page.file, 'utf8');
     originals.set(page.file, raw);
     const data = JSON.parse(raw);
-    for (const key of Object.keys(data)) assert(page.fields.some(field => field.name === key), `${page.name}.${key} must be editable`);
     if (page.name === 'site') data.intro = 'CMS home introduction';
     else {
       data.title = `CMS ${page.name} heading`;
@@ -79,7 +79,7 @@ try {
     }
     if (page.name === 'subscribe') assert($('.option-description').text().includes('CMS RSS description'));
   }
-  console.log('CMS editing verified for all 8 page entries, including rich About content, photo galleries and links.');
+  console.log('Page editing verified for all 8 page entries, including rich About content, photo galleries and links.');
 } finally {
   if (photo && fs.existsSync(fixturePost)) fs.unlinkSync(fixturePost);
   for (const [file, raw] of originals) fs.writeFileSync(file, raw);

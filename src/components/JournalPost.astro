@@ -4,7 +4,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 import Icon from '../components/Icon.astro';
 import EntryMedia from '../components/EntryMedia.astro';
-import { getPosts, postUrl, postSourceFile, formatDate, type Post } from '../lib/content';
+import { getPosts, postUrl, postSourceFile, postPreview, formatDate, type Post } from '../lib/content';
 import { getWindowDefinition, hasWindowOverride } from '../lib/windows';
 
 interface Props { post: Post; newer?: Post; older?: Post }
@@ -27,7 +27,7 @@ const mediaItems = [
 const hasEntryMedia = mediaItems.length > 0 || /!\[|<(?:img|video|audio|iframe)\b/i.test(post.rendered?.html ?? post.body ?? '') || hasWindowOverride('post-media');
 ---
 
-<SiteLayout title={post.data.title} description={post.data.excerpt} image={post.data.cover} imageAlt={post.data.coverAlt} article>
+<SiteLayout title={post.data.title} description={postPreview(post)} image={post.data.cover} imageAlt={post.data.coverAlt} article>
   <a class="back-link" href={`/${post.data.section}/`}><span aria-hidden="true">←</span> All entries</a>
   <div class="article-layout">
     <div class="article-main">

@@ -1,38 +1,28 @@
----
-import { parse } from 'yaml';
-import adminConfiguration from '../../public/admin/config.yml?raw';
-import '../styles/site-editor.css';
-import '../styles/site-editor-markdown.css';
-import '../styles/admin.css';
-const configuration = parse(adminConfiguration);
----
-<aside id="site-editor-shell" class="site-editor-shell" popover="manual" aria-label="Owner editor" data-auth-origin={configuration.backend.base_url} data-site-origin={configuration.site_url} transition:persist="site-editor"></aside>
 <script>
-  let loading: Promise<typeof import('../scripts/site-editor')> | undefined;
-  const open = async () => {
-    const shell = document.getElementById('site-editor-shell');
-    if (!shell) return;
-    try {
-      loading ??= import('../scripts/site-editor');
-      (await loading).openSiteEditor(shell);
-    } catch {
-      loading = undefined;
-      shell.textContent = 'The editor could not load. Reload the page and try again.';
-      shell.showPopover();
-    }
+  import { ownerHintKey } from '../lib/editor-config';
+
+  // Visitors never download the editor. It loads for a browser that signed in before,
+  // on the writing page, or when the owner asks for it (Ctrl+Alt+E or ?edit=1).
+  let loading: Promise<typeof import('../scripts/editor/owner')> | undefined;
+  const load = (interactive: boolean) => {
+    loading ??= import('../scripts/editor/owner');
+    loading.then(module => module.startOwner(interactive)).catch(() => { loading = undefined; });
   };
-  const requestOpen = () => document.dispatchEvent(new Event('gwenlium:open-site-editor'));
-  document.addEventListener('gwenlium:open-site-editor', () => { void open(); });
-  document.addEventListener('click', event => {
-    if (event.target instanceof Element && event.target.closest('[data-open-site-editor]')) requestOpen();
-  });
+  const remembered = () => {
+    try { return localStorage.getItem(ownerHintKey) === '1'; } catch { return false; }
+  };
   document.addEventListener('keydown', event => {
     if (event.ctrlKey && event.altKey && !event.metaKey && !event.shiftKey && event.code === 'KeyE') {
       event.preventDefault();
-      requestOpen();
+      load(true);
     }
   });
-  const initialize = () => { if (new URL(location.href).searchParams.get('edit') === '1') requestOpen(); };
-  document.addEventListener('astro:page-load', initialize);
-  initialize();
+  document.addEventListener('astro:page-load', () => {
+    const url = new URL(location.href);
+    if (url.searchParams.get('edit') === '1') {
+      url.searchParams.delete('edit');
+      history.replaceState(history.state, '', url);
+      load(true);
+    } else if (remembered() || url.pathname.startsWith('/write')) load(false);
+  });
 </script>

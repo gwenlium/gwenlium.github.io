@@ -42,7 +42,8 @@ a:focus-visible{outline:3px solid currentColor;outline-offset:4px}
     for (const entry of await fs.readdir(folder, { withFileTypes: true })) {
       const target = path.join(folder, entry.name);
       if (entry.isDirectory()) {
-        if (folder === directory && entry.name === 'admin') continue;
+        // The owner's editor stays reachable so maintenance can be switched off again.
+        if (folder === directory && (entry.name === 'admin' || entry.name === 'write')) continue;
         await replacePages(target);
       } else if (entry.isFile() && entry.name.endsWith('.html')) {
         await fs.writeFile(target, html);
@@ -68,5 +69,5 @@ a:focus-visible{outline:3px solid currentColor;outline-offset:4px}
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const settings = JSON.parse(await fs.readFile(path.join(root, 'src/content/site.json'), 'utf8'));
   const result = await applyMaintenance(path.join(root, 'dist'), settings);
-  console.log(result.enabled ? `Maintenance enabled: replaced ${result.pages} public pages; admin remains available.` : 'Maintenance disabled: publishing the full website.');
+  console.log(result.enabled ? `Maintenance enabled: replaced ${result.pages} public pages; the editor remains available.` : 'Maintenance disabled: publishing the full website.');
 }

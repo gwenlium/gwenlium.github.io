@@ -1,40 +1,13 @@
 ---
+// The old CMS address; the editor now lives on the site itself.
 ---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
-    <meta name="referrer" content="no-referrer" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="cms-config-url" type="text/yaml" href="/admin/config.yml" />
-    <title>Site editor - Gwenlium</title>
-    <script is:inline>window.CMS_MANUAL_INIT = true;</script>
+    <meta http-equiv="refresh" content="0; url=/write/" />
+    <title>Moved</title>
   </head>
-  <body>
-    <button class="admin-analytics-launch" type="button" data-open-analytics>Analytics</button>
-    <dialog class="admin-media admin-analytics" aria-labelledby="analytics-title" data-analytics-dialog>
-      <header><h1 id="analytics-title">Site analytics</h1><button type="button" data-close-analytics>Close</button></header>
-      <p>Visits and reading activity across Devlog, Life and the rest of the site.</p>
-      <form class="analytics-controls" data-analytics-form>
-        <label for="analytics-period">Period<select id="analytics-period" name="days"><option value="1">Today (UTC)</option><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></label>
-        <button type="submit">Refresh</button>
-      </form>
-      <p role="status" aria-live="polite" data-analytics-status></p>
-      <div data-analytics-results hidden>
-        <dl class="analytics-totals"><div><dt>Page views</dt><dd data-analytics-views></dd></div><div><dt>Visits</dt><dd data-analytics-visits></dd></div></dl>
-        <p class="admin-media-help">Visits are arrivals from another website or a direct link, not unique people. Counts may be sampled or delayed. Dates use UTC.</p>
-        <div class="analytics-tables">
-          <section><h2>Daily page views</h2><table><thead><tr><th scope="col">Date</th><th scope="col">Views</th></tr></thead><tbody data-analytics-daily></tbody></table></section>
-          <section><h2>Popular pages</h2><table><thead><tr><th scope="col">Page</th><th scope="col">Views</th></tr></thead><tbody data-analytics-pages></tbody></table></section>
-          <section><h2>Referrers</h2><table><thead><tr><th scope="col">Source</th><th scope="col">Views</th></tr></thead><tbody data-analytics-referrers></tbody></table></section>
-        </div>
-      </div>
-    </dialog>
-    <noscript>The site editor needs JavaScript. <a href="/">Return to the website</a>.</noscript>
-    <script>
-      import '../../scripts/admin';
-    </script>
-  </body>
+  <body><p>The editor moved to <a href="/write/">/write/</a>.</p></body>
 </html>

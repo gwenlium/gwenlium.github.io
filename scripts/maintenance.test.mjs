@@ -14,7 +14,7 @@ async function fixture(run) {
     'devlog/post/index.html': '<main>Post draft</main>',
     '404.html': '<main>Old error page</main>',
     'admin/index.html': '<main>Editor and login</main>',
-    'admin/config.yml': 'CMS configuration',
+    'write/index.html': '<main>Writing desk</main>',
     '_astro/client.js': 'client script',
     'media/photo.webp': 'uploaded media',
     'rss.xml': '<rss><channel><item>Post draft</item></channel></rss>',
@@ -61,7 +61,7 @@ test('maintenance replaces deep links and feeds without blocking the editor or a
       assert.equal($('meta[name="robots"]').attr('content'), 'noindex, nofollow');
       assert(!html.includes('draft'));
     }
-    for (const name of ['admin/index.html', 'admin/config.yml', '_astro/client.js', 'media/photo.webp']) {
+    for (const name of ['admin/index.html', 'write/index.html', '_astro/client.js', 'media/photo.webp']) {
       assert.equal(await fs.readFile(path.join(directory, name), 'utf8'), files[name]);
     }
     assert.deepEqual(JSON.parse(await fs.readFile(path.join(directory, 'search-index.json'), 'utf8')), { entries: [] });

@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import sharp from 'sharp';
 // Exercise the uploader's actual metadata parser without starting its browser/FFmpeg runtime.
-const source = fs.readFileSync('src/scripts/admin-media.ts', 'utf8').replace(/^import .*;\n/gm, '') + '\nexport { inspectRaster, stripWebpMetadata };';
+const source = fs.readFileSync('src/scripts/editor/prepare-media.ts', 'utf8').replace(/^import .*;\n/gm, '') + '\nexport { inspectRaster, stripWebpMetadata };';
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const sandbox = { exports: {}, Blob, File, AbortController, DOMException };
 vm.runInNewContext(code, sandbox);

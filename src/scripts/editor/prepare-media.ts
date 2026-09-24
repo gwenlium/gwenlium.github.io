@@ -2,7 +2,7 @@ import classWorkerURL from '@ffmpeg/ffmpeg/worker?worker&url';
 import coreURL from '@ffmpeg/core?url';
 import wasmURL from '@ffmpeg/core/wasm?url';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { normalizeWatermarkCredit, watermarkCreditError, watermarkLayout } from '../lib/watermark.mjs';
+import { normalizeWatermarkCredit, watermarkCreditError, watermarkLayout } from '../../lib/watermark.mjs';
 
 type PreviewMetadata =
   | { kind: 'image'; width: number; height: number; duration?: number }

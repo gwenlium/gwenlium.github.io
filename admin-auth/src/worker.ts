@@ -1,5 +1,5 @@
 import { contentPath, decodeBase64, EditorError, maxRequestBytes, maxTextBytes, previewRegistry, publishPayload, registryPath, shaPattern, validateContent } from './editor-content';
-import type { EditorFileInfo, EditorMediaEntry, EditorOwner } from '../../src/lib/site-editor-types';
+import type { EditorFileInfo, EditorMediaEntry, EditorOwner } from '../../src/lib/editor-types';
 
 interface Env {
   SITE_ORIGIN: string;
@@ -26,7 +26,7 @@ interface Configuration {
 }
 
 interface Attempt {
-  version: 1;
+  version: 2;
   state: string;
   verifier: string;
   issuedAt: number;
@@ -34,10 +34,31 @@ interface Attempt {
   callbackUri: string;
   siteOrigin: string;
   clientId: string;
+  device: string;
+}
+
+/** Sealed with AES-GCM; only this worker can open it, and only the browser key that signed in can use it. */
+interface OwnerSession {
+  version: 1;
+  userId: number;
+  refreshToken: string;
+  refreshExpiresAt: number;
+  device: string;
+}
+
+interface IssuedToken {
+  token: string;
+  expiresAt: number;
+  session?: string;
 }
 
 const COOKIE_NAME = '__Host-gwenlium-cms-oauth';
 const ATTEMPT_SECONDS = 600;
+// A P-256 public key in uncompressed form is 65 bytes, which is 87 base64url characters.
+const devicePattern = /^[A-Za-z0-9_-]{87}$/;
+const refreshPattern = /^ghr_[A-Za-z0-9]{1,508}$/;
+const SESSION_CLOCK_SKEW = 300;
+const SESSION_LABEL = 'gwenlium-editor-session-v1';
 const COOKIE_ATTRIBUTES = 'Path=/; Secure; HttpOnly; SameSite=Lax';
 const CLEAR_COOKIE = `${COOKIE_NAME}=; ${COOKIE_ATTRIBUTES}; Max-Age=0`;
 const GITHUB_API = 'https://api.github.com';
@@ -120,6 +141,52 @@ async function signAttempt(attempt: Attempt, secret: string): Promise<string> {
   return `${payload}.${base64url(new Uint8Array(signature))}`;
 }
 
+async function sessionKey(secret: string): Promise<CryptoKey> {
+  const material = await crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: encoder.encode(SESSION_LABEL), info: encoder.encode('owner session seal') },
+    material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'],
+  );
+}
+
+async function sealSession(session: OwnerSession, secret: string): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const sealed = new Uint8Array(await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: encoder.encode(SESSION_LABEL) },
+    await sessionKey(secret), encoder.encode(JSON.stringify(session)),
+  ));
+  const output = new Uint8Array(iv.length + sealed.length);
+  output.set(iv);
+  output.set(sealed, iv.length);
+  return base64url(output);
+}
+
+async function openSession(value: unknown, config: Configuration): Promise<OwnerSession> {
+  const failure = new OAuthError('Your saved sign-in is no longer valid. Sign in again.', 401);
+  if (typeof value !== 'string' || value.length < 40 || value.length > 3000) throw failure;
+  let session: Record<string, unknown> | undefined;
+  try {
+    const bytes = fromBase64url(value);
+    const opened = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: bytes.slice(0, 12), additionalData: encoder.encode(SESSION_LABEL) },
+      await sessionKey(config.stateSecret), bytes.slice(12),
+    );
+    session = record(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(opened)));
+  } catch { throw failure; }
+  if (
+    !session || session.version !== 1 || session.userId !== config.userId ||
+    typeof session.refreshToken !== 'string' || !refreshPattern.test(session.refreshToken) ||
+    typeof session.refreshExpiresAt !== 'number' || !Number.isSafeInteger(session.refreshExpiresAt) ||
+    session.refreshExpiresAt <= Math.floor(Date.now() / 1000) ||
+    typeof session.device !== 'string' || !devicePattern.test(session.device)
+  ) throw failure;
+  return session as unknown as OwnerSession;
+}
+
+function deviceKey(device: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', fromBase64url(device), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+}
+
 function cookieValue(request: Request): string | undefined {
   const matches = (request.headers.get('Cookie') ?? '').split(';')
     .map(part => part.trim())
@@ -149,7 +216,8 @@ async function verifyAttempt(request: Request, url: URL, config: Configuration):
     const attempt = record(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(fromBase64url(payload))));
     const now = Math.floor(Date.now() / 1000);
     if (
-      !attempt || attempt.version !== 1 || attempt.state !== state ||
+      !attempt || attempt.version !== 2 || attempt.state !== state ||
+      typeof attempt.device !== 'string' || !devicePattern.test(attempt.device) ||
       typeof attempt.verifier !== 'string' || !/^[A-Za-z0-9_-]{86}$/.test(attempt.verifier) ||
       typeof attempt.issuedAt !== 'number' || !Number.isSafeInteger(attempt.issuedAt) ||
       typeof attempt.expiresAt !== 'number' || !Number.isSafeInteger(attempt.expiresAt) ||
@@ -195,9 +263,9 @@ function escapeHtml(value: string): string {
   })[char]!);
 }
 
-function popupResponse(config: Configuration, result: { token: string } | { message: string }, status: number): Response {
+function popupResponse(config: Configuration, result: IssuedToken | { message: string }, status: number): Response {
   const success = 'token' in result;
-  const payload = success ? { token: result.token, provider: 'github' } : { message: result.message };
+  const payload = success ? { provider: 'github', ...result } : { message: result.message };
   const message = `authorization:github:${success ? 'success' : 'error'}:${JSON.stringify(payload)}`;
   const nonce = randomValue();
   const responseHeaders = headers(nonce);
@@ -211,7 +279,7 @@ function popupResponse(config: Configuration, result: { token: string } | { mess
 <body>
 <h1>Website sign-in</h1>
 <p id="status" role="status">Returning the sign-in result to the editor…</p>
-<p><a href="${escapeHtml(config.siteOrigin)}/admin/" rel="noreferrer noopener">Return to the editor</a></p>
+<p><a href="${escapeHtml(config.siteOrigin)}/write/" rel="noreferrer noopener">Return to the editor</a></p>
 <script nonce="${nonce}">
 (() => {
   const siteOrigin = ${scriptData(config.siteOrigin)};
@@ -257,9 +325,14 @@ async function startAuthorization(request: Request, url: URL, config: Configurat
   if (requestOrigin !== null && requestOrigin !== config.siteOrigin) {
     return textResponse('This site cannot initiate editor sign-in.', 403);
   }
+  // The editor's browser-held key: the saved session only ever works with this key's signatures.
+  const device = singleParameter(url, 'device_key');
+  if (!device || !devicePattern.test(device)) return textResponse('Reload the editor and sign in again.', 400);
+  try { await deviceKey(device); } catch { return textResponse('Reload the editor and sign in again.', 400); }
   const now = Math.floor(Date.now() / 1000);
   const attempt: Attempt = {
-    version: 1,
+    version: 2,
+    device,
     state: randomValue(),
     verifier: randomValue(64),
     issuedAt: now,
@@ -339,6 +412,62 @@ async function verifyRepository(token: string, config: Configuration): Promise<v
   ) throw failure;
 }
 
+function tokenRequest(config: Configuration, parameters: Record<string, string>): Promise<Record<string, unknown>> {
+  return githubJson('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'gwenlium-cms-auth',
+    },
+    body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, ...parameters }),
+  });
+}
+
+/** Validate a GitHub token response, re-verify the owner, and seal its refresh token for the signing browser. */
+async function issueToken(result: Record<string, unknown>, config: Configuration, device: string): Promise<IssuedToken> {
+  if (result.error === 'bad_refresh_token') throw new OAuthError('Your saved sign-in expired. Sign in again.', 401);
+  const token = result.access_token;
+  // Do not accept broad OAuth-app tokens or non-expiring user tokens.
+  if (
+    result.error || typeof token !== 'string' || !/^ghu_[A-Za-z0-9]{1,508}$/.test(token) ||
+    result.token_type !== 'bearer' || result.scope !== '' ||
+    typeof result.expires_in !== 'number' || !Number.isSafeInteger(result.expires_in) ||
+    result.expires_in <= 0 || result.expires_in > 28800
+  ) throw new OAuthError('GitHub did not issue an expiring GitHub App token. Check the app settings and sign in again.', 502);
+  const user = await githubJson(`${GITHUB_API}/user`, { headers: githubHeaders(token) });
+  if (user.id !== config.userId) {
+    throw new OAuthError('This GitHub account is not allowed to edit this website.', 403);
+  }
+  await verifyRepository(token, config);
+  const now = Math.floor(Date.now() / 1000);
+  const issued: IssuedToken = { token, expiresAt: now + result.expires_in };
+  const refreshToken = result.refresh_token;
+  const refreshSeconds = result.refresh_token_expires_in;
+  // Without a refresh token (app setting) the editor still works; it just asks again after the token expires.
+  if (typeof refreshToken === 'string' && refreshPattern.test(refreshToken) &&
+    typeof refreshSeconds === 'number' && Number.isSafeInteger(refreshSeconds) && refreshSeconds > 0 && refreshSeconds <= 366 * 86400) {
+    issued.session = await sealSession({ version: 1, userId: config.userId, refreshToken, refreshExpiresAt: now + refreshSeconds, device }, config.stateSecret);
+  }
+  return issued;
+}
+
+async function renewSession(request: Request, config: Configuration): Promise<Response> {
+  const body = record(await requestJson(request, 4096));
+  if (!body || Object.keys(body).some(key => !['session', 'timestamp', 'signature'].includes(key))) throw new EditorError('Invalid sign-in renewal.');
+  const session = await openSession(body.session, config);
+  const timestamp = body.timestamp;
+  const now = Math.floor(Date.now() / 1000);
+  if (typeof timestamp !== 'number' || !Number.isSafeInteger(timestamp) || Math.abs(now - timestamp) > SESSION_CLOCK_SKEW ||
+    typeof body.signature !== 'string' || !/^[A-Za-z0-9_-]{86}$/.test(body.signature)) throw new OAuthError('Your saved sign-in is no longer valid. Sign in again.', 401);
+  // Proof that the request comes from the browser that signed in: a copied session alone is useless.
+  const signed = encoder.encode(`${SESSION_LABEL}\n${body.session}\n${timestamp}`);
+  const valid = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, await deviceKey(session.device), fromBase64url(body.signature), signed);
+  if (!valid) throw new OAuthError('Your saved sign-in is no longer valid. Sign in again.', 401);
+  const result = await tokenRequest(config, { grant_type: 'refresh_token', refresh_token: session.refreshToken });
+  return analyticsJson(await issueToken(result, config, session.device), 200, config);
+}
+
 async function completeAuthorization(request: Request, url: URL, config: Configuration): Promise<Response> {
   try {
     const attempt = await verifyAttempt(request, url, config);
@@ -349,37 +478,13 @@ async function completeAuthorization(request: Request, url: URL, config: Configu
     if (!code || code.length > 512 || !/^[A-Za-z0-9_-]+$/.test(code)) {
       throw new OAuthError('GitHub did not supply a valid authorization code. Start again from the editor.', 400);
     }
-    const result = await githubJson('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'gwenlium-cms-auth',
-      },
-      body: new URLSearchParams({
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        code,
-        code_verifier: attempt.verifier,
-        redirect_uri: config.callbackUri,
-        repository_id: String(config.repositoryId),
-      }),
+    const result = await tokenRequest(config, {
+      code,
+      code_verifier: attempt.verifier,
+      redirect_uri: config.callbackUri,
+      repository_id: String(config.repositoryId),
     });
-    const token = result.access_token;
-    // Do not accept broad OAuth-app tokens or non-expiring user tokens. Refresh tokens
-    // returned by GitHub are deliberately discarded; the editor signs in again on expiry.
-    if (
-      result.error || typeof token !== 'string' || !/^ghu_[A-Za-z0-9]{1,508}$/.test(token) ||
-      result.token_type !== 'bearer' || result.scope !== '' ||
-      typeof result.expires_in !== 'number' || !Number.isSafeInteger(result.expires_in) ||
-      result.expires_in <= 0 || result.expires_in > 28800
-    ) throw new OAuthError('GitHub did not issue an expiring GitHub App token. Check the app settings and sign in again.', 502);
-    const user = await githubJson(`${GITHUB_API}/user`, { headers: githubHeaders(token) });
-    if (user.id !== config.userId) {
-      throw new OAuthError('This GitHub account is not allowed to edit this website.', 403);
-    }
-    await verifyRepository(token, config);
-    return popupResponse(config, { token }, 200);
+    return popupResponse(config, await issueToken(result, config, attempt.device), 200);
   } catch (error) {
     return popupResponse(config, {
       message: error instanceof OAuthError ? error.message : 'Sign-in could not be completed. Start again from the editor.',
@@ -565,11 +670,11 @@ async function editorFile(repository: EditorRepository, path: string, token: str
   return { path, sha: entry.sha, content };
 }
 
-async function requestJson(request: Request): Promise<unknown> {
-  if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(request.headers.get('Content-Type') ?? '')) throw new EditorError('Publish requires application/json.', 415);
+async function requestJson(request: Request, limit = maxRequestBytes): Promise<unknown> {
+  if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(request.headers.get('Content-Type') ?? '')) throw new EditorError('The editor request must be application/json.', 415);
   const length = request.headers.get('Content-Length');
-  if (length && (!/^\d+$/.test(length) || Number(length) > maxRequestBytes)) throw new EditorError('Publish request is too large.', 413);
-  if (!request.body) throw new EditorError('Publish requires a JSON body.');
+  if (length && (!/^\d+$/.test(length) || Number(length) > limit)) throw new EditorError('The editor request is too large.', 413);
+  if (!request.body) throw new EditorError('The editor request needs a JSON body.');
   const reader = request.body.getReader();
   const decoder = new TextDecoder('utf-8', { fatal: true });
   let size = 0; let source = '';
@@ -578,14 +683,14 @@ async function requestJson(request: Request): Promise<unknown> {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > maxRequestBytes) { await reader.cancel(); throw new EditorError('Publish request is too large.', 413); }
+      if (size > limit) { await reader.cancel(); throw new EditorError('The editor request is too large.', 413); }
       source += decoder.decode(value, { stream: true });
     }
     source += decoder.decode();
     return JSON.parse(source);
   } catch (error) {
     if (error instanceof EditorError) throw error;
-    throw new EditorError('Publish requires valid UTF-8 JSON.');
+    throw new EditorError('The editor request must be valid UTF-8 JSON.');
   } finally { reader.releaseLock(); }
 }
 
@@ -594,6 +699,11 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
   const conflict = () => new EditorError('The website changed since this draft was loaded. Refresh and review your draft before publishing.', 409);
   if (payload.baseCommit !== repository.head) throw conflict();
   for (const change of payload.changes) writablePath(repository, change.path);
+  const deletions = new Set(payload.deletions ?? []);
+  for (const path of deletions) {
+    if (!regularFile(repository, path)) throw new EditorError('The entry you deleted no longer exists. Refresh before publishing.', 409);
+    if (payload.changes.some(change => change.path === path)) throw new EditorError('An entry cannot be both changed and deleted.');
+  }
   writablePath(repository, registryPath);
   const registryFile = regularFile(repository, registryPath);
   const previews: Record<string, EditorMediaEntry> = registryFile ? previewRegistry((await editorFile(repository, registryPath, token)).content) : Object.create(null);
@@ -615,6 +725,7 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
   // post slugs must agree with the final tree, not only with each changed file.
   for (const entry of contentEntries) {
     if (!regularFile(repository, entry.path)) throw new EditorError('Editable content contains an unsafe file.');
+    if (deletions.has(entry.path)) continue;
     files.set(entry.path, changes.get(entry.path) ?? (await editorFile(repository, entry.path, token)).content);
   }
   for (const change of payload.changes) files.set(change.path, change.content);
@@ -622,7 +733,8 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
   if (await branchHead(repository, token) !== payload.baseCommit) throw conflict();
   const writeHeaders = new Headers(githubHeaders(token));
   writeHeaders.set('Content-Type', 'application/json');
-  const tree: Array<{ path: string; mode: string; type: string; sha?: string; content?: string }> = payload.changes.map(change => ({ path: change.path, mode: '100644', type: 'blob', content: change.content }));
+  const tree: Array<{ path: string; mode: string; type: string; sha?: string | null; content?: string }> = payload.changes.map(change => ({ path: change.path, mode: '100644', type: 'blob', content: change.content }));
+  for (const path of deletions) tree.push({ path, mode: '100644', type: 'blob', sha: null });
   for (const upload of payload.media) {
     const blob = await githubJson(`${repository.api}/git/blobs`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ content: upload.content, encoding: 'base64' }) });
     if (typeof blob.sha !== 'string' || !shaPattern.test(blob.sha)) throw new EditorError('GitHub did not confirm the prepared media upload.', 502);
@@ -644,10 +756,11 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
 
 async function editor(request: Request, url: URL, config: Configuration): Promise<Response> {
   if (request.headers.get('Origin') !== config.siteOrigin) return textResponse('Origin not allowed.', 403);
-  const method = url.pathname === '/editor/publish' ? 'POST' : 'GET';
+  const renewal = url.pathname === '/editor/session';
+  const method = url.pathname === '/editor/publish' || renewal ? 'POST' : 'GET';
   if (request.method === 'OPTIONS') {
     const requestedHeaders = (request.headers.get('Access-Control-Request-Headers') ?? '').toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
-    const allowedHeaders = method === 'POST' ? ['authorization', 'content-type'] : ['authorization'];
+    const allowedHeaders = renewal ? ['content-type'] : method === 'POST' ? ['authorization', 'content-type'] : ['authorization'];
     if (request.headers.get('Access-Control-Request-Method') !== method || requestedHeaders.some(header => !allowedHeaders.includes(header))) return analyticsJson({ error: 'Invalid preflight.' }, 403, config);
     const responseHeaders = headers();
     responseHeaders.set('Access-Control-Allow-Origin', config.siteOrigin);
@@ -657,6 +770,15 @@ async function editor(request: Request, url: URL, config: Configuration): Promis
     return new Response(null, { status: 204, headers: responseHeaders });
   }
   if (request.method !== method) return analyticsJson({ error: 'Method not allowed.' }, 405, config);
+  if (renewal) {
+    try {
+      if (url.search) throw new EditorError('This endpoint does not accept query parameters.');
+      return await renewSession(request, config);
+    } catch (error) {
+      const known = error instanceof EditorError || error instanceof OAuthError;
+      return analyticsJson({ error: known ? error.message.slice(0, 400) : 'Sign-in renewal failed. Try again.' }, known ? error.status : 502, config);
+    }
+  }
   const authorization = request.headers.get('Authorization') ?? '';
   if (!/^Bearer ghu_[A-Za-z0-9]{1,508}$/.test(authorization)) return analyticsJson({ error: 'Sign in to the editor.' }, 401, config);
   try {
@@ -687,7 +809,7 @@ async function editor(request: Request, url: URL, config: Configuration): Promis
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (['/editor', '/editor/file', '/editor/publish'].includes(url.pathname)) {
+    if (['/editor', '/editor/file', '/editor/publish', '/editor/session'].includes(url.pathname)) {
       const config = configuration(env);
       if (!config) return textResponse('Editor configuration is unavailable.', 503);
       if (url.protocol !== 'https:' || url.origin !== config.authOrigin) return textResponse('Invalid editor origin.', 400);

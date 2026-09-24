@@ -1,0 +1,32 @@
+/* The picture library dialog: prepare a new copy or reuse something already on the site. */
+.media-library { box-sizing: border-box; width: min(900px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 1.2rem; overflow: auto; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font: .8rem/1.6 var(--font-ui); box-shadow: inset 1px 1px var(--bevel-light), inset -1px -1px var(--bevel-dark), 5px 5px 0 #0003; }
+.media-library::backdrop { background: rgb(10 20 14 / .45); }
+.media-library *, .media-library *::before, .media-library *::after { box-sizing: border-box; }
+.media-library [hidden] { display: none !important; }
+.media-library header, .media-library-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.media-library h1 { margin: 0; font-size: 1.05rem; }
+.media-library h2 { margin: 1.4rem 0 .7rem; font-size: .85rem; }
+.media-library form { display: grid; gap: 12px; }
+.media-library label { display: grid; gap: 5px; }
+.media-library input { min-width: 0; max-width: 100%; padding: .45rem .6rem; border: 1px solid var(--line); background: var(--surface-raised); color: inherit; font: .8rem var(--font-reading); box-shadow: inset 1px 1px 0 var(--bevel-dark), inset -1px -1px 0 var(--bevel-light); }
+.media-library input[type=file] { width: 100%; }
+.media-library fieldset { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; border: 1px solid var(--line); }
+.media-library .media-library-choice { display: flex; align-items: center; gap: 8px; }
+.media-library .media-library-choice input { flex-shrink: 0; margin: 0; padding: 0; box-shadow: none; accent-color: var(--accent-ink); }
+.media-library-warning { grid-column: 1 / -1; margin: 0; padding: .6rem; border: 1px solid var(--line); background: var(--pink); }
+.media-library button { min-height: 34px; padding: .4rem .75rem; border: 1px solid var(--line); background: var(--surface-raised); color: var(--ink); font: 11px/1.4 var(--font-ui); cursor: pointer; box-shadow: inset 1px 1px 0 var(--bevel-light), inset -1px -1px 0 var(--bevel-dark); }
+.media-library button:hover:not(:disabled) { background: var(--sage); }
+.media-library button:focus-visible, .media-library input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.media-library button:disabled { opacity: .5; cursor: default; }
+.media-library-help { margin: 0; color: var(--muted); font-size: .7rem; }
+.media-library progress { width: 100%; accent-color: var(--accent-ink); }
+.media-library [data-status] { overflow-wrap: anywhere; }
+.media-library [data-preview-media] { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; justify-items: center; padding: 10px; border: 1px solid var(--line); background: var(--page-bg); }
+.media-library [data-preview-media] :is(img, video, audio) { display: block; max-width: 100%; max-height: 50dvh; object-fit: contain; }
+.media-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr)); gap: 10px; }
+.media-library-card { display: flex; flex-direction: column; justify-content: end; gap: 8px; min-width: 0; padding: 8px; border: 1px solid var(--line); background: var(--surface-raised); }
+.media-library-card img { width: 100%; height: 130px; object-fit: contain; background: var(--page-bg); }
+.media-library-card :is(audio, video) { width: 100%; max-height: 180px; }
+.media-library-card span { font-size: .68rem; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .media-library { padding: 1rem; } .media-library fieldset { grid-template-columns: 1fr; } }
+@media (forced-colors: active) { .media-library { border-color: CanvasText; box-shadow: none; } }

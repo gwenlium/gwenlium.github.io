@@ -1,8 +1,7 @@
-import { editorBackend } from './admin-github';
-import type { PreviewRegistry } from './admin-github';
-import { preparePreview, previewInputKind } from './admin-media';
-import type { PreparedPreview, PreviewInputKind } from './admin-media';
-import '../styles/admin.css';
+import type { PreviewRegistry } from '../../lib/editor-types';
+import { preparePreview, previewInputKind } from './prepare-media';
+import type { PreparedPreview, PreviewInputKind } from './prepare-media';
+import '../../styles/media-library.css';
 
 export type PreviewPickerOptions = {
   imagesOnly?: boolean;
@@ -18,7 +17,6 @@ export type PreviewPickerSettings = {
   onInsert: (url: string | string[]) => void;
   onCancel?: () => void;
   resolveURL?: (url: string) => string;
-  mode: 'publish' | 'draft';
 };
 
 const imageExtensions = '.jpg,.jpeg,.png,.webp,.gif';
@@ -27,28 +25,27 @@ const audioExtensions = '.mp3,.wav,.flac,.ogg,.oga,.opus,.m4a,.aac,.aif,.aiff,.w
 let pickerSequence = 0;
 
 export function createPreviewPicker(settings: PreviewPickerSettings) {
-  const draft = settings.mode === 'draft';
   const resolveURL = settings.resolveURL ?? ((url: string) => url);
-  const titleId = `admin-media-title-${++pickerSequence}`;
+  const titleId = `media-library-title-${++pickerSequence}`;
   const dialog = document.createElement('dialog');
-  dialog.className = 'admin-media';
+  dialog.className = 'media-library';
   dialog.setAttribute('aria-labelledby', titleId);
   dialog.innerHTML = `<header><h1 id="${titleId}">Media library</h1><button type="button" data-close aria-label="Close media picker">Close</button></header>
-    <p>Originals stay on this device. Images and animations are resized and watermarked; video is watermarked and compressed; audio is converted to MP3. ${draft ? 'Prepared copies stay in your private local draft until you explicitly Publish. Publishing makes those copies public, never the originals.' : 'Uploaded copies and saved drafts are public.'}</p>
+    <p>Originals stay on this device. Images and animations are resized and watermarked; video is watermarked and compressed; audio is converted to MP3. Prepared copies stay in your unpublished changes until you explicitly Publish. Publishing makes those copies public, never the originals.</p>
     <form data-prepare><label>Pictures, GIFs, audio or video<input type="file" data-file required></label>
       <label>Public name (optional)<input data-name pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxlength="54" placeholder="song-title or artwork-name"></label>
-      <fieldset data-length hidden><legend>${draft ? 'Prepared copy length' : 'Publication length'}</legend>
-        <label class="admin-media-choice"><input type="radio" name="${titleId}-length" value="preview" data-short checked>Short preview</label>
-        <label class="admin-media-choice"><input type="radio" name="${titleId}-length" value="full" data-full>Full length</label>
-        <p class="admin-media-warning" data-full-warning hidden>${draft ? 'Publishing will make the complete recording or animation public. Until then the processed copy stays in your private local draft. The original is never uploaded.' : 'The complete recording or animation will be public. Only the processed copy is uploaded, never the original.'} Copies must fit within 32 MiB.</p>
+      <fieldset data-length hidden><legend>Prepared copy length</legend>
+        <label class="media-library-choice"><input type="radio" name="${titleId}-length" value="preview" data-short checked>Short preview</label>
+        <label class="media-library-choice"><input type="radio" name="${titleId}-length" value="full" data-full>Full length</label>
+        <p class="media-library-warning" data-full-warning hidden>Publishing will make the complete recording or animation public. Until then the processed copy stays in your unpublished changes. The original is never uploaded. Copies must fit within 32 MiB.</p>
       </fieldset>
       <fieldset data-timing hidden><legend>Preview excerpt</legend><label>Start (seconds)<input data-start type="number" min="0" step="0.01" value="0" required></label><label>Duration (seconds, maximum 60)<input data-duration type="number" min="0.01" max="60" step="0.01" value="30" required></label></fieldset>
-      <p class="admin-media-help">JPEG, PNG, WebP and GIF up to 32 MiB; audio and video up to 128 MiB. GIF/WebP animation is preserved and needs ImageDecoder (current Chrome). Audio and video need WebAssembly. Large files may take time; canceling processing uploads nothing.</p>
-      <div class="admin-media-actions"><button type="submit" data-convert disabled>Prepare preview</button><button type="button" data-cancel hidden>Cancel processing</button></div>
+      <p class="media-library-help">JPEG, PNG, WebP and GIF up to 32 MiB; audio and video up to 128 MiB. GIF/WebP animation is preserved and needs ImageDecoder (current Chrome). Audio and video need WebAssembly. Large files may take time; canceling processing uploads nothing.</p>
+      <div class="media-library-actions"><button type="submit" data-convert disabled>Prepare preview</button><button type="button" data-cancel hidden>Cancel processing</button></div>
     </form>
     <p data-status role="status" aria-live="polite"></p><progress data-progress max="1" hidden></progress>
-    <section data-preview hidden><h2>Prepared copy</h2><div data-preview-media></div><p data-preview-details></p><button type="button" data-publish>${draft ? 'Stage and use copy' : 'Upload and use copy'}</button></section>
-    <button type="button" data-insert-selection hidden>Use selected pictures</button><section><h2>Existing media</h2><div class="admin-media-grid" data-library></div></section>`;
+    <section data-preview hidden><h2>Prepared copy</h2><div data-preview-media></div><p data-preview-details></p><button type="button" data-publish>Use copy</button></section>
+    <button type="button" data-insert-selection hidden>Use selected pictures</button><section><h2>Existing media</h2><div class="media-library-grid" data-library></div></section>`;
   document.body.append(dialog);
   const lifetime = new AbortController();
   const listener = { signal: lifetime.signal };
@@ -153,7 +150,7 @@ export function createPreviewPicker(settings: PreviewPickerSettings) {
     if (!entries.length) { library.textContent = 'No matching media yet.'; return; }
     for (const [url, entry] of entries) {
       const card = document.createElement('div');
-      card.className = 'admin-media-card';
+      card.className = 'media-library-card';
       if (entry.kind === 'image') {
         const image = document.createElement('img');
         image.src = resolveURL(url);
@@ -252,7 +249,7 @@ export function createPreviewPicker(settings: PreviewPickerSettings) {
     convert.disabled = input.disabled = name.disabled = timing.disabled = length.disabled = true;
     cancel.hidden = progress.hidden = false;
     progress.removeAttribute('value');
-    status.textContent = draft ? 'Preparing on this device for your private local draft.' : 'Preparing on this device. Nothing has been uploaded.';
+    status.textContent = 'Preparing on this device for your unpublished changes.';
     try {
       const { creator } = await settings.load();
       if (abort.signal.aborted || request !== opening) return;
@@ -279,15 +276,15 @@ export function createPreviewPicker(settings: PreviewPickerSettings) {
         else media.alt = 'Prepared, watermarked image or animation';
         previewMedia.append(media);
       }
-      previewDetails.textContent = `${prepared.length} prepared copy/copies. Review each copy before ${draft ? 'staging it in your local draft' : 'uploading'}.`;
-      publish.textContent = prepared.length > 1 ? `${draft ? 'Stage' : 'Upload'} and use ${prepared.length} pictures` : `${draft ? 'Stage' : 'Upload'} and use copy`;
+      previewDetails.textContent = `${prepared.length} prepared copy/copies. Review each copy before adding it.`;
+      publish.textContent = prepared.length > 1 ? `Use ${prepared.length} pictures` : `Use copy`;
       preview.hidden = false;
-      status.textContent = draft ? 'Review the prepared copy before staging. Nothing is public until you explicitly Publish; the original stays on this device.' : 'Review the prepared copy before uploading. Uploaded copies are public; the original stays on this device.';
+      status.textContent = 'Check the prepared copy. Nothing is public until you publish, and the original stays on this device.';
       publish.focus();
     } catch (error) {
       if (request === opening && dialog.open) {
         clearPreview();
-        status.textContent = abort.signal.aborted ? `Processing cancelled. ${draft ? 'Nothing was staged.' : 'Nothing was uploaded.'}` : error instanceof Error ? error.message : 'Could not prepare this file.';
+        status.textContent = abort.signal.aborted ? `Processing cancelled. Nothing was staged.` : error instanceof Error ? error.message : 'Could not prepare this file.';
       }
     } finally {
       if (controller === abort) {
@@ -305,18 +302,18 @@ export function createPreviewPicker(settings: PreviewPickerSettings) {
     const request = opening;
     close.disabled = publish.disabled = convert.disabled = input.disabled = true;
     form.inert = library.inert = insertSelection.inert = true;
-    status.textContent = draft ? 'Staging prepared copies in your private local draft…' : 'Uploading the prepared copy and its registry together…';
+    status.textContent = 'Adding the prepared copies…';
     try {
       const urls: string[] = [];
       for (const [index, item] of prepared.entries()) {
         if (destroyed || request !== opening) return;
-        status.textContent = `${draft ? 'Staging locally' : 'Uploading'} ${index + 1} of ${prepared.length}…`;
+        status.textContent = `Adding ${index + 1} of ${prepared.length}…`;
         urls.push(await settings.save(item));
       }
       saving = false;
       if (request === opening) insert(isMultiple() ? urls : urls[0]);
     } catch (error) {
-      if (!destroyed && request === opening) status.textContent = `${error instanceof Error ? error.message : draft ? 'Local staging failed.' : 'Upload failed.'} ${draft ? 'Some prepared copies may already be in your local draft. Nothing was published.' : 'Some copies may already be in Existing media.'} Retry to finish; existing copies are reused.`;
+      if (!destroyed && request === opening) status.textContent = `${error instanceof Error ? error.message : 'Adding failed.'} Some prepared copies may already be in your unpublished changes. Nothing was published. Retry to finish; existing copies are reused.`;
     } finally {
       saving = false;
       close.disabled = publish.disabled = input.disabled = false;
@@ -349,7 +346,7 @@ export function createPreviewPicker(settings: PreviewPickerSettings) {
       syncLength();
       input.accept = [accepts('image') ? imageExtensions : '', accepts('audio') ? audioExtensions : '', accepts('video') ? videoExtensions : ''].filter(Boolean).join(',');
       library.replaceChildren();
-      status.textContent = draft ? 'Loading published and private draft media…' : 'Loading registered media…';
+      status.textContent = 'Loading your pictures and media…';
       dialog.showModal();
       try {
         const { registry } = await settings.load();
@@ -373,28 +370,3 @@ export function createPreviewPicker(settings: PreviewPickerSettings) {
     },
   };
 }
-
-export const previewMediaLibrary = {
-  name: 'gwenlium-previews',
-  init({ handleInsert }: { handleInsert: (url: string | string[]) => void }) {
-    let options: PreviewPickerOptions = {};
-    const picker = createPreviewPicker({
-      mode: 'publish',
-      load: () => editorBackend().media(),
-      save: preview => editorBackend().publishPreview(preview),
-      onInsert(url) {
-        // Decap appends returned URLs to an existing multi-image field itself.
-        const existing = new Set(Array.isArray(options.value) ? options.value : options.value ? [options.value] : []);
-        handleInsert(options.allowMultiple ? [...new Set(Array.isArray(url) ? url : [url])].filter(item => !existing.has(item)) : url);
-      },
-    });
-    return {
-      ...picker,
-      show(next: PreviewPickerOptions = {}) {
-        options = { ...next, allowMultiple: next.allowMultiple !== false && next.config?.multiple === true };
-        return picker.show(options);
-      },
-      enableStandalone: () => true,
-    };
-  },
-};

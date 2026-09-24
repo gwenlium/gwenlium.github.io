@@ -1,0 +1,19 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+---
+
+<SiteLayout title="Write" description="The site owner's writing desk." editor>
+  <div class="writer" data-writer>
+    <noscript><p class="writer-loading">The writing desk needs JavaScript.</p></noscript>
+  </div>
+</SiteLayout>
+
+<script>
+  import { mountWriter, unmountWriter } from '../scripts/editor/writer';
+
+  document.addEventListener('astro:page-load', () => {
+    const root = document.querySelector<HTMLElement>('[data-writer]');
+    if (root) void mountWriter(root);
+  });
+  document.addEventListener('astro:before-swap', unmountWriter);
+</script>

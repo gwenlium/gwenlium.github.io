@@ -35,8 +35,15 @@ function runtime(handler, extra = {}) {
   }] });
 }
 
-async function authorize(worker) {
-  const start = await worker.dispatchFetch('https://auth.test/auth?provider=github&site_id=site.test', { redirect: 'manual' });
+const toBase64url = bytes => Buffer.from(bytes).toString('base64url');
+async function deviceKeys() {
+  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']);
+  return { pair, device: toBase64url(await crypto.subtle.exportKey('raw', pair.publicKey)) };
+}
+const defaultDevice = await deviceKeys();
+
+async function authorize(worker, device = defaultDevice.device) {
+  const start = await worker.dispatchFetch(`https://auth.test/auth?provider=github&site_id=site.test&device_key=${device}`, { redirect: 'manual' });
   assert.equal(start.status, 302);
   const state = new URL(start.headers.get('location')).searchParams.get('state');
   return worker.dispatchFetch('https://auth.test/callback?code=test-code&state=' + state, {
@@ -208,6 +215,7 @@ function editorFixture(options = {}) {
     ['src/content/gallery.json', JSON.stringify({ items: [] })],
     ['src/content/media-previews.json', JSON.stringify({ files: { [previousPreviewPath]: previousPreviewEntry } })],
     ['src/secret.ts', 'private source'],
+    ...(options.sources ?? []),
   ]);
   const blobs = new Map();
   const entries = [];
@@ -432,4 +440,94 @@ test('editor rejects original MP4 metadata, nested private boxes and oversized v
     assert.equal(response.status, allowed ? 200 : 400, await response.clone().text());
     if (!allowed) { assert.deepEqual(fixture.writes, []); assert.equal(fixture.head, editorHead); }
   }
+});
+
+function renewalUpstream(options = {}) {
+  const refreshes = [];
+  const handler = async request => {
+    const url = new URL(request.url);
+    if (url.pathname === '/login/oauth/access_token') {
+      const body = new URLSearchParams(await request.text());
+      if (body.get('grant_type') === 'refresh_token') {
+        refreshes.push(body.get('refresh_token'));
+        if (options.revoked) return Response.json({ error: 'bad_refresh_token' });
+        return Response.json({ access_token: token, token_type: 'bearer', scope: '', expires_in: 28800, refresh_token: 'ghr_' + 'c'.repeat(40), refresh_token_expires_in: 15897600 });
+      }
+      return Response.json({ access_token: token, token_type: 'bearer', scope: '', expires_in: 28800, ...(options.noRefresh ? {} : { refresh_token: 'ghr_' + 'b'.repeat(40), refresh_token_expires_in: 15897600 }) });
+    }
+    if (url.pathname === '/user') return Response.json({ id: 1 });
+    if (url.pathname === '/user/installations') return Response.json({ total_count: 1, installations: [{
+      id: 3, account: { id: 1 }, repository_selection: 'selected', suspended_at: null,
+      permissions: { contents: 'write', metadata: 'read' },
+    }] });
+    if (url.pathname === '/user/installations/3/repositories') return Response.json({ total_count: 1, repositories: [{ id: 2 }] });
+    throw new Error('Unexpected upstream request');
+  };
+  return { handler, refreshes };
+}
+
+function popupPayload(html) {
+  const match = /authorization:github:success:(\{.*?\})"/.exec(html);
+  assert.ok(match, 'sign-in succeeded');
+  return JSON.parse(JSON.parse(`"${match[1]}"`));
+}
+
+async function renewal(worker, session, pair, { timestamp = Math.floor(Date.now() / 1000), origin = 'https://site.test' } = {}) {
+  const signature = toBase64url(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, pair.privateKey, new TextEncoder().encode(`gwenlium-editor-session-v1\n${session}\n${timestamp}`)));
+  return worker.dispatchFetch('https://auth.test/editor/session', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ session, timestamp, signature }) });
+}
+
+test('sign-in requires a browser key and seals a renewable session bound to it', async t => {
+  const upstream = renewalUpstream(); const worker = runtime(upstream.handler); t.after(() => worker.dispose());
+  const missing = await worker.dispatchFetch('https://auth.test/auth?provider=github&site_id=site.test', { redirect: 'manual' });
+  assert.equal(missing.status, 400);
+  const response = await authorize(worker);
+  assert.equal(response.status, 200);
+  const payload = popupPayload(await response.text());
+  assert.equal(payload.token, token);
+  assert.ok(payload.expiresAt > Date.now() / 1000);
+  assert.match(payload.session, /^[A-Za-z0-9_-]+$/);
+  assert.ok(!payload.session.includes('ghr_'), 'the refresh token never reaches the browser in the clear');
+  const renewed = await renewal(worker, payload.session, defaultDevice.pair);
+  assert.equal(renewed.status, 200, await renewed.clone().text());
+  const value = await renewed.json();
+  assert.equal(value.token, token); assert.notEqual(value.session, payload.session);
+  assert.deepEqual(upstream.refreshes, ['ghr_' + 'b'.repeat(40)]);
+  assert.equal(renewed.headers.get('access-control-allow-origin'), 'https://site.test');
+});
+
+test('a copied session is useless without the browser key, a fresh proof and the site origin', async t => {
+  const upstream = renewalUpstream(); const worker = runtime(upstream.handler); t.after(() => worker.dispose());
+  const { session } = popupPayload(await (await authorize(worker)).text());
+  const stranger = await deviceKeys();
+  assert.equal((await renewal(worker, session, stranger.pair)).status, 401);
+  assert.equal((await renewal(worker, session, defaultDevice.pair, { timestamp: Math.floor(Date.now() / 1000) - 3600 })).status, 401);
+  assert.equal((await renewal(worker, session, defaultDevice.pair, { origin: 'https://attacker.test' })).status, 403);
+  assert.equal((await renewal(worker, session.slice(0, -4) + 'AAAA', defaultDevice.pair)).status, 401);
+  assert.deepEqual(upstream.refreshes, []);
+});
+
+test('a revoked refresh asks for sign-in again, and apps without refresh tokens still sign in', async t => {
+  const revoked = renewalUpstream({ revoked: true }); const worker = runtime(revoked.handler); t.after(() => worker.dispose());
+  const { session } = popupPayload(await (await authorize(worker)).text());
+  const response = await renewal(worker, session, defaultDevice.pair);
+  assert.equal(response.status, 401); assert.match((await response.json()).error, /Sign in again/);
+  const plain = renewalUpstream({ noRefresh: true }); const plainWorker = runtime(plain.handler); t.after(() => plainWorker.dispose());
+  const payload = popupPayload(await (await authorize(plainWorker)).text());
+  assert.equal(payload.token, token); assert.equal(payload.session, undefined);
+});
+
+test('editor deletes journal entries in the same atomic commit and nothing else', async t => {
+  const post = 'src/content/posts/old.md';
+  const fixture = editorFixture({ sources: [[post, '---\ntitle: Old\ndraft: true\n---\nText\n']] });
+  const worker = runtime(fixture.handler); t.after(() => worker.dispose());
+  const denied = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ changes: [], deletions: ['src/content/site.json'] }) });
+  assert.equal(denied.status, 400);
+  const missing = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ changes: [], deletions: ['src/content/posts/never.md'] }) });
+  assert.equal(missing.status, 409);
+  assert.deepEqual(fixture.writes, []);
+  const response = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ changes: [], deletions: [post] }) });
+  assert.equal(response.status, 200, await response.clone().text());
+  const treeWrites = fixture.writes.filter(write => write.path.endsWith('/git/trees'));
+  assert.deepEqual(treeWrites[0].body.tree, [{ path: post, mode: '100644', type: 'blob', sha: null }]);
 });

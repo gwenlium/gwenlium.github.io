@@ -19,7 +19,7 @@ const previewKinds = { webp: 'image', gif: 'image', mp3: 'audio', mp4: 'video' }
 export const publicBranding = { '/avatar.webp': true, '/favicon.png': true, '/social-card.png': true, '/followit-logo.svg': true };
 export const mediaFilePattern = /\.(?:avif|bmp|gif|heic|heif|ico|jpe?g|png|psd|svg|tiff?|webp|aac|aiff?|alac|flac|m4a|mp3|oga|ogg|opus|wav|wma|3gp|avi|m4v|mkv|mov|mp4|mpeg|mpg|ogv|webm|wmv)$/i;
 const trailerHosts = { 'youtube.com': true, 'www.youtube.com': true, 'm.youtube.com': true, 'youtu.be': true, 'www.youtube-nocookie.com': true, 'youtube-nocookie.com': true, 'vimeo.com': true, 'www.vimeo.com': true, 'player.vimeo.com': true };
-const importInstruction = 'Use the admin media picker to upload a processed copy, or keep the original outside this repository and run npm run media:import -- "/absolute/path/to/original". Commit the generated public/media file and src/content/media-previews.json together.';
+const importInstruction = 'Add media with the website editor (/write/) so it uploads a processed copy, or keep the original outside this repository and run npm run media:import -- "/absolute/path/to/original". Commit the generated public/media file and src/content/media-previews.json together.';
 
 export function readMediaPreviews(root, report) {
   const file = 'src/content/media-previews.json';
@@ -298,7 +298,8 @@ export function validateSource(root = projectRoot, now = new Date()) {
       const types = gallery ? ['image', 'video'] : ['image', 'video', 'audio'];
       if (!types.includes(item.type)) report(file, `${key}.type`, `Choose one of: ${types.join(', ')}.`);
       url(item.src, file, `${key}.src`, { media: true, kind: item.type, base, required: true });
-      text(item.alt, file, `${key}.alt`, item.type === 'image');
+      // Optional like the older photo lists; covers and pictures inside text still need one.
+      text(item.alt, file, `${key}.alt`);
       text(item.caption, file, `${key}.caption`);
       url(item.poster, file, `${key}.poster`, { media: true, kind: 'image', base });
     });

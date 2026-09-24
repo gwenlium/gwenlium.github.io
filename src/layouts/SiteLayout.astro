@@ -24,9 +24,12 @@ interface Props {
   imageAlt?: string;
   article?: boolean;
   noindex?: boolean;
+  /** The owner's writing page: no custom windows, and never indexed. */
+  editor?: boolean;
 }
 
-const { title, description = site.description, image, imageAlt, article = false, noindex = false } = Astro.props;
+const { title, description = site.description, image, imageAlt, article = false, editor = false } = Astro.props;
+const noindex = Astro.props.noindex || editor;
 const pageTitle = title ? `${title} - ${site.name}` : site.name;
 const siteUrl = Astro.site ?? new URL('https://gwenlium.dev');
 const canonical = new URL(Astro.url.pathname, siteUrl).href;
@@ -36,7 +39,7 @@ const section = Astro.url.pathname.split('/').filter(Boolean)[0] || 'home';
 const startWindow = getWindowDefinition('start-menu')!;
 const preferencesWindow = getWindowDefinition('site-settings')!;
 const playerWindow = getWindowDefinition('music-player')!;
-const pageTheme = ['home', 'devlog', 'life', 'gallery', 'music', 'about', 'subscribe'].includes(section) ? section : 'not-found';
+const pageTheme = editor ? 'devlog' : ['home', 'devlog', 'life', 'gallery', 'music', 'about', 'subscribe'].includes(section) ? section : 'not-found';
 const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
 ---
 
@@ -117,7 +120,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
     <meta name="twitter:image" content={socialImage} />
     <meta name="twitter:image:alt" content={socialImageAlt} />
     <ClientRouter />
-    {import.meta.env.PROD && Astro.url.hostname === siteUrl.hostname && /^[a-f0-9]{32}$/i.test(analytics.cloudflareBeaconToken) && <script is:inline type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon={JSON.stringify({ token: analytics.cloudflareBeaconToken })}></script>}
+    {import.meta.env.PROD && !editor && Astro.url.hostname === siteUrl.hostname && /^[a-f0-9]{32}$/i.test(analytics.cloudflareBeaconToken) && <script is:inline type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon={JSON.stringify({ token: analytics.cloudflareBeaconToken })}></script>}
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
@@ -134,7 +137,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
       <div id="page-scroll" tabindex="0" role="region" aria-label="Page content" transition:name="page-content" transition:animate="none">
         <main id="main-content" class="page-content" tabindex="-1">
           <slot />
-          <CustomWindows page={windowPage} />
+          {!editor && <CustomWindows page={windowPage} />}
         </main>
       </div>
 
@@ -150,7 +153,8 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
         <button type="button" class="button-secondary taskbar-control" data-open-player aria-controls="music-player" aria-expanded={!playerWindow.initiallyClosed} aria-label={`${playerWindow.title} player`}>
           <Icon name="music" size={17} /><span>{playerWindow.title}</span>
         </button>
-        <button type="button" class="button-secondary" data-open-site-editor data-owner-editor aria-controls="site-editor-shell" aria-expanded="false" hidden>Edit website</button>
+        <button type="button" class="button-secondary taskbar-control owner-taskbar" data-owner-menu data-owner-editor aria-haspopup="menu" hidden><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m4 20 4-1 11-11-3-3L5 16l-1 4ZM14 7l3 3" /></svg><span>Edit</span></button>
+        <button type="button" class="button owner-taskbar owner-taskbar--publish" data-owner-publish hidden>Publish</button>
         <div class="taskbar-windows" data-taskbar-windows role="group" aria-label="Open windows"></div>
         <button type="button" class="button-secondary taskbar-control" data-auto-arrange-windows aria-label="Auto arrange windows" title="Restore the responsive default layout of open windows">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" /></svg><span>Auto arrange</span>

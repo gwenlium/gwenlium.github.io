@@ -28,7 +28,7 @@ const writers = new Map<HTMLElement, Writer>();
 const seenText = new WeakMap<Text, string>();
 const queuedRoots = new Set<HTMLElement>();
 const roots = '[data-typewriter], #main-content [data-desktop-window]:not([data-persistent-window]) > .window-body';
-const ignored = 'script, style, noscript, svg, math, input, textarea, select, [contenteditable], [hidden], [aria-hidden="true"], .sr-only, .text-caret';
+const ignored = 'script, style, noscript, svg, math, input, textarea, select, [contenteditable], [hidden], [aria-hidden="true"], .sr-only, .text-caret, [data-typewriter-skip]';
 let timer = 0;
 let cursorFrame = 0;
 let contentFrame = 0;

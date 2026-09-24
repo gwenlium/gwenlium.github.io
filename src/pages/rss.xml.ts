@@ -1,7 +1,7 @@
 import rss from '@astrojs/rss';
 import type { APIContext } from 'astro';
 import { load } from 'cheerio';
-import { getPosts, postUrl, type Post } from '../lib/content';
+import { getPosts, postPreview, postUrl, type Post } from '../lib/content';
 import { site } from '../lib/settings';
 
 const htmlEscapes: Record<string, string> = {
@@ -56,12 +56,13 @@ export async function GET(context: APIContext): Promise<Response> {
     xmlns: { atom: 'http://www.w3.org/2005/Atom' },
     customData: `<language>en</language><atom:link href="${new URL('/rss.xml', base).href}" rel="self" type="application/rss+xml" />`,
     items: posts.map((post) => {
-      const { title, date, excerpt, tags } = post.data;
+      const { title, date, tags } = post.data;
       return {
         title,
         link: new URL(postUrl(post), base).href,
         pubDate: date,
-        description: excerpt,
+        // The summary is optional; the start of the text stands in for it.
+        description: postPreview(post),
         categories: [post.data.section === 'life' ? 'Life' : 'Devlog', ...tags],
         content: articleContent(post, base),
       };

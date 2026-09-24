@@ -1,16 +1,16 @@
 import { parseDocument } from 'yaml';
-import type { PreparedPreview } from './admin-media';
-import type { PreviewRegistry } from './admin-github';
-import { normalizeWatermarkCredit } from '../lib/watermark.mjs';
+import type { PreparedPreview } from './prepare-media';
+import { normalizeWatermarkCredit } from '../../lib/watermark.mjs';
 import type {
   EditorBinding, EditorConflict, EditorDraftFile, EditorFile, EditorMediaEntry,
-  EditorPublishRequest, EditorPublishResult, EditorSnapshot,
-} from '../lib/site-editor-types';
+  EditorPublishRequest, EditorPublishResult, EditorSnapshot, PreviewRegistry,
+} from '../../lib/editor-types';
+import { authFailure, type OwnerAuth } from './auth';
+import { readRecord, writeIfRevision } from './database';
 
-const registryPath = 'src/content/media-previews.json';
+export const registryPath = 'src/content/media-previews.json';
 const sitePath = 'src/content/site.json';
 const previewPath = /^\/media\/[a-z0-9]+(?:-[a-z0-9]+)*-preview-([a-f0-9]{32})\.(webp|gif|mp4|mp3)$/;
-const tokenPattern = /^ghu_[A-Za-z0-9]{1,508}$/;
 const forbiddenKeys: Record<string, boolean> = { ['__proto__']: true, prototype: true, constructor: true };
 const own = (value: object, key: PropertyKey) => Object.prototype.hasOwnProperty.call(value, key);
 
@@ -23,7 +23,6 @@ type SavedDraft = {
   media: StagedMedia[];
 };
 type Session = {
-  token: string;
   controller: AbortController;
   key: string;
   revision: number;
@@ -34,15 +33,31 @@ type Session = {
   conflicts?: EditorConflict[];
 };
 
+export type EntrySummary = {
+  path: string;
+  title: string;
+  permalink: string;
+  section: 'devlog' | 'life';
+  draft: boolean;
+  date: string;
+  cover: string;
+  changed: boolean;
+  isNew: boolean;
+};
+
 function failure(message: string, status?: number): Error & { status?: number } {
   return Object.assign(new Error(message), status === undefined ? {} : { status });
+}
+
+export function isPostPath(path: string): boolean {
+  return /^src\/content\/posts\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)*[a-z0-9]+(?:-[a-z0-9]+)*\.md$/.test(path);
 }
 
 function editablePath(path: string): boolean {
   if (typeof path !== 'string' || path.includes('\\') || path.split('/').some(part => !part || part === '.' || part === '..')) return false;
   return /^src\/content\/(?:site|windows|gallery|music)\.json$/.test(path)
     || /^src\/content\/pages\/[^/]+\.json$/.test(path)
-    || /^src\/content\/posts\/(?:[^/]+\/)*[^/]+\.md$/.test(path);
+    || isPostPath(path);
 }
 
 function assertPath(path: string, writable = false): void {
@@ -55,7 +70,7 @@ function snapshotFrom(value: unknown): EditorSnapshot {
     || typeof item.branch !== 'string' || !item.branch
     || typeof item.repository !== 'string' || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(item.repository)
     || !item.owner || !Number.isSafeInteger(item.owner.id) || item.owner.id <= 0
-    || typeof item.owner.login !== 'string' || !item.owner.login || !Array.isArray(item.files)) {
+    || typeof item.owner.login !== 'string' || !Array.isArray(item.files)) {
     throw new Error('The editor returned an invalid owner snapshot.');
   }
   const paths = new Set<string>();
@@ -126,7 +141,6 @@ function locate(value: unknown, parts: string[], writing: boolean): { path: (str
       throw new Error('The parent of this editable field no longer exists.');
     }
     path.push(key);
-    // The container was narrowed above; the resolved key only accesses its own entries.
     const container = current as Record<string | number, unknown>;
     current = own(container, key) ? container[key] : undefined;
     if (current === undefined && !last) throw new Error('The parent of this editable field no longer exists.');
@@ -134,7 +148,7 @@ function locate(value: unknown, parts: string[], writing: boolean): { path: (str
   return { path, value: current };
 }
 
-function markdownParts(content: string) {
+export function markdownParts(content: string) {
   const opening = /^(?:\uFEFF)?---[ \t]*\r?\n/.exec(content);
   if (!opening) return { opening: '---\n', closing: '---\n', prefix: '', yaml: '', body: content };
   const rest = content.slice(opening[0].length);
@@ -144,7 +158,7 @@ function markdownParts(content: string) {
   return { opening: opening[0], closing: closing[0], prefix: content.slice(0, end), yaml: rest.slice(0, closing.index), body: content.slice(end) };
 }
 
-function bindingDocument(content: string, markdown: boolean) {
+export function bindingDocument(content: string, markdown: boolean) {
   if (!markdown) {
     const value: unknown = JSON.parse(content);
     safeValue(value);
@@ -205,26 +219,68 @@ async function base64(blob: Blob): Promise<string> {
   return btoa(chunks.join(''));
 }
 
-/** Owner authorization and private, explicitly published drafts. Tokens never leave memory. */
+function entryFrom(path: string, content: string, changed: boolean, isNew: boolean): EntrySummary {
+  let data: Record<string, unknown> = {};
+  try { data = bindingDocument(content, true).value as Record<string, unknown>; } catch { /* Listed with its path so it can still be opened. */ }
+  const date = data.date instanceof Date ? data.date.toISOString().slice(0, 10) : typeof data.date === 'string' ? data.date : '';
+  return {
+    path, changed, isNew,
+    title: typeof data.title === 'string' ? data.title : '',
+    permalink: typeof data.permalink === 'string' ? data.permalink : '',
+    section: data.section === 'life' ? 'life' : 'devlog',
+    draft: data.draft !== false,
+    date,
+    cover: typeof data.cover === 'string' ? data.cover : '',
+  };
+}
+
+/** Owner drafts: private to this browser until published, then committed in one atomic change. */
 export class SiteEditorStore {
   private readonly authOrigin: string;
   private readonly siteOrigin: string;
+  private readonly auth: OwnerAuth;
+  readonly local: boolean;
   private session?: Session;
   private generation = 0;
   private pendingAuth?: AbortController;
-  private cancelPopup?: () => void;
   private writes: Promise<unknown> = Promise.resolve();
   private listeners = new Set<() => void>();
   private objectURLs = new Map<string, string>();
-  private database?: Promise<IDBDatabase>;
   private warning?: string;
+  private channel?: BroadcastChannel;
+  private restoring?: Promise<boolean>;
 
-  constructor(options: { authOrigin: string; siteOrigin: string }) {
+  constructor(options: { authOrigin: string; siteOrigin: string; auth: OwnerAuth; local?: boolean }) {
     const auth = new URL(options.authOrigin);
     const site = new URL(options.siteOrigin);
-    if (auth.protocol !== 'https:' || site.protocol !== 'https:' || auth.username || auth.password || site.username || site.password) throw new Error('The editor requires HTTPS origins without URL credentials.');
-    this.authOrigin = auth.origin;
+    if (!options.local && (auth.protocol !== 'https:' || site.protocol !== 'https:')) throw new Error('The editor requires HTTPS origins.');
+    if (auth.username || auth.password || site.username || site.password) throw new Error('The editor origins cannot contain credentials.');
+    this.authOrigin = options.local ? options.authOrigin.replace(/\/$/, '') : auth.origin;
     this.siteOrigin = site.origin;
+    this.auth = options.auth;
+    this.local = Boolean(options.local);
+    try {
+      // Other tabs of the site share one draft; follow their saves instead of conflicting with them.
+      this.channel = new BroadcastChannel('gwenlium-site-editor');
+      this.channel.onmessage = event => { if (event.data?.key === this.session?.key) void this.follow(String(event.data.head)); };
+    } catch { /* Without BroadcastChannel, the revision check still prevents lost writes. */ }
+  }
+
+  private follow(head: string): Promise<void> {
+    return this.enqueue(async session => {
+      const saved = await readRecord<SavedDraft>('drafts', session.key);
+      this.active(session);
+      if ((saved?.revision ?? 0) === session.revision && head === session.snapshot.head) return;
+      session.revision = saved?.revision ?? 0;
+      session.files = new Map((saved?.files ?? []).map(file => [file.path, { ...file }]));
+      session.media = new Map((saved?.media ?? []).map(media => [media.url, { ...media, entry: mediaEntry(media.entry, media.url) }]));
+      if (head !== session.snapshot.head) {
+        // The other tab published: load the version it published.
+        session.snapshot = saved?.snapshot.head === head ? snapshotFrom(saved.snapshot) : snapshotFrom(await this.api(session.controller, '/editor'));
+        session.cache.clear();
+      }
+      this.emit();
+    }).catch(() => undefined);
   }
 
   get authenticated(): boolean { return !!this.session; }
@@ -232,6 +288,7 @@ export class SiteEditorStore {
   get snapshot(): EditorSnapshot | undefined { return this.session ? structuredClone(this.session.snapshot) : undefined; }
   get draftFiles(): EditorDraftFile[] { return this.session ? Array.from(this.session.files.values(), file => ({ ...file })) : []; }
   get storageWarning(): string | undefined { return this.warning; }
+  get remembered(): boolean { return this.auth.remembered; }
 
   subscribe(callback: () => void): () => void {
     this.listeners.add(callback);
@@ -256,13 +313,16 @@ export class SiteEditorStore {
     return result;
   }
 
-  private async api(token: string, controller: AbortController, path: string, body?: EditorPublishRequest): Promise<unknown> {
+  private async api(controller: AbortController, path: string, body?: EditorPublishRequest, retried = false): Promise<unknown> {
+    const token = await this.auth.token(retried);
     const response = await fetch(`${this.authOrigin}${path}`, {
       method: body ? 'POST' : 'GET', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error',
       signal: controller.signal,
       headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
+    // A token GitHub revoked early gets one quiet renewal before asking to sign in.
+    if (response.status === 401 && !retried) return this.api(controller, path, body, true);
     let value: unknown;
     try { value = await response.json(); }
     catch { throw failure('The editor service returned an unreadable response.', response.status); }
@@ -274,81 +334,45 @@ export class SiteEditorStore {
     return value;
   }
 
+  /** Call from a click handler: the popup opens synchronously. */
   signIn(): Promise<void> {
-    if (window.location.origin !== this.siteOrigin) return Promise.reject(failure('Open the editor on its configured website origin.', 403));
-    this.cancelPopup?.();
-    const url = new URL('/auth', this.authOrigin);
-    url.searchParams.set('provider', 'github');
-    url.searchParams.set('site_id', new URL(this.siteOrigin).host);
-    // Opening before the first await preserves the browser's user-activation permission.
-    const popup = window.open(url.href, '_blank', 'popup,width=640,height=760');
-    if (!popup) return Promise.reject(new Error('Allow the GitHub sign-in popup, then try again.'));
-    const { promise, resolve, reject } = Promise.withResolvers<void>();
-    let handshaken = false;
-    let finished = false;
-    const cleanup = () => {
-      window.removeEventListener('message', receive);
-      clearTimeout(timeout);
-      clearInterval(closed);
-      this.cancelPopup = undefined;
-      try { popup.close(); } catch { /* The popup may already be closed. */ }
-    };
-    const finish = (error?: Error) => {
-      if (finished) return;
-      finished = true;
-      cleanup();
-      if (error) reject(error);
-    };
-    const receive = (event: MessageEvent) => {
-      if (finished || event.origin !== this.authOrigin || event.source !== popup || typeof event.data !== 'string') return;
-      if (event.data === 'authorizing:github') {
-        try { popup.postMessage('authorizing:github', this.authOrigin); handshaken = true; }
-        catch { finish(new Error('The GitHub sign-in window could not complete authorization.')); }
-        return;
-      }
-      if (!handshaken) return;
-      const success = 'authorization:github:success:';
-      const error = 'authorization:github:error:';
-      if (event.data.startsWith(error)) {
-        finish(new Error('GitHub did not authorize the configured website owner.'));
-        return;
-      }
-      if (!event.data.startsWith(success)) return;
-      let data: unknown;
-      try { data = JSON.parse(event.data.slice(success.length)); }
-      catch { finish(new Error('GitHub returned an invalid authorization response.')); return; }
-      if (!data || typeof data !== 'object' || !('provider' in data) || data.provider !== 'github'
-        || !('token' in data) || typeof data.token !== 'string' || !tokenPattern.test(data.token)) {
-        finish(new Error('GitHub returned an invalid authorization token.'));
-        return;
-      }
-      finish();
-      void this.connect(data.token).then(resolve, reject);
-    };
-    const timeout = window.setTimeout(() => finish(new Error('GitHub sign-in timed out. Try signing in again.')), 5 * 60 * 1000);
-    const closed = window.setInterval(() => { if (popup.closed) finish(new Error('GitHub sign-in was cancelled.')); }, 400);
-    this.cancelPopup = () => finish(new Error('GitHub sign-in was cancelled.'));
-    window.addEventListener('message', receive);
-    return promise;
+    const signingIn = this.auth.signIn();
+    return signingIn.then(() => this.connect());
   }
 
-  async connect(token: string): Promise<void> {
-    if (window.location.origin !== this.siteOrigin) throw failure('Open the editor on its configured website origin.', 403);
-    if (!tokenPattern.test(token)) throw failure('A valid GitHub App owner token is required.', 401);
-    this.signOut();
+  /** Reconnect a remembered sign-in without any popup. Resolves false when there is none. */
+  restore(): Promise<boolean> {
+    if (this.session) return Promise.resolve(true);
+    // The page controls and the writing page both ask at load; share one connection.
+    this.restoring ??= (async () => {
+      try {
+        await this.auth.token();
+      } catch (error) {
+        if ((error as { status?: number }).status === 401) return false;
+        throw error;
+      }
+      await this.connect();
+      return true;
+    })().finally(() => { this.restoring = undefined; });
+    return this.restoring;
+  }
+
+  async connect(): Promise<void> {
+    if (!this.local && window.location.origin !== this.siteOrigin) throw failure('Open the editor on the website itself.', 403);
+    this.close();
     const generation = this.generation;
     const controller = new AbortController();
     this.pendingAuth = controller;
     try {
-      const verified = snapshotFrom(await this.api(token, controller, '/editor'));
+      const verified = snapshotFrom(await this.api(controller, '/editor'));
       if (generation !== this.generation) throw failure('Sign-in was cancelled.', 401);
       const key = JSON.stringify([this.siteOrigin, verified.owner.id, verified.repository]);
       let saved: SavedDraft | undefined;
-      try { saved = await this.load(key); }
+      try { saved = await readRecord<SavedDraft>('drafts', key); }
       catch (error) { this.storageFailure(error); throw error; }
       if (generation !== this.generation) throw failure('Sign-in was cancelled.', 401);
       const session: Session = {
-        token, controller, key, revision: saved?.revision ?? 0, snapshot: verified,
+        controller, key, revision: saved?.revision ?? 0, snapshot: verified,
         files: new Map(), media: new Map(), cache: new Map(),
       };
       if (saved) {
@@ -360,7 +384,7 @@ export class SiteEditorStore {
         for (const file of saved.files) {
           assertPath(file.path, true);
           if ((file.baseContent !== null && typeof file.baseContent !== 'string') || typeof file.content !== 'string' || session.files.has(file.path)) throw new Error('The saved private draft is invalid. It has not been overwritten.');
-          if (file.content !== file.baseContent) session.files.set(file.path, { ...file });
+          if (file.content !== file.baseContent || file.deleted) session.files.set(file.path, { ...file });
         }
         for (const media of saved.media) {
           if (!(media.file instanceof Blob) || !media.file.size || session.media.has(media.url)) throw new Error('The saved private media draft is invalid. It has not been overwritten.');
@@ -371,19 +395,19 @@ export class SiteEditorStore {
       this.session = session;
       this.warning = undefined;
       this.emit();
+      // Drafts made against an older version are re-based quietly when nothing conflicts.
+      if (session.files.size && session.snapshot.head !== verified.head) void this.refresh().catch(() => undefined);
     } finally {
       if (this.pendingAuth === controller) this.pendingAuth = undefined;
     }
   }
 
-  signOut(): void {
+  private close(): void {
     this.generation++;
-    this.cancelPopup?.();
     this.pendingAuth?.abort();
     this.pendingAuth = undefined;
     if (this.session) {
       this.session.controller.abort();
-      this.session.token = '';
       this.session.files.clear();
       this.session.media.clear();
       this.session.cache.clear();
@@ -392,6 +416,12 @@ export class SiteEditorStore {
     }
     this.revokeMedia();
     this.warning = undefined;
+  }
+
+  /** Forget the sign-in on this device. Unpublished drafts stay saved for the next sign-in. */
+  async signOut(): Promise<void> {
+    this.close();
+    await this.auth.signOut();
     this.emit();
   }
 
@@ -401,7 +431,7 @@ export class SiteEditorStore {
     if (!expected) throw failure('This file does not exist at the draft base commit.', 404);
     let pending = cache.get(path);
     if (!pending) {
-      pending = this.api(session.token, session.controller, `/editor/file?${new URLSearchParams({ path, ref: snapshot.head })}`).then(value => {
+      pending = this.api(session.controller, `/editor/file?${new URLSearchParams({ path, ref: snapshot.head })}`).then(value => {
         this.active(session);
         const file = value as EditorFile;
         if (!file || file.path !== path || typeof file.content !== 'string' || file.sha !== expected.sha) throw new Error('The editor returned a source file that does not match the draft base.');
@@ -416,6 +446,7 @@ export class SiteEditorStore {
   private source(session: Session, path: string): Promise<string> {
     assertPath(path);
     const draft = session.files.get(path);
+    if (draft?.deleted) return Promise.reject(failure('This entry is deleted in your unpublished changes.', 404));
     return draft ? Promise.resolve(draft.content) : this.remote(session, session.snapshot, path, session.cache);
   }
 
@@ -425,6 +456,14 @@ export class SiteEditorStore {
     return this.source(this.active(session), path);
   }
 
+  exists(path: string): boolean {
+    const session = this.session;
+    if (!session) return false;
+    const draft = session.files.get(path);
+    if (draft) return !draft.deleted;
+    return session.snapshot.files.some(file => file.path === path);
+  }
+
   private async update(session: Session, path: string, content: string): Promise<void> {
     assertPath(path, true);
     if (typeof content !== 'string') throw new Error('File content must be text.');
@@ -432,7 +471,7 @@ export class SiteEditorStore {
     const baseContent = prior ? prior.baseContent : session.snapshot.files.some(file => file.path === path)
       ? await this.remote(session, session.snapshot, path, session.cache) : null;
     this.active(session);
-    if (!this.warning && content === (prior?.content ?? baseContent)) return;
+    if (!this.warning && !prior?.deleted && content === (prior?.content ?? baseContent)) return;
     if (content === baseContent) session.files.delete(path);
     else session.files.set(path, { path, baseContent, content });
     this.emit();
@@ -441,6 +480,32 @@ export class SiteEditorStore {
 
   write(path: string, content: string): Promise<void> {
     return this.enqueue(session => this.update(session, path, content));
+  }
+
+  /** Delete a journal entry. A never-published entry simply disappears from the draft. */
+  remove(path: string): Promise<void> {
+    return this.enqueue(async session => {
+      if (!isPostPath(path)) throw new Error('Only journal entries can be deleted.');
+      const published = session.snapshot.files.some(file => file.path === path);
+      if (!published) session.files.delete(path);
+      else {
+        const prior = session.files.get(path);
+        const baseContent = prior ? prior.baseContent : await this.remote(session, session.snapshot, path, session.cache);
+        this.active(session);
+        session.files.set(path, { path, baseContent, content: '', deleted: true });
+      }
+      this.emit();
+      await this.save(session);
+    });
+  }
+
+  /** Undo every unpublished change to one file. */
+  revert(path: string): Promise<void> {
+    return this.enqueue(async session => {
+      if (!session.files.delete(path)) return;
+      this.emit();
+      await this.save(session);
+    });
   }
 
   async get(binding: EditorBinding): Promise<unknown> {
@@ -470,8 +535,7 @@ export class SiteEditorStore {
       if (parsed.document && parsed.parts) {
         if (!parts.length) throw new Error('Edit a named Markdown frontmatter field or its body.');
         parsed.document.setIn(target.path, value);
-        const yaml = parsed.document.toString();
-        result = parsed.parts.opening + yaml + parsed.parts.closing + parsed.parts.body;
+        result = parsed.parts.opening + parsed.document.toString() + parsed.parts.closing + parsed.parts.body;
       } else {
         if (!parts.length) result = `${JSON.stringify(value, null, 2)}\n`;
         else {
@@ -483,6 +547,23 @@ export class SiteEditorStore {
       }
       await this.update(session, binding.file, result);
     });
+  }
+
+  /** Every journal entry, drafts and unpublished new ones included. */
+  async entries(): Promise<EntrySummary[]> {
+    const session = this.active();
+    await this.writes;
+    const paths = new Set(session.snapshot.files.map(file => file.path).filter(isPostPath));
+    for (const [path, file] of session.files) {
+      if (!isPostPath(path)) continue;
+      if (file.deleted) paths.delete(path); else paths.add(path);
+    }
+    const entries = await Promise.all([...paths].map(async path => {
+      const draft = session.files.get(path);
+      return entryFrom(path, await this.source(session, path), Boolean(draft), draft?.baseContent === null);
+    }));
+    this.active(session);
+    return entries.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : a.title.localeCompare(b.title)));
   }
 
   addMedia(prepared: PreparedPreview): Promise<string> {
@@ -497,9 +578,9 @@ export class SiteEditorStore {
       }
       const existing = session.media.get(prepared.url);
       if (existing && existing.entry.sha256 !== entry.sha256) throw new Error('Another private preview already uses that filename.');
+      // The same picture added twice is one file; pictures already showing keep their preview.
+      if (existing) return prepared.url;
       session.media.set(prepared.url, { url: prepared.url, file: prepared.file, entry });
-      const priorURL = this.objectURLs.get(prepared.url);
-      if (priorURL) { URL.revokeObjectURL(priorURL); this.objectURLs.delete(prepared.url); }
       this.emit();
       await this.save(session);
       return prepared.url;
@@ -521,8 +602,12 @@ export class SiteEditorStore {
     const settings = JSON.parse(site);
     const creator = normalizeWatermarkCredit(settings.watermarkText)
       || (typeof settings.name === 'string' && settings.name.trim() ? normalizeWatermarkCredit(`© ${settings.name}`) : '');
-    if (!creator) throw new Error('Set your site display name or watermark text before preparing media.');
+    if (!creator) throw new Error('Set your site display name or watermark text before adding pictures.');
     return { registry, creator };
+  }
+
+  mediaKind(url: string): EditorMediaEntry['kind'] | undefined {
+    return this.session?.media.get(url)?.entry.kind ?? (previewPath.exec(url)?.[2] === 'mp4' ? 'video' : previewPath.exec(url)?.[2] === 'mp3' ? 'audio' : previewPath.test(url) ? 'image' : undefined);
   }
 
   resolveMedia(url: string): string {
@@ -532,16 +617,20 @@ export class SiteEditorStore {
       if (!objectURL) { objectURL = URL.createObjectURL(draft.file); this.objectURLs.set(url, objectURL); }
       return objectURL;
     }
-    if (this.session && previewPath.test(url)) {
+    // Published minutes ago but not deployed yet: GitHub already has the file.
+    if (!this.local && this.session && previewPath.test(url)) {
       return `https://raw.githubusercontent.com/${this.session.snapshot.repository}/${this.session.snapshot.head}/public${url}`;
     }
     return url;
   }
 
-  publish(): Promise<EditorPublishResult> {
+  /** Publish all changes, or only the listed files (and the new media they use). */
+  publish(paths?: string[]): Promise<EditorPublishResult> {
     return this.enqueue(async session => {
-      const changes = Array.from(session.files.values(), ({ path, content }) => ({ path, content }));
-      if (!changes.length) throw new Error('There are no changed files to publish. Add a staged preview to a page before publishing it.');
+      const selected = Array.from(session.files.values()).filter(file => !paths || paths.includes(file.path));
+      const changes = selected.filter(file => !file.deleted).map(({ path, content }) => ({ path, content }));
+      const deletions = selected.filter(file => file.deleted && file.baseContent !== null).map(file => file.path);
+      if (!changes.length && !deletions.length) throw new Error('There is nothing selected to publish.');
       const references = new Set<string>();
       for (const change of changes) {
         const parsed = bindingDocument(change.content, change.path.endsWith('.md'));
@@ -551,27 +640,39 @@ export class SiteEditorStore {
       const referenced = Array.from(session.media.values()).filter(media => references.has(media.url));
       const media = await Promise.all(referenced.map(async item => ({ path: `public${item.url}`, content: await base64(item.file), entry: item.entry })));
       this.active(session);
-      const value = await this.api(session.token, session.controller, '/editor/publish', { baseCommit: session.snapshot.head, changes, media });
+      const value = await this.api(session.controller, '/editor/publish', { baseCommit: session.snapshot.head, changes, media, deletions });
       this.active(session);
       const result = value as EditorPublishResult;
       if (!result || !/^[a-f0-9]{40}$/.test(result.commit) || typeof result.htmlUrl !== 'string'
         || result.htmlUrl !== `https://github.com/${session.snapshot.repository}/commit/${result.commit}`) throw new Error('The publish response could not be confirmed. Keep this draft and refresh before trying again.');
       let snapshot: EditorSnapshot;
       try {
-        snapshot = snapshotFrom(await this.api(session.token, session.controller, '/editor'));
+        snapshot = snapshotFrom(await this.api(session.controller, '/editor'));
         this.active(session);
         this.sameOwner(session, snapshot);
-        await this.removeSaved(session);
       } catch (error) {
-        const status = error && typeof error === 'object' && 'status' in error && typeof error.status === 'number' ? error.status : undefined;
-        throw failure(`Published commit ${result.commit}, but the local draft could not be cleared and refreshed. Keep it and use Refresh before publishing again. ${error instanceof Error ? error.message : ''}`, status);
+        const status = (error as { status?: number })?.status;
+        throw failure(`Published, but the editor could not reload the latest version. Reload the page before editing more. ${error instanceof Error ? error.message : ''}`, status);
       }
+      // Unselected changes stay as drafts, now based on the new version.
+      const published = new Set(selected.map(file => file.path));
+      const remaining = new Map<string, EditorDraftFile>();
+      for (const [path, file] of session.files) {
+        if (published.has(path)) continue;
+        const base = snapshot.files.some(item => item.path === path) ? await this.remote(session, snapshot, path, new Map()) : null;
+        if (file.deleted) { if (base !== null) remaining.set(path, { ...file, baseContent: base }); }
+        else if (file.content !== base) remaining.set(path, { ...file, baseContent: base });
+      }
+      const keep = new Map(Array.from(session.media).filter(([url]) => !references.has(url)));
+      await this.save(session, snapshot, remaining, keep);
       this.active(session);
       session.snapshot = snapshot;
-      session.files.clear();
-      session.media.clear();
+      session.files = remaining;
+      session.media = keep;
       session.cache.clear();
-      this.revokeMedia();
+      for (const [url, objectURL] of this.objectURLs) {
+        if (!keep.has(url)) { URL.revokeObjectURL(objectURL); this.objectURLs.delete(url); }
+      }
       this.warning = undefined;
       this.emit();
       return result;
@@ -581,10 +682,10 @@ export class SiteEditorStore {
   discard(): Promise<void> {
     return this.enqueue(async session => {
       // Read first so a failed network request cannot erase the owner's saved work.
-      const snapshot = snapshotFrom(await this.api(session.token, session.controller, '/editor'));
+      const snapshot = snapshotFrom(await this.api(session.controller, '/editor'));
       this.active(session);
       this.sameOwner(session, snapshot);
-      await this.removeSaved(session);
+      await this.save(session, snapshot, new Map(), new Map());
       this.active(session);
       session.snapshot = snapshot;
       session.files.clear();
@@ -600,9 +701,10 @@ export class SiteEditorStore {
     if (snapshot.owner.id !== session.snapshot.owner.id || snapshot.repository !== session.snapshot.repository || snapshot.branch !== session.snapshot.branch) throw failure('The editor owner or repository configuration changed. Sign in again before continuing.', 403);
   }
 
+  /** Move drafts onto the latest published version. Returns files changed on both sides. */
   refresh(resolutions?: Record<string, 'draft' | 'remote'>): Promise<EditorConflict[]> {
     return this.enqueue(async session => {
-      const snapshot = snapshotFrom(await this.api(session.token, session.controller, '/editor'));
+      const snapshot = snapshotFrom(await this.api(session.controller, '/editor'));
       this.active(session);
       this.sameOwner(session, snapshot);
       const cache = new Map<string, Promise<string>>();
@@ -620,7 +722,7 @@ export class SiteEditorStore {
         for (const [url, staged] of media) {
           const registered = registry.files[url];
           if (!registered) continue;
-          if (registered.sha256 !== staged.entry.sha256) throw new Error('A published preview now uses a private draft filename with different contents. Your private draft and preview have been kept unchanged.');
+          if (registered.sha256 !== staged.entry.sha256) throw new Error('A published picture now uses a private draft filename with different contents. Your draft has been kept unchanged.');
           media.delete(url);
         }
       }
@@ -631,7 +733,7 @@ export class SiteEditorStore {
       }
       const unseen = conflicts.some(conflict => !session.conflicts?.some(previous => previous.path === conflict.path
         && previous.base === conflict.base && previous.draft === conflict.draft && previous.remote === conflict.remote));
-      if (unseen || conflicts.some(conflict => !resolutions || !own(resolutions, conflict.path) || !['draft', 'remote'].includes(resolutions[conflict.path]))) {
+      if (conflicts.length && (unseen || conflicts.some(conflict => !resolutions || !own(resolutions, conflict.path) || !['draft', 'remote'].includes(resolutions[conflict.path])))) {
         session.conflicts = conflicts.map(conflict => ({ ...conflict }));
         return conflicts;
       }
@@ -639,10 +741,10 @@ export class SiteEditorStore {
       const files = new Map<string, EditorDraftFile>();
       for (const file of session.files.values()) {
         const remote = remoteFiles.get(file.path)!;
-        if (remote === file.content || (conflicted.has(file.path) && resolutions?.[file.path] === 'remote')) continue;
-        files.set(file.path, { path: file.path, baseContent: remote, content: file.content });
+        if ((!file.deleted && remote === file.content) || (conflicted.has(file.path) && resolutions?.[file.path] === 'remote')) continue;
+        if (file.deleted && remote === null) continue;
+        files.set(file.path, { ...file, baseContent: remote });
       }
-      // Persist the entire resolved rebase before replacing the original state.
       await this.save(session, snapshot, files, media);
       this.active(session);
       session.snapshot = snapshot;
@@ -664,66 +766,16 @@ export class SiteEditorStore {
   }
 
   private storageFailure(error: unknown): void {
-    this.warning = `The private draft could not be saved or restored on this device. ${error instanceof Error ? error.message : 'Browser storage is unavailable.'}`;
+    this.warning = `Your changes could not be saved on this device. ${error instanceof Error ? error.message : 'Browser storage is unavailable.'} Keep this tab open until you publish.`;
     this.emit();
   }
 
-  private db(): Promise<IDBDatabase> {
-    if (this.database) return this.database;
-    const { promise, resolve, reject } = Promise.withResolvers<IDBDatabase>();
-    this.database = promise;
-    try {
-      const request = indexedDB.open('gwenlium-site-editor', 1);
-      let failed = false;
-      request.onupgradeneeded = () => { request.result.createObjectStore('drafts', { keyPath: 'key' }); };
-      request.onerror = () => { failed = true; reject(request.error ?? new Error('Private draft storage could not be opened.')); };
-      request.onblocked = () => { failed = true; reject(new Error('Close other editor tabs to open private draft storage.')); };
-      request.onsuccess = () => {
-        const db = request.result;
-        if (failed) { db.close(); return; }
-        db.onversionchange = () => { db.close(); this.database = undefined; };
-        resolve(db);
-      };
-    } catch (error) { reject(error); }
-    void promise.catch(() => { if (this.database === promise) this.database = undefined; });
-    return promise;
-  }
-
-  private async load(key: string): Promise<SavedDraft | undefined> {
-    const db = await this.db();
-    const { promise, resolve, reject } = Promise.withResolvers<SavedDraft | undefined>();
-    const transaction = db.transaction('drafts', 'readonly');
-    const request = transaction.objectStore('drafts').get(key);
-    transaction.oncomplete = () => resolve(request.result);
-    transaction.onerror = () => reject(transaction.error ?? new Error('The private draft could not be read.'));
-    transaction.onabort = () => reject(transaction.error ?? new Error('The private draft read was interrupted.'));
-    return promise;
-  }
-
-  private async persist(session: Session, record?: SavedDraft): Promise<void> {
-    const db = await this.db();
+  private async persist(session: Session, record: SavedDraft): Promise<void> {
+    const empty = !record.files.length && !record.media.length;
+    await writeIfRevision('drafts', session.key, session.revision, empty ? undefined : record);
     this.active(session);
-    const { promise, resolve, reject } = Promise.withResolvers<void>();
-    const transaction = db.transaction('drafts', 'readwrite');
-    const store = transaction.objectStore('drafts');
-    const request = store.get(session.key);
-    let conflict: Error | undefined;
-    request.onsuccess = () => {
-      const saved: SavedDraft | undefined = request.result;
-      if ((saved?.revision ?? 0) !== session.revision) {
-        conflict = new Error('Another editor tab changed this private draft. Your edits remain in this tab; do not close it or overwrite the other tab.');
-        transaction.abort();
-        return;
-      }
-      if (record) store.put(record);
-      else store.delete(session.key);
-    };
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(conflict ?? transaction.error ?? new Error('The private draft could not be saved.'));
-    transaction.onabort = () => reject(conflict ?? transaction.error ?? new Error('The private draft save was interrupted.'));
-    await promise;
-    this.active(session);
-    session.revision = record?.revision ?? 0;
+    session.revision = empty ? 0 : record.revision;
+    this.channel?.postMessage({ key: session.key, head: record.snapshot.head });
   }
 
   private async save(session: Session, snapshot = session.snapshot, files = session.files, media = session.media): Promise<void> {
@@ -732,13 +784,17 @@ export class SiteEditorStore {
         key: session.key, revision: session.revision + 1, snapshot,
         files: Array.from(files.values()), media: Array.from(media.values()),
       });
-      this.warning = undefined;
-      this.emit();
+      if (this.warning) { this.warning = undefined; this.emit(); }
     } catch (error) { if (this.session === session) this.storageFailure(error); throw error; }
   }
 
-  private async removeSaved(session: Session): Promise<void> {
-    try { await this.persist(session); }
-    catch (error) { if (this.session === session) this.storageFailure(error); throw error; }
+  /** For owner-only services outside the editor API (analytics). */
+  accessToken(): Promise<string> {
+    return this.auth.token();
+  }
+
+  /** Throws on a missing sign-in so callers can show the sign-in prompt. */
+  requireSession(): void {
+    if (!this.session) throw authFailure('Sign in with GitHub to edit the website.');
   }
 }

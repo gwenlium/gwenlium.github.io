@@ -2,7 +2,7 @@ import { parseDocument } from 'yaml';
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import type { Root, RootContent } from 'mdast';
 import { builtinWindowPages, systemWindowIds, windowContents, windowPages, windowTones } from '../../src/lib/window-catalogue.mjs';
-import type { EditorMediaEntry, EditorPublishRequest } from '../../src/lib/site-editor-types';
+import type { EditorMediaEntry, EditorPublishRequest } from '../../src/lib/editor-types';
 import { normalizeWatermarkCredit, watermarkCreditError } from '../../src/lib/watermark.mjs';
 
 export const registryPath = 'src/content/media-previews.json';
@@ -228,10 +228,18 @@ function magic(bytes: Uint8Array, extension: string, entry: EditorMediaEntry): v
 }
 export async function publishPayload(value: unknown): Promise<EditorPublishRequest> {
   const request = object(value);
-  keys(request, ['baseCommit', 'changes', 'media']);
+  keys(request, ['baseCommit', 'changes', 'media', 'deletions']);
   requireValue(typeof request.baseCommit === 'string' && shaPattern.test(request.baseCommit), 'A full base commit SHA is required.');
-  requireValue(Array.isArray(request.changes) && request.changes.length <= 100 && Array.isArray(request.media) && request.media.length <= 32 && request.changes.length + request.media.length > 0, 'Publish between 1 and 100 content changes, with at most 32 media files.');
+  request.deletions ??= [];
+  requireValue(Array.isArray(request.changes) && request.changes.length <= 100 && Array.isArray(request.media) && request.media.length <= 32
+    && Array.isArray(request.deletions) && request.deletions.length <= 20
+    && request.changes.length + request.media.length + request.deletions.length > 0, 'Publish between 1 and 100 content changes, with at most 32 media files and 20 deleted entries.');
   const seen = new Set<string>();
+  // Only journal entries can be deleted; pages, windows and media stay so shared links keep working.
+  for (const path of request.deletions) {
+    requireValue(contentPath(path) && path.startsWith('src/content/posts/') && !seen.has(path), 'Only journal entries can be deleted, each once.');
+    seen.add(path);
+  }
   let textBytes = 0;
   for (const value of request.changes) {
     const change = object(value); keys(change, ['path', 'content']);
@@ -304,7 +312,8 @@ export function validateContent(files: Map<string, string>, previews: Record<str
       const entry = object(item); keys(entry, ['type', 'src', 'alt', 'caption', 'poster', ...(gallery ? ['id', 'title', 'topics'] : [])]);
       if (gallery) { text(entry.id, true); requireValue(!ids.has(entry.id as string), 'Duplicate gallery ID.'); ids.add(entry.id as string); text(entry.title, true); strings(entry.topics); }
       requireValue(typeof entry.type === 'string' && (gallery ? ['image', 'video'] : ['image', 'audio', 'video']).includes(entry.type), 'Invalid media type.');
-      url(entry.src, entry.type, true); text(entry.alt, entry.type === 'image'); text(entry.caption); url(entry.poster, 'image');
+      // Descriptions are encouraged by the editor but optional, like the older photo lists.
+      url(entry.src, entry.type, true); text(entry.alt); text(entry.caption); url(entry.poster, 'image');
     }
     return ids;
   };
