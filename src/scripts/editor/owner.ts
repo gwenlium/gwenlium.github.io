@@ -9,6 +9,7 @@ import { createRichText, type RichTextHandle } from './rich-text';
 import { chooseFromLibrary, stageFiles } from './media';
 import { openPublish, resumeLiveCheck } from './publish';
 import { openAnalytics } from './analytics';
+import { openAboutDetails, openGallery, openMusic, openSiteSettings, windowContentField } from './manage';
 import { anchoredPanel, button, confirmAction, errorText, node, openDialog, toast } from './ui';
 import { hasOwnerHint } from './auth';
 import '../../styles/owner-editor.css';
@@ -221,15 +222,24 @@ class OwnerControls {
     panel.append(item(this.editing ? 'Stop editing this page' : 'Edit this page', this.editing ? 'Back to browsing' : 'Click text or pictures on the page to change them', () => this.setEditing(!this.editing)));
     panel.append(item('All entries', 'Drafts, published and scheduled posts', () => go(writerUrl())));
     if (pageName() === 'gallery') panel.append(item('Add to gallery', 'Pictures or video from this device', () => this.pickGallery()));
-    const more = node('div', undefined, 'owner-menu__more');
-    more.append(
+    const saved = () => this.applyDraft();
+    const manage = node('div', undefined, 'owner-menu__more');
+    manage.append(
+      node('span', 'Manage', 'owner-menu__group'),
+      button('Site settings', () => { close(); void openSiteSettings(this.store, saved); }, 'owner-menu__small'),
+      button('Gallery', () => { close(); void openGallery(this.store, saved); }, 'owner-menu__small'),
+      button('Music', () => { close(); void openMusic(this.store, saved); }, 'owner-menu__small'),
+      button('About page', () => { close(); void openAboutDetails(this.store, saved); }, 'owner-menu__small'),
       button('Windows', () => { close(); void this.windowList(); }, 'owner-menu__small'),
       button('Unused media', () => { close(); void this.unusedMedia(); }, 'owner-menu__small'),
+    );
+    const more = node('div', undefined, 'owner-menu__more');
+    more.append(
       ...(this.store.local ? [] : [button('Analytics', () => { close(); openAnalytics(() => this.store.accessToken()); }, 'owner-menu__small')]),
       button('Discard changes', () => { close(); void this.discard(); }, 'owner-menu__small'),
       button('Sign out', () => { close(); this.signOut(); }, 'owner-menu__small'),
     );
-    panel.append(more);
+    panel.append(manage, more);
     queueMicrotask(() => panel.querySelector<HTMLElement>('[role="menuitem"]')?.focus());
     panel.addEventListener('keydown', event => {
       const items = [...panel.querySelectorAll<HTMLElement>('button')];
@@ -573,6 +583,12 @@ class OwnerControls {
     const check = (label: string, checked: boolean) => { const wrap = node('label', undefined, 'owner-check'); const input = node('input'); input.type = 'checkbox'; input.checked = checked; wrap.append(input, node('span', label)); body.append(wrap); return input; };
     const enabled = check('Visible', existing?.enabled ?? true);
     const closed = check('Starts closed (visitors open it from the taskbar)', existing?.initiallyClosed ?? false);
+    // Built-in windows show their own page content; custom windows choose what they show.
+    const custom = !existing || !Object.hasOwn(builtinWindowPages, existing.id);
+    const content = custom ? await windowContentField(this.store, {
+      content: existing?.content ?? 'text', media: existing?.media ?? [], links: existing?.links ?? [], items: existing?.items ?? [], limit: existing?.limit ?? 0,
+    }, text => { status.textContent = text; }) : undefined;
+    if (content) body.append(content.element);
     body.append(node('p', 'To place or resize it, use Edit this page and move the window where you want it.', 'owner-hint'));
     footer.append(button('Cancel', () => dialog.close()));
     if (existing && !Object.hasOwn(builtinWindowPages, existing.id)) footer.append(button('Delete window', () => void (async () => {
@@ -586,15 +602,15 @@ class OwnerControls {
         const records = await this.windows();
         const item: WindowDefinition = { ...(existing || { id: `custom-${crypto.randomUUID()}`, content: 'text', body: '', media: [], links: [], items: [], limit: 0, width: 480, height: 0, floating: false }),
           title: title.value.trim(), page: page.value as WindowDefinition['page'], tone: tone.value as WindowDefinition['tone'],
-          enabled: enabled.checked, initiallyClosed: closed.checked };
+          enabled: enabled.checked, initiallyClosed: closed.checked, ...(content ? content.get() as Partial<WindowDefinition> : {}) };
         const index = records.findIndex(row => row.id === item.id);
         if (index >= 0) records[index] = item; else records.push(item);
         await this.store.set(binding(windowsFile, '/windows', 'Windows'), records);
         await this.applyDraft(); dialog.close();
-        if (!existing && (item.page === pageName() || item.page === 'all')) {
+        if (!existing && item.content === 'text' && (item.page === pageName() || item.page === 'all')) {
           this.setEditing(true);
           toast('Window created. Click its text area to write in it.');
-        } else if (!existing) toast('Window created. It shows on its page once you get there.');
+        } else if (!existing) toast(item.content === 'text' ? 'Window created. It shows on its page once you get there.' : 'Window created. It fills in when the site rebuilds after you publish.');
       } catch (error) { status.textContent = errorText(error); }
     })(), 'owner-button owner-button--primary'));
     title.focus();

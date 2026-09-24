@@ -2,7 +2,7 @@ import { preparePreview, previewInputKind } from './prepare-media';
 import { createPreviewPicker } from './library';
 import type { SiteEditorStore } from './store';
 
-export type StagedFile = { url: string; kind: 'image' | 'video' | 'audio' };
+export type StagedFile = { url: string; kind: 'image' | 'video' | 'audio'; name: string };
 
 /** A readable public file name from the original, e.g. "Lyn Front.PNG" becomes "lyn-front". */
 function publicName(file: File): string | undefined {
@@ -37,7 +37,7 @@ export async function stageFiles(store: SiteEditorStore, files: File[], onStatus
       }
     } else prepared = await preparePreview(file, { creator, name, signal, onProgress });
     const url = await store.addMedia(prepared);
-    staged.push({ url, kind: prepared.entry.kind });
+    staged.push({ url, kind: prepared.entry.kind, name: file.name.replace(/\.[^.]+$/, '') });
   }
   if (files.length) onStatus(files.length === 1 ? 'Ready.' : `${files.length} files ready.`);
   return staged;
