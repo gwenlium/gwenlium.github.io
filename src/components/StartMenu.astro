@@ -91,7 +91,12 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
       <p>Use a standard-mapped controller and press a button to let your browser detect it. Release held controls after connecting or returning to this tab. Controls pause when the tab is hidden or unfocused. Text entry still uses your keyboard; browser security may require a click or keypress before audio or clipboard access.</p>
     </details>
   </div>
-  <footer class="start-footer"><span><kbd>Esc</kbd> Close</span><button type="button" data-open-shortcuts aria-controls="start-keyboard-shortcuts"><kbd>?</kbd> Shortcuts</button></footer>
+  <footer class="start-footer">
+    <span><kbd>Esc</kbd> Close</span>
+    <button type="button" data-open-site-editor data-owner-sign-in aria-controls="site-editor-shell" aria-expanded="false">Owner sign in</button>
+    <button type="button" data-open-site-editor data-owner-editor aria-controls="site-editor-shell" aria-expanded="false" hidden>Edit website</button>
+    <button type="button" data-open-shortcuts aria-controls="start-keyboard-shortcuts"><kbd>?</kbd> Shortcuts</button>
+  </footer>
 </dialog>
 
 <script>
@@ -174,7 +179,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
   .start-shortcuts kbd { font: inherit; }
   .start-shortcuts dd { margin: 0; font-family: var(--font-reading); font-size: .85rem; line-height: 1.5; }
   .start-shortcuts p { margin: .8rem 0 0; color: var(--muted); font-family: var(--font-reading); font-size: .8rem; line-height: 1.5; }
-  .start-footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .8rem; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--sage) 30%, var(--surface)); color: var(--muted); font-size: .6rem; }
+  .start-footer { display: flex; flex-wrap: wrap; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .8rem; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--sage) 30%, var(--surface)); color: var(--muted); font-size: .6rem; }
   .start-footer kbd { font: inherit; color: var(--ink); }
   .start-footer button { min-height: 32px; margin: -.4rem -.3rem; padding: .4rem .3rem; border: 0; border-radius: 2px; background: transparent; color: var(--ink); font: inherit; }
   .start-footer button:hover { background: var(--sage); }
@@ -187,7 +192,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
   @media (max-height: 420px) {
     .start-titlebar { padding: .3rem .5rem; }
     .start-avatar { width: 24px; height: 24px; }
-    .start-heading > span, .start-footer { display: none; }
+    .start-heading > span { display: none; }
     .start-content { padding: .7rem; }
   }
   @media (forced-colors: active) {

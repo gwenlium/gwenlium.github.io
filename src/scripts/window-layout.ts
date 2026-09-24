@@ -54,6 +54,7 @@ let resizeFrame = 0;
 let preview: HTMLElement | undefined;
 let nextTransitionId = 0;
 let suspended = false;
+let raising = false;
 
 function editing(): boolean { return document.documentElement.dataset.siteEditing === 'true'; }
 
@@ -189,17 +190,17 @@ function snapBox(snap: Snap | 'maximize', bounds: Box): Box {
 
 function detach(entry: Layout): void {
   const placement = entry.placement;
-  if (!placement) return;
   // Clear first: custom element move callbacks may synchronously register again.
   entry.placement = undefined;
-  if (placement.portaled && placement.marker.isConnected && entry.host.isConnected) {
+  if (placement?.portaled && placement.marker.isConnected && entry.host.isConnected) {
     if (typeof placement.parent.moveBefore === 'function') placement.parent.moveBefore(entry.host, placement.marker);
     else placement.parent.insertBefore(entry.host, placement.marker);
-  } else if (entry.root.hasAttribute('popover')) {
+  }
+  if (entry.root.hasAttribute('popover')) {
     if (entry.root.matches(':popover-open')) entry.root.hidePopover();
     entry.root.removeAttribute('popover');
   }
-  placement.marker.remove();
+  placement?.marker.remove();
 }
 
 function place(entry: Layout): void {
@@ -225,6 +226,8 @@ function place(entry: Layout): void {
     else destination.append(entry.host);
   }
   if (entry.placement) entry.placement.marker.hidden = entry.root.hidden;
+  // Direct children of body (including Preferences) need the same top layer.
+  if (typeof entry.root.showPopover === 'function' && !entry.root.hasAttribute('popover')) entry.root.setAttribute('popover', 'manual');
   if (entry.root.hasAttribute('popover')) {
     if (entry.root.hidden && entry.root.matches(':popover-open')) entry.root.hidePopover();
     else if (!entry.root.hidden && !entry.root.matches(':popover-open')) entry.root.showPopover();
@@ -252,15 +255,23 @@ function apply(entry: Layout, bounds = workspace()): void {
 }
 
 function raise(entry: Layout): void {
-  // Small bounded z-indices, shared by music and page windows.
-  layouts.delete(entry.root);
-  layouts.set(entry.root, entry);
-  let layer = 10;
-  for (const window of layouts.values()) window.root.style.setProperty('--window-layer', String(layer++));
-  if (entry.root.hasAttribute('popover') && entry.root.matches(':popover-open') && !document.querySelector('dialog[open]')) {
-    entry.root.hidePopover();
-    entry.root.showPopover();
-  }
+  if (raising) return;
+  raising = true;
+  try {
+    // Small bounded z-indices also support browsers without popovers.
+    layouts.delete(entry.root);
+    layouts.set(entry.root, entry);
+    let layer = 10;
+    for (const window of layouts.values()) window.root.style.setProperty('--window-layer', String(layer++));
+    if (entry.root.hasAttribute('popover') && entry.root.matches(':popover-open') && !document.querySelector('dialog[open]')) {
+      const focused = document.activeElement instanceof HTMLElement && entry.root.contains(document.activeElement) ? document.activeElement : undefined;
+      // Popover reordering can restore old focus. Do not raise that other window
+      // recursively, and keep the user's current field or button focused.
+      entry.root.hidePopover();
+      entry.root.showPopover();
+      focused?.focus({ preventScroll: true });
+    }
+  } finally { raising = false; }
 }
 
 export function registerWindow(root: HTMLElement, options: { floating?: boolean } = {}): void {

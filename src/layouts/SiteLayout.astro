@@ -144,6 +144,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
         <button type="button" class="button-secondary taskbar-control" data-open-player aria-controls="music-player" aria-expanded={!playerWindow.initiallyClosed} aria-label={`${playerWindow.title} player`}>
           <Icon name="music" size={17} /><span>{playerWindow.title}</span>
         </button>
+        <button type="button" class="button-secondary" data-open-site-editor data-owner-editor aria-controls="site-editor-shell" aria-expanded="false" hidden>Edit website</button>
         <div class="taskbar-windows" data-taskbar-windows role="group" aria-label="Open windows"></div>
         <button type="button" class="button-secondary taskbar-control" data-auto-arrange-windows aria-label="Auto arrange windows" title="Restore the responsive default layout of open windows">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" /></svg><span>Auto arrange</span>

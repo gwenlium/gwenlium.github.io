@@ -45,7 +45,7 @@ function pageName(): string {
 let controller: SiteEditor | undefined;
 export function openSiteEditor(shell: HTMLElement): void {
   controller ??= new SiteEditor(shell);
-  controller.open();
+  controller.open(true);
 }
 
 class SiteEditor {
@@ -73,6 +73,7 @@ class SiteEditor {
     this.status.setAttribute('aria-live', 'polite');
     shell.replaceChildren(this.bar, this.status);
     this.store.subscribe(() => this.renderBar());
+    this.shell.addEventListener('toggle', () => this.syncAccess());
     document.addEventListener('gwenlium:windows-changed', () => this.frontToolbar());
     document.addEventListener('focusin', event => {
       if (event.target instanceof Element && event.target.closest('[data-desktop-window]')) this.frontToolbar();
@@ -90,7 +91,9 @@ class SiteEditor {
       this.selected = source;
       void this.run(() => this.edit(source));
     }, true);
-    document.addEventListener('astro:before-swap', () => {
+    document.addEventListener('astro:before-swap', event => {
+      // Keep the owner taskbar's size stable before the next page is laid out.
+      this.syncAccess((event as Event & { newDocument: Document }).newDocument);
       this.rendering++;
       for (const dialog of this.activeDialogs) dialog.close();
       this.selected = undefined;
@@ -132,8 +135,26 @@ class SiteEditor {
     });
     this.renderBar();
   }
-  open(): void {
+  open(focus = false): void {
     if (!this.shell.matches(':popover-open')) this.shell.showPopover();
+    this.frontToolbar();
+    this.syncAccess();
+    if (focus) this.bar.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+  }
+  private syncAccess(target: Document = document): void {
+    // Only a session verified by the owner API reveals editing entry points.
+    const authenticated = this.store.authenticated;
+    const expanded = String(this.shell.matches(':popover-open'));
+    for (const control of target.querySelectorAll<HTMLElement>('[data-open-site-editor]')) {
+      if (control.hasAttribute('data-owner-editor')) control.hidden = !authenticated;
+      else if (control.hasAttribute('data-owner-sign-in')) control.hidden = authenticated;
+      control.setAttribute('aria-expanded', expanded);
+    }
+  }
+  private hideToolbar(): void {
+    this.shell.hidePopover();
+    this.syncAccess();
+    document.querySelector<HTMLElement>(this.store.authenticated ? '.taskbar [data-owner-editor]' : '[data-open-start]')?.focus({ preventScroll: true });
   }
   private frontToolbar(): void {
     if (this.frontingToolbar || !this.shell.isConnected || !this.shell.matches(':popover-open') || document.querySelector('dialog[open]')) return;
@@ -163,6 +184,7 @@ class SiteEditor {
     document.dispatchEvent(new CustomEvent('gwenlium:editor-mode-changed'));
   }
   private renderBar(): void {
+    this.syncAccess();
     this.bar.replaceChildren();
     if (!this.store.authenticated) {
       this.bar.append(node('strong', 'Owner editing'), button('Sign in with GitHub', () => {
@@ -173,8 +195,8 @@ class SiteEditor {
           this.setMode();
           await this.resolveConflicts();
           this.message = 'Click outlined text or pictures to edit. Move and resize windows normally. Publish is the only public write.';
-        });
-      }), button('Close', () => this.shell.hidePopover()));
+        }).then(() => this.open(true));
+      }), button('Close', () => this.hideToolbar()));
       this.status.textContent = this.message || 'Only the site owner can sign in. Drafts stay in this browser until Publish.';
     } else {
       this.bar.append(node('strong', this.preview ? 'Draft preview' : 'Edit site'),
@@ -196,6 +218,7 @@ class SiteEditor {
           await this.applyDraft();
           this.message = 'Private draft discarded.';
         })),
+        button('Hide toolbar', () => this.hideToolbar()),
         button('Sign out', () => this.signOut()));
       const publish = [...this.bar.querySelectorAll('button')].find(item => item.textContent === 'Review & publish');
       if (publish) publish.disabled = !this.store.dirty;

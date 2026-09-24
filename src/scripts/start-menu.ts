@@ -240,6 +240,13 @@ function showShortcuts(): void {
   summary?.scrollIntoView({ block: 'nearest' });
 }
 
+// Close the modal before the nonmodal owner editor receives focus.
+document.addEventListener('gwenlium:open-site-editor', () => {
+  if (!menu?.dialog.open) return;
+  menu.returnTrigger = null;
+  menu.dialog.close();
+}, listenerOptions);
+
 // Astro runs bundled scripts once; delegated listeners cover each new dialog.
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;

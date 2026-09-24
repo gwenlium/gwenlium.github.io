@@ -21,13 +21,18 @@ const configuration = parse(adminConfiguration);
       shell.showPopover();
     }
   };
+  const requestOpen = () => document.dispatchEvent(new Event('gwenlium:open-site-editor'));
+  document.addEventListener('gwenlium:open-site-editor', () => { void open(); });
+  document.addEventListener('click', event => {
+    if (event.target instanceof Element && event.target.closest('[data-open-site-editor]')) requestOpen();
+  });
   document.addEventListener('keydown', event => {
     if (event.ctrlKey && event.altKey && !event.metaKey && !event.shiftKey && event.code === 'KeyE') {
       event.preventDefault();
-      void open();
+      requestOpen();
     }
   });
-  const initialize = () => { if (new URL(location.href).searchParams.get('edit') === '1') void open(); };
+  const initialize = () => { if (new URL(location.href).searchParams.get('edit') === '1') requestOpen(); };
   document.addEventListener('astro:page-load', initialize);
   initialize();
 </script>
