@@ -142,6 +142,12 @@
       "sha256": "85b19ee6c086c84aeb1025d132d675461f47b6d5640b4834f404e820b6c03bfc",
       "kind": "audio",
       "duration": 0.053311
+    },
+    "/media/weapon1-preview-b9412a994186d81d3419793f76d7cba5.webp": {
+      "sha256": "b9412a994186d81d3419793f76d7cba5e90d30d65d535080811c80b438b2a028",
+      "kind": "image",
+      "width": 1600,
+      "height": 1600
     }
   }
 }
