@@ -1,4 +1,4 @@
-[data-owner-editor][hidden], [data-owner-sign-in][hidden] { display: none !important; }
+[data-owner-editor][hidden] { display: none !important; }
 .taskbar:has([data-owner-editor]:not([hidden])) { flex-wrap: wrap; }
 .taskbar:has([data-owner-editor]:not([hidden])) .taskbar-windows { min-width: min(10rem, 100%); }
 .site-editor-shell { position: fixed; inset: auto .6rem .6rem; margin: 0 auto; width: min(74rem, calc(100% - 1.2rem)); max-height: 35dvh; overflow: auto; padding: .7rem; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); box-shadow: 4px 4px 0 var(--line); font-family: var(--font-reading); font-size: .8rem; }

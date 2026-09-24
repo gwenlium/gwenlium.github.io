@@ -145,9 +145,8 @@ class SiteEditor {
     // Only a session verified by the owner API reveals editing entry points.
     const authenticated = this.store.authenticated;
     const expanded = String(this.shell.matches(':popover-open'));
-    for (const control of target.querySelectorAll<HTMLElement>('[data-open-site-editor]')) {
-      if (control.hasAttribute('data-owner-editor')) control.hidden = !authenticated;
-      else if (control.hasAttribute('data-owner-sign-in')) control.hidden = authenticated;
+    for (const control of target.querySelectorAll<HTMLElement>('[data-owner-editor]')) {
+      control.hidden = !authenticated;
       control.setAttribute('aria-expanded', expanded);
     }
   }
