@@ -1,5 +1,33 @@
 {
   "files": {
+    "/media/2026-09-22-22-55-15-3-preview-f3721abb9d86e79c72ca846ad2820159.gif": {
+      "sha256": "f3721abb9d86e79c72ca846ad2820159a450aba6ab10782d55d7f7c2f16b8423",
+      "kind": "image",
+      "width": 800,
+      "height": 450,
+      "duration": 3.32
+    },
+    "/media/2026-09-22-22-55-15-4-preview-92ffbde5a43d9b834f203f6a74807a4e.gif": {
+      "sha256": "92ffbde5a43d9b834f203f6a74807a4e4cd63188d5cebbaf96938e976af24639",
+      "kind": "image",
+      "width": 800,
+      "height": 450,
+      "duration": 3.56
+    },
+    "/media/2026-09-22-22-55-15-5-preview-2362f7342627a7eaf52918168f3888a1.gif": {
+      "sha256": "2362f7342627a7eaf52918168f3888a12354931092dd86570d393ff0120b7611",
+      "kind": "image",
+      "width": 800,
+      "height": 450,
+      "duration": 3.74
+    },
+    "/media/2026-09-22-22-55-15-6-compressed-preview-f5dfbeef729e2604b9b41b1eda8a55b0.gif": {
+      "sha256": "f5dfbeef729e2604b9b41b1eda8a55b0561bf498bbbd236bcb51b0d7097b0761",
+      "kind": "image",
+      "width": 800,
+      "height": 450,
+      "duration": 4.86
+    },
     "/media/gwendolyn-drawing-preview-34802e58d25184674929d847caa7e270.webp": {
       "sha256": "3989b02c6d274b8e41a7eb750aa1b49fb9d6272c63afd5245a67675e67c8b75c",
       "kind": "image",
