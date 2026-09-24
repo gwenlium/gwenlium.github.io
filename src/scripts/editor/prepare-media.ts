@@ -52,7 +52,8 @@ type Probe = {
 };
 
 const MiB = 1024 * 1024;
-const imageBytes = 32 * MiB;
+// Pictures are shrunk to 1600 px while decoding, so memory is bounded by the pixel limit, not the file size.
+const imageBytes = 256 * MiB;
 const videoBytes = 128 * MiB;
 const outputBytes = 32 * MiB;
 const maxEdge = 8192;
@@ -121,7 +122,7 @@ function dimensions(width: number, height: number, stillPhoto = false): Dimensio
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) fail('The media has no valid dimensions.');
   const edgeLimit = stillPhoto ? 16384 : maxEdge;
   const pixelLimit = stillPhoto ? 80_000_000 : maxPixels;
-  if (width > edgeLimit || height > edgeLimit || width * height > pixelLimit) fail(stillPhoto ? 'Still photos must be at most 16384 pixels per edge and 80 megapixels.' : 'Source frames must be at most 8192 pixels per edge and 40 megapixels. Resize the original locally first.');
+  if (width > edgeLimit || height > edgeLimit || width * height > pixelLimit) fail(stillPhoto ? 'Pictures can be up to 16384 pixels on a side and 80 megapixels. Export a smaller copy first.' : 'Source frames must be at most 8192 pixels per edge and 40 megapixels. Resize the original locally first.');
   return { width, height };
 }
 
@@ -176,7 +177,8 @@ function inspectRaster(data: Uint8Array): Raster {
   if (mime === 'image/png') {
     need(0, 33);
     if (text(data, 12, 4) !== 'IHDR' || view.getUint32(8) !== 13) fail('The PNG header is corrupt.');
-    const size = dimensions(view.getUint32(16), view.getUint32(20));
+    // PNG here is always a still picture (APNG is refused below), so it gets the photo limits.
+    const size = dimensions(view.getUint32(16), view.getUint32(20), true);
     let position = 8;
     let ended = false;
     while (position < data.length) {
@@ -285,10 +287,10 @@ function inspectRaster(data: Uint8Array): Raster {
 export async function previewInputKind(file: File, signal?: AbortSignal): Promise<PreviewInputKind> {
   checkAbort(signal);
   if (!(file instanceof File) || !file.size) fail('Choose a nonempty local media file.');
-  if (file.size > videoBytes) fail('Originals must be at most 128 MiB (32 MiB for images). Trim or resize the original locally first.');
   const mime = rasterMime(new Uint8Array(await bytes(file.slice(0, 64), signal)));
+  if (!mime && file.size > videoBytes) fail('Video and audio originals can be up to 128 MiB. Trim or export a smaller copy first.');
   if (mime) {
-    if (file.size > imageBytes) fail('Image originals must be at most 32 MiB. Resize the original locally first.');
+    if (file.size > imageBytes) fail('Pictures can be up to 256 MiB. Export a smaller copy first.');
     if (mime === 'image/gif' || mime === 'image/webp') {
       let raster = imageMetadata.get(file);
       if (!raster) {
@@ -693,16 +695,20 @@ async function prepare(file: File, options: Settings, hasTiming: boolean): Promi
   const mime = rasterMime(header);
   let generated: Generated;
   if (mime) {
-    if (file.size > imageBytes) fail('Image originals must be at most 32 MiB. Resize the original locally first.');
-    const data = await bytes(file, options.signal);
-    const raster = imageMetadata.get(file) || inspectRaster(new Uint8Array(data));
-    if (raster.delays && (raster.mime === 'image/webp' || raster.delays.length > 1)) generated = await animation(data, raster, options);
+    if (file.size > imageBytes) fail('Pictures can be up to 256 MiB. Export a smaller copy first.');
+    let data: ArrayBuffer | undefined;
+    let raster = imageMetadata.get(file);
+    if (!raster) { data = await bytes(file, options.signal); raster = inspectRaster(new Uint8Array(data)); }
+    if (raster.delays && (raster.mime === 'image/webp' || raster.delays.length > 1)) generated = await animation(data ?? await bytes(file, options.signal), raster, options);
     else {
       if (hasTiming || options.fullLength) fail('Length and trim settings apply only to audio, video and animated images, not still images.');
-      generated = await still(new Blob([data], { type: mime }), options, raster);
+      // Decode from the file itself rather than a second in-memory copy of a large original.
+      data = undefined;
+      generated = await still(file.type === mime ? file : new Blob([file], { type: mime }), options, raster);
     }
   } else {
     const extension = file.name.split('.').at(-1)?.toLowerCase() || '';
+    if (file.size > videoBytes) fail('Video and audio originals can be up to 128 MiB. Trim or export a smaller copy first.');
     if (audioExtensions.has(extension)) generated = await audio(file, options);
     else if (videoExtensions.has(extension)) generated = await video(file, options);
     else fail('Choose JPEG, PNG, WebP, GIF, a supported audio file, or a supported video file. SVG, APNG, AVIF and TIFF need a supported local export.');
@@ -723,7 +729,7 @@ export async function preparePreview(file: File, options: PreviewOptions): Promi
   checkAbort(options.signal);
   if (!globalThis.isSecureContext || !globalThis.crypto?.subtle || typeof document === 'undefined' || typeof FileReader === 'undefined' || typeof Promise.withResolvers !== 'function') fail('Safe preview preparation needs a current HTTPS browser with Canvas, FileReader, Web Crypto and Promise.withResolvers support.');
   if (typeof File === 'undefined' || !(file instanceof File) || !file.size) fail('Choose a nonempty local media file in a supported browser.');
-  if (file.size > videoBytes) fail('Originals must be at most 128 MiB (32 MiB for images). Trim or resize the original locally first.');
+  if (file.size > Math.max(imageBytes, videoBytes)) fail('Pictures can be up to 256 MiB, and video and audio up to 128 MiB. Export a smaller copy first.');
   let creator: string;
   try { creator = normalizeWatermarkCredit(options.creator); }
   catch { fail(watermarkCreditError); }

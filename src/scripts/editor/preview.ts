@@ -5,6 +5,8 @@ type PreviewMedia = { type: 'image' | 'video' | 'audio'; src: string; alt: strin
 export type PreviewPayload = {
   path?: string; section: 'devlog' | 'life'; title: string; date: string; tags: string[];
   excerpt: string; body: string; cover: string; coverAlt: string; media: PreviewMedia[];
+  /** Where the writer was, so "Back to writing" can step back instead of adding a new page. */
+  returnUrl?: string; returnIndex?: number;
 };
 
 const key = 'gwenlium:preview';
@@ -119,7 +121,18 @@ function fill(): void {
   document.documentElement.dataset.pageTheme = payload.section;
   document.title = `${payload.title.trim() || 'Untitled entry'} (preview)`;
   const back = document.querySelector<HTMLAnchorElement>('[data-preview-return]');
-  if (back) back.href = payload.path ? `/write/?entry=${encodeURIComponent(payload.path)}` : '/write/';
+  if (back) {
+    back.href = payload.returnUrl ?? (payload.path ? `/write/?entry=${encodeURIComponent(payload.path)}` : '/write/');
+    const returnIndex = payload.returnIndex;
+    back.onclick = event => {
+      // Straight from the writer: go back, so the browser history does not fill up with previews.
+      const index = (history.state as { index?: number } | null)?.index;
+      if (typeof returnIndex === 'number' && typeof index === 'number' && index === returnIndex + 1) {
+        event.preventDefault();
+        history.back();
+      }
+    };
+  }
   const archive = document.querySelector<HTMLAnchorElement>('[data-preview-back-link]');
   if (archive) archive.href = `/${payload.section}/`;
 

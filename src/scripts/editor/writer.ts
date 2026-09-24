@@ -94,6 +94,7 @@ function composePost(original: string | null, before: Model | undefined, model: 
 }
 
 let active: Writer | undefined;
+const placeKey = 'gwenlium:writer-place';
 
 export async function mountWriter(root: HTMLElement): Promise<void> {
   active?.destroy();
@@ -210,15 +211,9 @@ class Writer {
     return bar;
   }
 
+  /** Every move inside the writer goes through the site's router, so Back and Forward always agree. */
   private goto(href: string): void {
-    void this.flush().then(() => {
-      history.pushState(history.state, '', href);
-      this.editor?.destroy();
-      this.editor = undefined;
-      this.path = undefined;
-      this.model = undefined;
-      void this.route();
-    });
+    void this.flush().then(() => navigate(href));
   }
 
   // The list of entries
@@ -422,6 +417,7 @@ class Writer {
     this.updateHeader();
     this.refreshChrome();
     if (focusTitle) title.focus();
+    else this.restorePlace();
   }
 
   private updateHeader(): void {
@@ -730,10 +726,32 @@ class Writer {
   private async preview(): Promise<void> {
     await this.flush();
     const model = this.model;
-    if (!model) return;
+    if (!model || !this.path) { toast('Write something first, then preview it.'); return; }
+    // Coming back from the preview returns to the same scroll position and cursor.
+    const scroller = document.getElementById('page-scroll');
+    try {
+      sessionStorage.setItem(placeKey, JSON.stringify({ path: this.path, scroll: scroller?.scrollTop ?? 0, cursor: this.editor?.cursor() ?? 0, at: Date.now() }));
+    } catch { /* Only the position is lost. */ }
     storePreview({ path: this.path, section: model.section, title: model.title, date: model.date, tags: model.tags, excerpt: model.excerpt,
-      body: model.body, cover: model.cover, coverAlt: model.coverAlt, media: model.media });
+      body: model.body, cover: model.cover, coverAlt: model.coverAlt, media: model.media,
+      returnUrl: `${location.pathname}${location.search}`, returnIndex: (history.state as { index?: number } | null)?.index });
     await navigate('/write/preview/');
+  }
+
+  /** Back from the preview: put the page and the cursor where they were. */
+  private restorePlace(): void {
+    let place: { path?: string; scroll?: number; cursor?: number; at?: number } | undefined;
+    try { place = JSON.parse(sessionStorage.getItem(placeKey) ?? 'null') ?? undefined; } catch { place = undefined; }
+    if (!place || place.path !== this.path || Date.now() - (place.at ?? 0) > 30 * 60 * 1000) return;
+    try { sessionStorage.removeItem(placeKey); } catch { /* Harmless. */ }
+    requestAnimationFrame(() => {
+      if (typeof place!.cursor === 'number') this.editor?.restoreCursor(place!.cursor);
+      // Placing the cursor can scroll to it; the saved scroll position wins once that settles.
+      setTimeout(() => {
+        const scroller = document.getElementById('page-scroll');
+        if (scroller && typeof place!.scroll === 'number') scroller.scrollTop = place!.scroll;
+      }, 60);
+    });
   }
 
   private async revert(): Promise<void> {

@@ -40,7 +40,7 @@ export function createPreviewPicker(settings: PreviewPickerSettings) {
         <p class="media-library-warning" data-full-warning hidden>Publishing will make the complete recording or animation public. Until then the processed copy stays in your unpublished changes. The original is never uploaded. Copies must fit within 32 MiB.</p>
       </fieldset>
       <fieldset data-timing hidden><legend>Preview excerpt</legend><label>Start (seconds)<input data-start type="number" min="0" step="0.01" value="0" required></label><label>Duration (seconds, maximum 60)<input data-duration type="number" min="0.01" max="60" step="0.01" value="30" required></label></fieldset>
-      <p class="media-library-help">JPEG, PNG, WebP and GIF up to 32 MiB; audio and video up to 128 MiB. GIF/WebP animation is preserved and needs ImageDecoder (current Chrome). Audio and video need WebAssembly. Large files may take time; canceling processing uploads nothing.</p>
+      <p class="media-library-help">JPEG, PNG, WebP and GIF up to 256 MiB and 80 megapixels; audio and video up to 128 MiB. GIF/WebP animation is preserved and needs ImageDecoder (current Chrome). Audio and video need WebAssembly. Large files may take time; canceling processing uploads nothing.</p>
       <div class="media-library-actions"><button type="submit" data-convert disabled>Prepare preview</button><button type="button" data-cancel hidden>Cancel processing</button></div>
     </form>
     <p data-status role="status" aria-live="polite"></p><progress data-progress max="1" hidden></progress>

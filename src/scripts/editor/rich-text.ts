@@ -27,6 +27,9 @@ export type RichTextHandle = {
   /** Pictures in the text that still need a description. */
   missingDescriptions(): number;
   focusMissingDescription(): boolean;
+  /** The cursor position, to come back to the same place later. */
+  cursor(): number;
+  restoreCursor(position: number): void;
 };
 
 const safeLink = (value: string) => {
@@ -327,6 +330,12 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
       original = '';
     },
     missingDescriptions: () => figures().filter(node => !String(node.attrs.alt ?? '').trim()).length,
+    cursor: () => editor.state.selection.from,
+    restoreCursor(position: number) {
+      if (editor.isDestroyed) return;
+      editor.commands.setTextSelection(Math.max(0, Math.min(position, editor.state.doc.content.size)));
+      editor.commands.focus(undefined, { scrollIntoView: false });
+    },
     focusMissingDescription() {
       const input = surface.querySelector<HTMLInputElement>('.rt-figure.is-missing .rt-figure__alt');
       if (!input) return false;
