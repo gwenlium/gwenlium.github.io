@@ -5,6 +5,7 @@ import { ownerStore, writerUrl } from './session';
 import { isPostPath, markdownParts, type EntrySummary, type SiteEditorStore } from './store';
 import { createRichText, type RichTextHandle } from './rich-text';
 import { chooseFromLibrary, stageFiles } from './media';
+import { canCrop, cropPicture } from './crop';
 import { openPublish, resolveConflicts } from './publish';
 import { button, confirmAction, errorText, node, openDialog, toast } from './ui';
 import '../../styles/owner-editor.css';
@@ -429,6 +430,7 @@ class Writer {
       resolveMedia: url => this.store.resolveMedia(url),
       addPictures: async files => (await stageFiles(this.store, files, text => { this.status.textContent = text; })).map(file => file.url),
       chooseFromLibrary: () => chooseFromLibrary(this.store, true),
+      crop: { available: canCrop, open: src => cropPicture(this.store, src, text => { this.status.textContent = text; }) },
       onChange: markdown => { model.body = markdown; this.changed(); },
       onStatus: text => { this.status.textContent = text; },
     });
@@ -673,6 +675,13 @@ class Writer {
         fields.append(caption);
       }
       const actions = node('div', undefined, 'writer-media__actions');
+      if (row.item.type === 'image' && canCrop(row.item.src)) actions.append(button('Crop', () => void cropPicture(this.store, row.item.src, text => { this.status.textContent = text; }).then(url => {
+        if (!url) return;
+        // Find the picture again by address: the list may have changed while the file picker was open.
+        if (row.cover) { if (model.cover === row.item.src) model.cover = url; }
+        else { const item = model.media.find(entry => entry.src === row.item.src); if (item) item.src = url; }
+        touch();
+      }), 'writer-mini'));
       if (!row.cover && row.item.type === 'image') actions.append(button('Make cover', () => {
         const [item] = model.media.splice(row.index, 1);
         if (model.cover) model.media.unshift({ type: 'image', src: model.cover, alt: model.coverAlt, caption: '', poster: '' });

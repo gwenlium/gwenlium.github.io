@@ -13,6 +13,8 @@ export type RichTextOptions = {
   /** Prepare local files and stage them; resolves with the staged picture URLs. */
   addPictures(files: File[]): Promise<string[]>;
   chooseFromLibrary(): Promise<string | undefined>;
+  /** Crop or turn a picture in the text; `open` resolves with the new picture's address. */
+  crop?: { available(src: string): boolean; open(src: string): Promise<string | undefined> };
   onChange(markdown: string): void;
   onStatus(text: string): void;
   /** Smaller toolbar for editing a block of page text in place. */
@@ -138,7 +140,12 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
         remove.type = 'button';
         remove.textContent = 'Remove';
         remove.className = 'rt-figure__remove';
-        row.append(input, remove);
+        const crop = document.createElement('button');
+        crop.type = 'button';
+        crop.textContent = 'Crop';
+        crop.className = 'rt-figure__crop';
+        crop.hidden = true;
+        row.append(input, crop, remove);
         dom.append(image, row);
         const render = () => {
           const src = String(node.attrs.src ?? '');
@@ -146,6 +153,7 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
           if (image instanceof HTMLImageElement) image.alt = String(node.attrs.alt ?? '');
           if (document.activeElement !== input) input.value = String(node.attrs.alt ?? '');
           dom.classList.toggle('is-missing', !String(node.attrs.alt ?? '').trim());
+          crop.hidden = kind !== 'image' || !options.crop?.available(src);
         };
         render();
         input.addEventListener('input', () => {
@@ -157,6 +165,10 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
         input.addEventListener('keydown', event => {
           if (event.key === 'Enter') { event.preventDefault(); editor.commands.focus(); }
         });
+        crop.addEventListener('click', () => void options.crop?.open(String(node.attrs.src ?? '')).then(url => {
+          const position = getPos();
+          if (url && typeof position === 'number' && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setNodeAttribute(position, 'src', url));
+        }));
         remove.addEventListener('click', () => {
           const position = getPos();
           if (typeof position === 'number') editor.chain().focus().deleteRange({ from: position, to: position + node.nodeSize }).run();
@@ -169,7 +181,7 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
             render();
             return true;
           },
-          stopEvent(event: Event) { return event.target === input || event.target === remove; },
+          stopEvent(event: Event) { return event.target === input || event.target === remove || event.target === crop; },
           ignoreMutation() { return true; },
         };
       };

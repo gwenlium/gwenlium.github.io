@@ -4,8 +4,25 @@ import type { SiteEditorStore } from './store';
 
 export type StagedFile = { url: string; kind: 'image' | 'video' | 'audio'; name: string };
 
+// Originals of still pictures added during this visit, so a crop can start from full quality
+// and the result is signed once. They stay in this tab and are never uploaded.
+const originals = new Map<string, File>();
+
+export function rememberOriginal(url: string, file: File): void {
+  originals.delete(url);
+  originals.set(url, file);
+  for (const oldest of originals.keys()) {
+    if (originals.size <= 40) break;
+    originals.delete(oldest);
+  }
+}
+
+export function originalOf(url: string): File | undefined {
+  return originals.get(url);
+}
+
 /** A readable public file name from the original, e.g. "Lyn Front.PNG" becomes "lyn-front". */
-function publicName(file: File): string | undefined {
+export function publicName(file: File): string | undefined {
   const name = file.name.replace(/\.[^.]+$/, '').normalize('NFKD').replace(/\p{M}/gu, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) && !/^(img|dsc|image|screenshot|photo)?-?\d*$/.test(name) ? name : undefined;
@@ -37,6 +54,7 @@ export async function stageFiles(store: SiteEditorStore, files: File[], onStatus
       }
     } else prepared = await preparePreview(file, { creator, name, signal, onProgress });
     const url = await store.addMedia(prepared);
+    if (kind === 'image') rememberOriginal(url, file);
     staged.push({ url, kind: prepared.entry.kind, name: file.name.replace(/\.[^.]+$/, '') });
   }
   if (files.length) onStatus(files.length === 1 ? 'Ready.' : `${files.length} files ready.`);

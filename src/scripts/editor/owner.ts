@@ -7,6 +7,7 @@ import { isPostPath, type SiteEditorStore } from './store';
 import { renderMarkdownPreview } from './markdown';
 import { createRichText, type RichTextHandle } from './rich-text';
 import { chooseFromLibrary, stageFiles } from './media';
+import { canCrop, cropPicture } from './crop';
 import { openPublish, resumeLiveCheck } from './publish';
 import { openAnalytics } from './analytics';
 import { openAboutDetails, openGallery, openMusic, openSiteSettings, windowContentField } from './manage';
@@ -477,6 +478,7 @@ class OwnerControls {
       resolveMedia: url => this.store.resolveMedia(url),
       addPictures: async files => (await stageFiles(this.store, files, text => { status.textContent = text; })).map(file => file.url),
       chooseFromLibrary: () => chooseFromLibrary(this.store, true),
+      crop: { available: canCrop, open: src => cropPicture(this.store, src, text => { status.textContent = text; }) },
       onChange: () => undefined,
       onStatus: text => { status.textContent = text; },
     });

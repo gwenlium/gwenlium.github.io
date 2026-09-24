@@ -22,6 +22,9 @@ type PreviewOptions = {
   start?: number;
   duration?: number;
   fullLength?: boolean;
+  /** Still pictures only: turn clockwise, then keep this part (fractions of the turned picture). */
+  rotate?: 0 | 90 | 180 | 270;
+  crop?: { x: number; y: number; width: number; height: number };
   signal?: AbortSignal;
   onProgress?: (progress: number | undefined) => void;
 };
@@ -383,15 +386,61 @@ async function decodeBitmap(blob: Blob, signal?: AbortSignal, resizeWidth?: numb
   return abortable(createImageBitmap(blob, { imageOrientation: 'from-image', ...(resizeWidth ? { resizeWidth, resizeQuality: 'high' as const } : {}) }), signal, (image) => image.close());
 }
 
+/**
+ * The width to decode at so the long edge lands on `edge` without upscaling. createImageBitmap
+ * resizes after applying EXIF orientation, so this uses the displayed shape, which an image
+ * element reports without decoding pixels. Without it, fall back to the shorter stored side.
+ */
+async function decodeWidth(blob: Blob, source: Dimensions, edge: number, signal?: AbortSignal): Promise<number> {
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  try {
+    image.src = url;
+    await abortable(new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('not shown')); }), signal);
+    const turned = image.naturalWidth === source.height && image.naturalHeight === source.width;
+    return bounded(turned ? source.height : source.width, turned ? source.width : source.height, edge).width;
+  } catch {
+    checkAbort(signal);
+    return Math.min(edge, source.width, source.height);
+  } finally {
+    image.onload = image.onerror = null;
+    image.removeAttribute('src');
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function still(blob: Blob, options: Settings, source: Dimensions): Promise<Generated> {
-  const bitmap = await decodeBitmap(blob, options.signal, Math.min(1600, source.width, source.height));
+  const turn = options.rotate ?? 0;
+  const crop = options.crop ?? { x: 0, y: 0, width: 1, height: 1 };
+  const edited = turn !== 0 || crop.x > 0 || crop.y > 0 || crop.width < 1 || crop.height < 1;
+  // Without editing, decode straight at 1600 px; a crop keeps up to 4096 px so the kept part stays sharp.
+  const bitmap = await decodeBitmap(blob, options.signal, await decodeWidth(blob, source, edited ? 4096 : 1600, options.signal));
   let surface: CanvasSurface | undefined;
+  let turned: CanvasSurface | undefined;
   let mark: HTMLCanvasElement | undefined;
   try {
     dimensions(bitmap.width, bitmap.height, true);
-    const size = bounded(bitmap.width, bitmap.height, 1600);
+    let image: CanvasImageSource = bitmap;
+    let area = { x: 0, y: 0, width: bitmap.width, height: bitmap.height };
+    if (edited) {
+      const quarter = turn === 90 || turn === 270;
+      turned = canvas({ width: quarter ? bitmap.height : bitmap.width, height: quarter ? bitmap.width : bitmap.height });
+      turned.context.translate(turned.element.width / 2, turned.element.height / 2);
+      turned.context.rotate(turn * Math.PI / 180);
+      turned.context.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
+      const fraction = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+      const x = Math.round(fraction(crop.x) * turned.element.width);
+      const y = Math.round(fraction(crop.y) * turned.element.height);
+      area = {
+        x, y,
+        width: Math.max(1, Math.min(turned.element.width - x, Math.round(fraction(crop.width) * turned.element.width))),
+        height: Math.max(1, Math.min(turned.element.height - y, Math.round(fraction(crop.height) * turned.element.height))),
+      };
+      image = turned.element;
+    }
+    const size = bounded(area.width, area.height, 1600);
     surface = canvas(size);
-    surface.context.drawImage(bitmap, 0, 0, size.width, size.height);
+    surface.context.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, size.width, size.height);
     mark = await watermark(options.creator, size);
     surface.context.drawImage(mark, size.width - mark.width, size.height - mark.height);
     const encoded = await encodeCanvas(surface.element, 'image/webp', options.signal);
@@ -404,6 +453,7 @@ async function still(blob: Blob, options: Settings, source: Dimensions): Promise
   } finally {
     bitmap.close();
     if (surface) surface.element.width = surface.element.height = 1;
+    if (turned) turned.element.width = turned.element.height = 1;
     if (mark) mark.width = mark.height = 1;
   }
 }
@@ -720,7 +770,9 @@ async function prepare(file: File, options: Settings, hasTiming: boolean): Promi
     let data: ArrayBuffer | undefined;
     let raster = imageMetadata.get(file);
     if (!raster) { data = await bytes(file, options.signal); raster = inspectRaster(new Uint8Array(data)); }
-    if (raster.delays && (raster.mime === 'image/webp' || raster.delays.length > 1)) generated = await animation(data ?? await bytes(file, options.signal), raster, options);
+    const animated = Boolean(raster.delays && (raster.mime === 'image/webp' || raster.delays.length > 1));
+    if (animated && (options.rotate || options.crop)) fail('Cropping and turning work for still pictures, not animations.');
+    if (animated) generated = await animation(data ?? await bytes(file, options.signal), raster, options);
     else {
       if (hasTiming || options.fullLength) fail('Length and trim settings apply only to audio, video and animated images, not still images.');
       // Decode from the file itself rather than a second in-memory copy of a large original.
@@ -758,6 +810,11 @@ export async function preparePreview(file: File, options: PreviewOptions): Promi
   if (options.name !== undefined && options.name !== '' && (typeof options.name !== 'string' || options.name.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(options.name))) fail('The public name must be 1–64 lowercase letters or numbers separated by single hyphens, without an extension.');
   if (options.fullLength !== undefined && typeof options.fullLength !== 'boolean') fail('Choose short preview or full length.');
   if (options.fullLength && (options.start !== undefined || options.duration !== undefined)) fail('Full-length publishing cannot also specify excerpt settings.');
+  if (options.rotate !== undefined && ![0, 90, 180, 270].includes(options.rotate)) fail('Turn pictures in quarter turns.');
+  if (options.crop !== undefined) {
+    const { x, y, width, height } = options.crop;
+    if (![x, y, width, height].every(value => Number.isFinite(value) && value >= 0 && value <= 1) || width <= 0 || height <= 0 || x + width > 1.0001 || y + height > 1.0001) fail('The crop must stay inside the picture.');
+  }
   const start = options.start ?? 0;
   const duration = options.duration ?? 30;
   if (!Number.isFinite(start) || start < 0 || start > Number.MAX_SAFE_INTEGER / 1000) fail('The excerpt offset must be a finite, nonnegative number of seconds.');
