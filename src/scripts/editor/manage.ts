@@ -2,6 +2,9 @@ import type { EditorBinding } from '../../lib/editor-types';
 import type { SiteEditorStore } from './store';
 import { checkField, linksEditor, listEditor, mediaField, pickFiles, section, selectField, textField, topicsField, type Field, type Link } from './forms';
 import { button, errorText, node, openDialog, toast } from './ui';
+import { createRichText } from './rich-text';
+import { chooseFromLibrary, stageFiles } from './media';
+import { canCrop, cropPicture } from './crop';
 
 /** Owner dialogs for everything that is not text on a page: settings, collections, lists. */
 
@@ -226,17 +229,39 @@ export async function openAboutDetails(store: SiteEditorStore, onSaved: () => Pr
   const about = await load<Record<string, unknown>>(store, aboutFile).catch(error => { status.textContent = errorText(error); return undefined; });
   if (!about) return;
   const onStatus = (value: string) => { status.textContent = value; };
+  const text = (key: string) => (typeof about[key] === 'string' ? about[key] as string : '');
+  const eyebrow = textField('Small heading', text('eyebrow'), { hint: 'Shown above the title.' });
+  const title = textField('Title', text('title'), { hint: '{name} is replaced by the site name.' });
+  const intro = textField('Introduction', text('intro'), { multiline: true, hint: 'Optional, shown under the title.' });
+  const bioField = node('div', undefined, 'writer-field');
+  bioField.append(node('span', 'Your bio', 'writer-field__label'));
+  const bioHost = node('div');
+  bioField.append(bioHost);
+  const bio = createRichText(bioHost, {
+    markdown: text('body'), placeholder: 'Write about yourself…', label: 'Your bio', compact: true,
+    resolveMedia: url => store.resolveMedia(url),
+    addPictures: async files => (await stageFiles(store, files, onStatus)).map(file => file.url),
+    chooseFromLibrary: () => chooseFromLibrary(store, true),
+    crop: { available: canCrop, open: src => cropPicture(store, src, onStatus) },
+    onChange: () => undefined, onStatus,
+  });
+  dialog.addEventListener('close', () => bio.destroy(), { once: true });
   const portrait = mediaField(store, 'Portrait', { src: typeof about.avatar === 'string' ? about.avatar : '', alt: typeof about.avatarAlt === 'string' ? about.avatarAlt : '' }, { describe: true, onStatus });
   const links = linksEditor('Profile links', Array.isArray(about.links) ? about.links as Link[] : []);
   const photos = Array.isArray(about.photos) ? (about.photos as string[]).map(src => ({ type: 'image' as const, src, alt: '', caption: '', poster: '' })) : [];
   const media = mediaListField(store, 'Pictures, video and audio', [...photos, ...(Array.isArray(about.media) ? about.media as MediaItem[] : [])], onStatus);
-  body.append(node('p', 'The heading, introduction and your bio are edited right on the About page with Edit this page.', 'owner-hint'), portrait.element, links.element, media.element);
+  body.append(eyebrow.element, title.element, intro.element, bioField, portrait.element, links.element, media.element);
   footer.append(button('Cancel', () => dialog.close()), saveButton('Save', async () => {
     const picture = portrait.get();
+    if (!title.get().trim()) throw new Error('Give the page a title.');
+    if (bio.missingDescriptions()) { bio.focusMissingDescription(); throw new Error('Describe every picture in your bio.'); }
     if (picture.src && !picture.alt) throw new Error('Describe the portrait.');
     const list = links.get().filter(link => link.label || link.url !== 'https://');
     if (list.some(link => !link.label || !/^https?:\/\//.test(link.url))) throw new Error('Every link needs a label and a full web address.');
-    const next: Record<string, unknown> = { ...about, avatar: picture.src, avatarAlt: picture.alt, links: list, media: media.get() };
+    const next: Record<string, unknown> = {
+      ...about, eyebrow: eyebrow.get().trim(), title: title.get().trim(), intro: intro.get().trim(), body: bio.getMarkdown(),
+      avatar: picture.src, avatarAlt: picture.alt, links: list, media: media.get(),
+    };
     delete next.photos;
     if (unchanged({ ...about, media: [...photos, ...(Array.isArray(about.media) ? about.media as MediaItem[] : [])], photos: undefined }, next)) { dialog.close(); toast('Nothing changed.'); return; }
     await store.set(whole(aboutFile, 'About page'), next);
