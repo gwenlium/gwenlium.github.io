@@ -4,6 +4,7 @@ import Image from '@tiptap/extension-image';
 import { Placeholder } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { mediaKindOf, videoEmbed } from '../../lib/embed.mjs';
 
 export type RichTextOptions = {
   markdown: string;
@@ -79,10 +80,16 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
     button('&bull; List', 'Bulleted list', 'bullets'),
     button('1. List', 'Numbered list', 'numbers'),
     button('Link', 'Add or edit a link (Ctrl+K)', 'link'),
-    button('+ Picture', 'Add pictures from this device (or drop or paste them into the text)', 'picture'),
+    button('+ Media', 'Add pictures, video or audio from this device (or drop or paste them into the text)', 'picture'),
     button('Library', 'Reuse a picture already on the website', 'library'),
+    button('YouTube', 'Embed a YouTube or Vimeo video by its address', 'embed'),
   ];
   toolbar.append(block, ...tools);
+  const embedForm = document.createElement('form');
+  embedForm.className = 'rt-link';
+  embedForm.hidden = true;
+  embedForm.innerHTML = '<input type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" aria-label="YouTube or Vimeo address" required><button type="submit">Embed</button><button type="button" data-cancel>Cancel</button>';
+  const embedInput = embedForm.querySelector('input')!;
   const linkForm = document.createElement('form');
   linkForm.className = 'rt-link';
   linkForm.hidden = true;
@@ -92,10 +99,10 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
   surface.className = 'rt-surface prose';
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
-  fileInput.accept = '.jpg,.jpeg,.png,.webp,.gif';
+  fileInput.accept = '.jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,.m4v,.webm,.mkv,.mp3,.wav,.flac,.ogg,.m4a,.aac';
   fileInput.multiple = true;
   fileInput.hidden = true;
-  root.append(toolbar, linkForm, surface, fileInput);
+  root.append(toolbar, linkForm, embedForm, surface, fileInput);
   host.append(root);
 
   let original = options.markdown;
@@ -114,15 +121,18 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
         const dom = document.createElement('figure');
         dom.className = 'rt-figure';
         dom.contentEditable = 'false';
-        const image = document.createElement('img');
+        // Pictures, prepared video and audio share this node; show each as what it is.
+        const kind = mediaKindOf(String(initial.attrs.src ?? ''));
+        const image = document.createElement(kind === 'image' ? 'img' : kind);
         image.draggable = true;
+        if (image instanceof HTMLMediaElement) { image.controls = true; image.preload = 'metadata'; }
         const row = document.createElement('div');
         row.className = 'rt-figure__row';
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'rt-figure__alt';
-        input.placeholder = 'Describe this picture';
-        input.setAttribute('aria-label', 'Picture description');
+        input.placeholder = kind === 'image' ? 'Describe this picture' : `What is in this ${kind}?`;
+        input.setAttribute('aria-label', kind === 'image' ? 'Picture description' : 'Description');
         input.maxLength = 300;
         const remove = document.createElement('button');
         remove.type = 'button';
@@ -132,8 +142,8 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
         dom.append(image, row);
         const render = () => {
           const src = String(node.attrs.src ?? '');
-          if (image.dataset.src !== src) { image.dataset.src = src; image.src = options.resolveMedia(src); }
-          image.alt = String(node.attrs.alt ?? '');
+          if (image.dataset.src !== src) { image.dataset.src = src; (image as HTMLImageElement | HTMLMediaElement).src = options.resolveMedia(src); }
+          if (image instanceof HTMLImageElement) image.alt = String(node.attrs.alt ?? '');
           if (document.activeElement !== input) input.value = String(node.attrs.alt ?? '');
           dom.classList.toggle('is-missing', !String(node.attrs.alt ?? '').trim());
         };
@@ -226,8 +236,8 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
   }
 
   async function insertFiles(files: File[], position?: number) {
-    const pictures = files.filter(file => /^image\//.test(file.type) || /\.(jpe?g|png|webp|gif)$/i.test(file.name));
-    if (!pictures.length) { options.onStatus('Only pictures can go into the text. Add video or audio under Media.'); return; }
+    const pictures = files.filter(file => /^(?:image|video|audio)\//.test(file.type) || /\.(?:jpe?g|png|webp|gif|mp4|mov|m4v|webm|mkv|mp3|wav|flac|ogg|m4a|aac)$/i.test(file.name));
+    if (!pictures.length) { options.onStatus('Choose pictures, video or audio.'); return; }
     adding++; sync();
     try {
       const urls = await options.addPictures(pictures);
@@ -282,6 +292,18 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
   linkInput.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); closeLink(); } });
   linkForm.querySelector('[data-cancel]')!.addEventListener('click', closeLink);
   linkForm.querySelector('[data-remove]')!.addEventListener('click', () => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); closeLink(); });
+  // A YouTube or Vimeo address alone in its own paragraph; the site shows the player there.
+  embedForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const href = embedInput.value.trim();
+    if (!videoEmbed(href)) { embedInput.setCustomValidity('Use a YouTube or Vimeo video address.'); embedInput.reportValidity(); return; }
+    editor.chain().focus().insertContent([{ type: 'paragraph', content: [{ type: 'text', text: href, marks: [{ type: 'link', attrs: { href } }] }] }]).run();
+    embedForm.hidden = true;
+    options.onStatus('Video added. It plays right there on the website.');
+  });
+  embedInput.addEventListener('input', () => embedInput.setCustomValidity(''));
+  embedInput.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); embedForm.hidden = true; editor.commands.focus(); } });
+  embedForm.querySelector('[data-cancel]')!.addEventListener('click', () => { embedForm.hidden = true; editor.commands.focus(); });
 
   block.addEventListener('change', () => {
     const chain = editor.chain().focus();
@@ -302,6 +324,11 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
       case 'numbers': chain.toggleOrderedList().run(); break;
       case 'link': openLink(); break;
       case 'picture': fileInput.click(); break;
+      case 'embed':
+        embedForm.hidden = false;
+        embedInput.value = '';
+        embedInput.focus();
+        break;
       case 'library':
         void options.chooseFromLibrary().then(url => { if (url && !editor.isDestroyed) insertPictures([url]); });
         break;

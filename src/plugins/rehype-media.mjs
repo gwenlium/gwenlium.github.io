@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { mediaKindOf, videoEmbed } from '../lib/embed.mjs';
 
 const manifestFile = new URL('../generated/media.json', import.meta.url);
 const sizes = '(min-width: 1200px) 960px, (min-width: 800px) calc(100vw - 280px), calc(100vw - 48px)';
@@ -17,6 +18,23 @@ export default function rehypeMedia() {
     const visit = (parent) => {
       for (let index = 0; index < (parent.children?.length ?? 0); index++) {
         const node = parent.children[index];
+        // A YouTube or Vimeo link alone in a paragraph becomes the embedded player.
+        const only = node.type === 'element' && node.tagName === 'p'
+          ? node.children.filter((child) => !(child.type === 'text' && !child.value.trim())) : [];
+        if (only.length === 1 && only[0].type === 'element' && only[0].tagName === 'a') {
+          const href = typeof only[0].properties?.href === 'string' ? only[0].properties.href : '';
+          const embed = videoEmbed(href);
+          if (embed) {
+            const label = only[0].children.map((child) => child.value ?? '').join('').trim();
+            parent.children[index] = { type: 'element', tagName: 'div', properties: { className: ['media-embed'] }, children: [{
+              type: 'element', tagName: 'iframe', properties: {
+                src: embed, title: label && label !== href ? label : 'Embedded video', loading: 'lazy',
+                allow: 'fullscreen; picture-in-picture; encrypted-media', allowFullScreen: true, referrerPolicy: 'strict-origin-when-cross-origin',
+              }, children: [],
+            }] };
+            continue;
+          }
+        }
         if (node.type !== 'element' || node.tagName !== 'img') {
           if (node.children) visit(node);
           continue;
@@ -24,6 +42,18 @@ export default function rehypeMedia() {
         const properties = node.properties ?? (node.properties = {});
         const original = typeof properties.src === 'string' ? properties.src : '';
         if (!original) continue;
+        // Prepared video and audio use the picture syntax in text; render them as players.
+        const kind = mediaKindOf(original);
+        if (kind !== 'image') {
+          const label = typeof properties.alt === 'string' ? properties.alt : '';
+          parent.children[index] = {
+            type: 'element', tagName: kind, properties: {
+              src: original, controls: true, preload: 'none', ...(kind === 'video' ? { playsInline: true, controlslist: 'nodownload' } : {}),
+              ...(label ? { ariaLabel: label } : {}),
+            }, children: [],
+          };
+          continue;
+        }
         properties.loading ??= 'lazy';
         properties.decoding ??= 'async';
         properties.dataZoom = '';

@@ -5,6 +5,7 @@ import Media from '../components/Media.astro';
 import Icon from '../components/Icon.astro';
 import { site } from '../lib/settings';
 import { getWindowDefinition, hasWindowOverride } from '../lib/windows';
+import { videoEmbed } from '../lib/embed.mjs';
 
 const game = site.game;
 const links = game.links.filter((link) => link.label && /^(https?:\/\/|mailto:|\/(?!\/))/.test(link.url));
@@ -17,17 +18,7 @@ if (game.trailerUrl) {
     if (url.protocol === 'https:' || url.protocol === 'http:') {
       trailer = url.href;
       directVideo = /\.(mp4|webm|ogg|ogv|mov)$/i.test(url.pathname);
-      const youtubeHosts = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com'];
-      const youtubeId = url.hostname === 'youtu.be'
-        ? url.pathname.slice(1)
-        : youtubeHosts.includes(url.hostname)
-          ? url.searchParams.get('v') || url.pathname.match(/^\/(?:embed|shorts)\/([^/]+)/)?.[1]
-          : '';
-      if (youtubeId && /^[\w-]{11}$/.test(youtubeId)) embed = `https://www.youtube-nocookie.com/embed/${youtubeId}`;
-      if (['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'].includes(url.hostname)) {
-        const id = url.pathname.match(/^\/(?:video\/)?(\d+)(?:\/|$)/)?.[1];
-        if (id) embed = `https://player.vimeo.com/video/${id}?dnt=1`;
-      }
+      embed = videoEmbed(url.href) ?? '';
     }
   } catch { /* Invalid trailer addresses are not rendered as active links. */ }
 }

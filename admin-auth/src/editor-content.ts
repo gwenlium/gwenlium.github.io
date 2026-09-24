@@ -296,10 +296,10 @@ export function validateContent(files: Map<string, string>, previews: Record<str
     requireValue(parsed.origin === siteOrigin && !parsed.search && !parsed.hash && !/%/.test(parsed.pathname), 'Use a registered local media preview.');
     const branding = ['/avatar.webp', '/favicon.png', '/social-card.png', '/followit-logo.svg'];
     if (branding.includes(parsed.pathname)) {
-      requireValue((!kind || kind === 'image') && exists(`public${parsed.pathname}`), 'Missing public branding image.'); return;
+      requireValue((!kind || kind === 'image' || kind === 'media') && exists(`public${parsed.pathname}`), 'Missing public branding image.'); return;
     }
     const entry = previews[parsed.pathname];
-    requireValue(entry && (!kind || kind === entry.kind) && exists(`public${parsed.pathname}`), 'Missing preview or incorrect media kind. Prepare the media before publishing.');
+    requireValue(entry && (!kind || kind === 'media' || kind === entry.kind) && exists(`public${parsed.pathname}`), 'Missing preview or incorrect media kind. Prepare the media before publishing.');
   };
   const image = (source: unknown, alt: unknown): void => { url(source, 'image'); text(alt, Boolean(source)); };
   const links = (value: unknown): void => {
@@ -329,7 +329,8 @@ export function validateContent(files: Map<string, string>, previews: Record<str
     walk(tree, node => {
       // Inline HTML is not a code-editing escape hatch. Markdown supplies images and links.
       requireValue(node.type !== 'html', 'Use Markdown rather than raw HTML in editable content.');
-      if (node.type === 'link' || node.type === 'image' || node.type === 'definition') url(node.url, node.type === 'image' ? 'image' : undefined, true);
+      // Pictures, prepared video and audio share the picture syntax in text (any registered preview).
+      if (node.type === 'link' || node.type === 'image' || node.type === 'definition') url(node.url, node.type === 'image' ? 'media' : undefined, true);
       if (node.type === 'image' || node.type === 'imageReference') text(node.alt, true);
       if (node.type === 'imageReference' || node.type === 'linkReference') url(definitions.get(node.identifier), node.type === 'imageReference' ? 'image' : undefined, true);
     });

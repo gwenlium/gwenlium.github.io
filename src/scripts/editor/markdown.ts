@@ -1,5 +1,6 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { mediaKindOf, videoEmbed } from '../../lib/embed.mjs';
 
 // Raw Markdown may link to ordinary web URLs, but only the trusted draft resolver
 // may introduce blob URLs. Neither path accepts data URLs or executable schemes.
@@ -32,7 +33,34 @@ export function renderMarkdownPreview(markdown: string, resolveMedia?: (url: str
     ALLOW_DATA_ATTR: false,
     ALLOW_ARIA_ATTR: false,
   });
-  for (const element of fragment.querySelectorAll<HTMLElement>('[href], [src], [poster], audio, video')) {
+  // Same as the site build (rehype-media): prepared video and audio in the picture syntax become
+  // players, and a YouTube or Vimeo link alone in a paragraph becomes the embedded player.
+  for (const image of fragment.querySelectorAll('img')) {
+    const kind = mediaKindOf(image.getAttribute('src') ?? '');
+    if (kind === 'image') continue;
+    const player = document.createElement(kind);
+    player.setAttribute('src', image.getAttribute('src') ?? '');
+    if (image.alt) player.setAttribute('aria-label', image.alt);
+    image.replaceWith(player);
+  }
+  for (const paragraph of fragment.querySelectorAll('p')) {
+    const parts = [...paragraph.childNodes].filter(child => !(child.nodeType === Node.TEXT_NODE && !child.textContent?.trim()));
+    const link = parts.length === 1 && parts[0] instanceof HTMLAnchorElement ? parts[0] : undefined;
+    const embed = link && videoEmbed(link.getAttribute('href') ?? '');
+    if (!embed) continue;
+    const frame = document.createElement('iframe');
+    frame.src = embed;
+    frame.title = link!.textContent?.trim() && link!.textContent.trim() !== link!.getAttribute('href') ? link!.textContent.trim() : 'Embedded video';
+    frame.loading = 'lazy';
+    frame.allow = 'fullscreen; picture-in-picture; encrypted-media';
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    const wrap = document.createElement('div');
+    wrap.className = 'media-embed';
+    wrap.append(frame);
+    paragraph.replaceWith(wrap);
+  }
+  for (const element of fragment.querySelectorAll<HTMLElement>('[href], a[href], img[src], audio[src], video[src], [poster], audio, video')) {
+    if (element instanceof HTMLIFrameElement) continue;
     for (const attribute of ['href', 'src', 'poster']) {
       const source = element.getAttribute(attribute);
       if (source === null) continue;

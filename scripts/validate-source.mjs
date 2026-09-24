@@ -346,7 +346,8 @@ export function validateSource(root = projectRoot, now = new Date()) {
     visit(tree, (node) => {
       const field = `${prefix}:${node.position?.start.line ?? 1}`;
       if (node.type === 'link' || node.type === 'image' || node.type === 'definition') {
-        url(node.url, file, field, { media: node.type === 'image', kind: node.type === 'image' ? 'image' : undefined, base, required: true });
+        // Pictures, prepared video (.mp4) and audio (.mp3) all use the picture syntax in text.
+        url(node.url, file, field, { media: node.type === 'image', kind: undefined, base, required: true });
       }
       if (node.type === 'image' || node.type === 'imageReference') text(node.alt, file, `${field} image alt`, true);
       if (node.type === 'imageReference' || node.type === 'linkReference') {

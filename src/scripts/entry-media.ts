@@ -28,7 +28,7 @@ function hasProse(root: HTMLElement): boolean {
 function mediaUnit(node: HTMLElement, source: HTMLElement): HTMLElement {
   let unit = node;
   for (let parent = node.parentElement; parent && parent !== source; parent = parent.parentElement) {
-    if (parent.matches('figure, picture, [data-media-zoom], .media-video')
+    if (parent.matches('figure, picture, [data-media-zoom], .media-video, .media-embed')
       || (parent.matches('a') && !hasProse(parent))) unit = parent;
   }
   return unit;

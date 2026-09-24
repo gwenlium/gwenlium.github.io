@@ -420,3 +420,6 @@ html[data-motion='reduced']::view-transition-old(*), html[data-motion='reduced']
 :root[data-motion='reduced'] .preference-switch__track::after { transition: none; }
 @media (prefers-reduced-motion: reduce) { .preference-switch__track::after { transition: none; } }
 @media (forced-colors: active) { .preference-switch input:checked + .preference-switch__track { border-color: Highlight; } .preference-switch__track::after { background: ButtonText; } }
+/* YouTube or Vimeo players embedded from a link alone in entry text. */
+.media-embed { margin: 1.2em 0; }
+.media-embed iframe { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border: 0; }
