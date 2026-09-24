@@ -824,7 +824,7 @@ async function requestJson(request: Request, limit = maxRequestBytes): Promise<u
 }
 
 async function publishEditor(request: Request, repository: EditorRepository, token: string, config: Configuration): Promise<Response> {
-  const payload = await publishPayload(await requestJson(request));
+  const payload = publishPayload(await requestJson(request));
   const conflict = () => new EditorError('The website changed since this draft was loaded. Refresh and review your draft before publishing.', 409);
   if (payload.baseCommit !== repository.head) throw conflict();
   for (const change of payload.changes) writablePath(repository, change.path);
@@ -873,16 +873,16 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
   writeHeaders.set('Content-Type', 'application/json');
   const tree: Array<{ path: string; mode: string; type: string; sha?: string | null; content?: string }> = payload.changes.map(change => ({ path: change.path, mode: '100644', type: 'blob', content: change.content }));
   for (const path of deletions) tree.push({ path, mode: '100644', type: 'blob', sha: null });
-  for (const upload of payload.media) {
-    const blob = await githubJson(`${repository.api}/git/blobs`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ content: upload.content, encoding: 'base64' }) });
-    if (typeof blob.sha !== 'string' || !shaPattern.test(blob.sha)) throw new EditorError('GitHub did not confirm the prepared media upload.', 502);
-    tree.push({ path: upload.path, mode: '100644', type: 'blob', sha: blob.sha });
-  }
+  // The browser uploaded each prepared file as a Git blob and checked that GitHub's SHA is the
+  // hash of the bytes it verified. GitHub refuses a tree that names a blob it does not have.
+  for (const upload of payload.media) tree.push({ path: upload.path, mode: '100644', type: 'blob', sha: upload.blob });
   if (payload.media.length || removedMedia.length) {
     const sorted = Object.fromEntries(Object.entries(previews).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
     tree.push({ path: registryPath, mode: '100644', type: 'blob', content: `${JSON.stringify({ files: sorted }, null, 2)}\n` });
   }
-  const nextTree = await githubJson(`${repository.api}/git/trees`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ base_tree: repository.treeSha, tree }) });
+  const nextTree = await githubJson(`${repository.api}/git/trees`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ base_tree: repository.treeSha, tree }) }).catch(error => {
+    throw payload.media.length ? new EditorError('GitHub could not find every uploaded file. Publish again to upload them again.', 502) : error;
+  });
   if (typeof nextTree.sha !== 'string' || !shaPattern.test(nextTree.sha)) throw new EditorError('GitHub did not confirm the publication tree.', 502);
   if (await branchHead(repository, token) !== payload.baseCommit) throw conflict();
   const commit = await githubJson(`${repository.api}/git/commits`, { method: 'POST', headers: writeHeaders, body: JSON.stringify({ message: payload.message?.trim() || 'Publish website edits', tree: nextTree.sha, parents: [payload.baseCommit] }) });

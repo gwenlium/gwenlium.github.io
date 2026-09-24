@@ -15,6 +15,12 @@ const bundled = await build({
   conditions: ['workerd', 'worker'],
 });
 const script = bundled.outputFiles[0].text;
+// The media privacy checks run in the browser before anything is uploaded; test the shared module.
+const mediaCheck = await build({
+  entryPoints: [fileURLToPath(new URL('../src/lib/media-check.ts', import.meta.url))],
+  bundle: true, write: false, platform: 'neutral', format: 'esm', target: 'es2022',
+});
+const { checkPreparedMedia } = await import(`data:text/javascript;base64,${Buffer.from(mediaCheck.outputFiles[0].text).toString('base64')}`);
 const token = 'ghu_' + 'a'.repeat(40);
 
 function runtime(handler, extra = {}) {
@@ -357,11 +363,13 @@ test('editor preflights disallowed paths, duplicates, broken content and malform
     { changes: [{ path: 'src/content/posts/new.md', content: '---\ntitle: Bad section\nsection: [devlog]\n---\nText' }] },
     { changes: [{ path: 'src/content/gallery.json', content: JSON.stringify({ items: [{ id: 'bad-type', title: 'Bad type', type: ['image'], alt: 'Image', src: previousPreviewPath }] }) }] },
     { changes: [{ path: 'src/content/gallery.json', content: JSON.stringify({ items: [{ id: 'missing', title: 'Missing media', type: 'image', alt: 'Missing image', src: `/media/missing-preview-${'0'.repeat(32)}.webp` }] }) }] },
+    // Media arrives as Git blobs the browser uploaded; bytes, bad SHAs, sizes and digests are refused.
     { media: [{ path: `public/media/original-preview-${'0'.repeat(32)}.webp`, content: 'aW52YWxpZA==', entry: { sha256: '0'.repeat(64), kind: 'image', width: 1, height: 1 } }] },
+    { media: [{ path: `public/media/original-preview-${'0'.repeat(32)}.webp`, blob: 'not-a-sha', size: 10, entry: { sha256: '0'.repeat(64), kind: 'image', width: 1, height: 1 } }] },
+    { media: [{ path: `public/media/original-preview-${'0'.repeat(32)}.webp`, blob: 'f'.repeat(40), size: 33 * 1024 * 1024, entry: { sha256: '0'.repeat(64), kind: 'image', width: 1, height: 1 } }] },
+    { media: [{ path: `public/media/original-preview-${'1'.repeat(32)}.webp`, blob: 'f'.repeat(40), size: 10, entry: { sha256: '0'.repeat(64), kind: 'image', width: 1, height: 1 } }] },
     { repository: 'attacker/elsewhere' },
   ];
-  const fake = Buffer.from('not an actual image'); const sha256 = createHash('sha256').update(fake).digest('hex');
-  invalid.push({ media: [{ path: `public/media/fake-preview-${sha256.slice(0, 32)}.webp`, content: fake.toString('base64'), entry: { sha256, kind: 'image', width: 1, height: 1 } }] });
   for (const body of invalid) {
     const response = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody(body) });
     assert.equal(response.status, 400, JSON.stringify(body));
@@ -391,13 +399,13 @@ test('editor never force-updates a racing publication or reports a rejected ref 
 
 test('editor publishes text, prepared media and server-merged registry in one atomic commit', async t => {
   const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
-  const content = preparedImage;
-  const sha256 = createHash('sha256').update(Buffer.from(content, 'base64')).digest('hex');
+  const sha256 = createHash('sha256').update(preparedBytes).digest('hex');
+  const blob = createHash('sha1').update(`blob ${preparedBytes.length}\0`).update(preparedBytes).digest('hex');
   const path = `public/media/pixel-preview-${sha256.slice(0, 32)}.webp`;
   const entry = { sha256, kind: 'image', width: 1, height: 1 };
   const response = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({
     changes: [{ path: 'src/content/gallery.json', content: JSON.stringify({ items: [{ id: 'pixel', title: 'Pixel', type: 'image', src: path.slice(6), alt: 'One pixel', caption: 'A test image', poster: '' }] }) }],
-    media: [{ path, content, entry }],
+    media: [{ path, blob, size: preparedBytes.length, entry }],
   }) });
   assert.equal(response.status, 200, await response.clone().text());
   assert.deepEqual(await response.json(), { commit: publishedCommit, htmlUrl: `https://github.com/owner/website/commit/${publishedCommit}` });
@@ -405,6 +413,9 @@ test('editor publishes text, prepared media and server-merged registry in one at
   const treeWrites = fixture.writes.filter(write => write.path.endsWith('/git/trees'));
   assert.equal(treeWrites.length, 1); assert.equal(treeWrites[0].body.base_tree, editorTree);
   assert.deepEqual(treeWrites[0].body.tree.map(item => item.path).sort(), [path, 'src/content/gallery.json', 'src/content/media-previews.json'].sort());
+  // The browser uploaded the bytes; the worker only names that blob in the tree.
+  assert.equal(treeWrites[0].body.tree.find(item => item.path === path).sha, blob);
+  assert.deepEqual(fixture.writes.filter(write => write.path.endsWith('/git/blobs')), []);
   const registry = treeWrites[0].body.tree.find(item => item.path === 'src/content/media-previews.json');
   assert.deepEqual(JSON.parse(registry.content), { files: { [previousPreviewPath]: previousPreviewEntry, [path.slice(6)]: entry } });
   const commits = fixture.writes.filter(write => write.path.endsWith('/git/commits'));
@@ -440,16 +451,21 @@ function mp4ContainerFixture({ width = 640, metadata = 'generated', creationDate
   return Buffer.concat([box('ftyp', Buffer.from('isom0000isom')), box('moov', box('mvhd', mvhd), box('trak', box('tkhd', tkhd), mdia), udta), box('mdat', Buffer.from([0]))]);
 }
 
-test('editor rejects original MP4 metadata, nested private boxes and oversized video before writes', async t => {
+test('prepared media checks reject original MP4 metadata, nested private boxes and oversized video before upload', async () => {
   for (const options of [{ metadata: 'generated' }, { metadata: 'location' }, { metadata: 'nested-uuid' }, { width: 1920 }, { creationDate: 123456 }]) {
-    const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
     const bytes = mp4ContainerFixture(options); const sha256 = createHash('sha256').update(bytes).digest('hex');
-    const path = `public/media/video-preview-${sha256.slice(0, 32)}.mp4`;
-    const response = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ media: [{ path, content: bytes.toString('base64'), entry: { sha256, kind: 'video', width: options.width ?? 640, height: 480, duration: 2 } }] }) });
-    const allowed = options.metadata === 'generated';
-    assert.equal(response.status, allowed ? 200 : 400, await response.clone().text());
-    if (!allowed) { assert.deepEqual(fixture.writes, []); assert.equal(fixture.head, editorHead); }
+    const check = checkPreparedMedia(`/media/video-preview-${sha256.slice(0, 32)}.mp4`, { sha256, kind: 'video', width: options.width ?? 640, height: 480, duration: 2 }, new Uint8Array(bytes));
+    if (options.metadata === 'generated') await check;
+    else await assert.rejects(check, undefined, JSON.stringify(options));
   }
+});
+
+test('prepared media checks accept generated stills and reject fakes and mismatched digests', async () => {
+  await checkPreparedMedia(`/media/pixel-preview-${preparedDigest.slice(0, 32)}.webp`, previousPreviewEntry, new Uint8Array(preparedBytes));
+  const fake = Buffer.from('not an actual image'); const sha256 = createHash('sha256').update(fake).digest('hex');
+  await assert.rejects(checkPreparedMedia(`/media/fake-preview-${sha256.slice(0, 32)}.webp`, { sha256, kind: 'image', width: 1, height: 1 }, new Uint8Array(fake)));
+  await assert.rejects(checkPreparedMedia(`/media/pixel-preview-${'0'.repeat(32)}.webp`, previousPreviewEntry, new Uint8Array(preparedBytes)), /filename/);
+  await assert.rejects(checkPreparedMedia(`/media/pixel-preview-${preparedDigest.slice(0, 32)}.webp`, previousPreviewEntry, new Uint8Array([...preparedBytes.subarray(0, -1), 1])), /digest/);
 });
 
 function renewalUpstream(options = {}) {

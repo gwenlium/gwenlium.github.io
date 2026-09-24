@@ -42,7 +42,8 @@ export function policy(hashes) {
     "img-src 'self' data: blob: https://raw.githubusercontent.com",
     "media-src 'self' blob:",
     "font-src 'self'",
-    "connect-src 'self' https://gwenlium-cms-auth.gwenlium.workers.dev https://cloudflareinsights.com",
+    // api.github.com: the owner's browser uploads prepared media there directly when publishing.
+    "connect-src 'self' https://gwenlium-cms-auth.gwenlium.workers.dev https://api.github.com https://cloudflareinsights.com",
     'frame-src https://www.youtube-nocookie.com https://player.vimeo.com',
     "worker-src 'self' blob:",
     "object-src 'none'",

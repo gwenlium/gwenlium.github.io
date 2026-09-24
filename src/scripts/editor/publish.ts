@@ -133,7 +133,10 @@ export async function openPublish(store: SiteEditorStore, onPublished: () => Pro
     boxes.forEach(box => { box.disabled = true; });
     status.textContent = store.local ? 'Saving…' : 'Publishing… keep this page open for a moment.';
     try {
-      const result = await store.publish(paths, { message: commitMessage(changes.filter(change => paths.includes(change.file.path)).map(change => change.summary)) });
+      const result = await store.publish(paths, {
+        message: commitMessage(changes.filter(change => paths.includes(change.file.path)).map(change => change.summary)),
+        onProgress: text => { status.textContent = `${text} Keep this page open.`; },
+      });
       await onPublished();
       body.replaceChildren();
       footer.replaceChildren(button('Done', () => dialog.close(), 'owner-button owner-button--primary'));

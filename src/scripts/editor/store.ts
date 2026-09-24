@@ -1,8 +1,9 @@
 import { parseDocument } from 'yaml';
 import type { PreparedPreview } from './prepare-media';
 import { normalizeWatermarkCredit } from '../../lib/watermark.mjs';
+import { checkPreparedMedia } from '../../lib/media-check';
 import type {
-  EditorBinding, EditorConflict, EditorDraftFile, EditorFile, EditorMediaEntry,
+  EditorBinding, EditorConflict, EditorDraftFile, EditorFile, EditorMediaEntry, EditorMediaUpload,
   EditorPublishRequest, EditorPublishResult, EditorSnapshot, PreviewRegistry,
 } from '../../lib/editor-types';
 import { authFailure, type OwnerAuth } from './auth';
@@ -213,8 +214,16 @@ function collectMediaReferences(value: unknown, urls: Set<string>): void {
   }
 }
 
-async function base64(blob: Blob): Promise<string> {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
+/** fetch, with a readable message instead of the browser's bare "Failed to fetch". */
+async function reach(controller: AbortController, url: string, init: RequestInit, message: string): Promise<Response> {
+  try { return await fetch(url, init); }
+  catch (error) {
+    if (controller.signal.aborted) throw error;
+    throw failure(message, 0);
+  }
+}
+
+function base64(bytes: Uint8Array): string {
   const chunks: string[] = [];
   for (let index = 0; index < bytes.length; index += 0x8000) chunks.push(String.fromCharCode(...bytes.subarray(index, index + 0x8000)));
   return btoa(chunks.join(''));
@@ -315,14 +324,43 @@ export class SiteEditorStore {
     return result;
   }
 
+  /**
+   * Check a prepared file, then store it in the repository as a Git blob. In production this goes
+   * straight to GitHub with the owner's token (a Cloudflare Worker cannot carry tens of megabytes);
+   * locally, the dev stand-in keeps it. Returns the blob SHA, checked against the bytes sent.
+   */
+  private async uploadBlob(session: Session, url: string, entry: EditorMediaEntry, file: Blob, retried = false): Promise<string> {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    // The privacy boundary: no camera, location or other private metadata may leave this device.
+    await checkPreparedMedia(url, entry, bytes);
+    const header = new TextEncoder().encode(`blob ${bytes.length}\0`);
+    const framed = new Uint8Array(header.length + bytes.length);
+    framed.set(header); framed.set(bytes, header.length);
+    const expected = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-1', framed)), byte => byte.toString(16).padStart(2, '0')).join('');
+    const repository = session.snapshot.repository;
+    if (!this.local && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) throw failure('The website repository is unknown. Reload the editor.');
+    const token = this.local ? '' : await this.auth.token(retried);
+    const response = await reach(session.controller, this.local ? `${this.authOrigin}/editor/blob` : `https://api.github.com/repos/${repository}/git/blobs`, {
+      method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error', signal: session.controller.signal,
+      ...(this.local
+        ? { headers: { 'Content-Type': 'application/octet-stream' }, body: bytes }
+        : { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' }, body: JSON.stringify({ content: base64(bytes), encoding: 'base64' }) }),
+    }, 'GitHub could not be reached to upload a file. Check your connection and try again; your changes are still saved here.');
+    if (response.status === 401 && !this.local && !retried) return this.uploadBlob(session, url, entry, file, true);
+    const value = await response.json().catch(() => undefined) as { sha?: unknown; message?: unknown } | undefined;
+    if (!response.ok) throw failure(`GitHub did not accept a file (${typeof value?.message === 'string' ? value.message : `HTTP ${response.status}`}). Nothing was published.`, response.status);
+    if (value?.sha !== expected) throw failure('GitHub stored a different file than was sent. Nothing was published; try again.');
+    return expected;
+  }
+
   private async api(controller: AbortController, path: string, body?: EditorPublishRequest | Record<string, unknown>, retried = false): Promise<unknown> {
     const token = await this.auth.token(retried);
-    const response = await fetch(`${this.authOrigin}${path}`, {
+    const response = await reach(controller, `${this.authOrigin}${path}`, {
       method: body ? 'POST' : 'GET', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error',
       signal: controller.signal,
       headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
-    });
+    }, 'The editor service could not be reached. Check your connection and try again; your changes are still saved here.');
     // A token GitHub revoked early gets one quiet renewal before asking to sign in.
     if (response.status === 401 && !retried) return this.api(controller, path, body, true);
     let value: unknown;
@@ -656,7 +694,7 @@ export class SiteEditorStore {
    * Publish all changes, or only the listed files (and the new media they use).
    * `mediaDeletions` removes unused prepared media files (as /media/... URLs) in the same commit.
    */
-  publish(paths?: string[], options: { message?: string; mediaDeletions?: string[] } = {}): Promise<EditorPublishResult> {
+  publish(paths?: string[], options: { message?: string; mediaDeletions?: string[]; onProgress?: (text: string) => void } = {}): Promise<EditorPublishResult> {
     return this.enqueue(async session => {
       const selected = Array.from(session.files.values()).filter(file => !paths || paths.includes(file.path));
       const changes = selected.filter(file => !file.deleted).map(({ path, content }) => ({ path, content }));
@@ -672,8 +710,15 @@ export class SiteEditorStore {
         if (parsed.parts) collectMediaReferences(parsed.parts.body, references);
       }
       const referenced = Array.from(session.media.values()).filter(media => references.has(media.url));
-      const media = await Promise.all(referenced.map(async item => ({ path: `public${item.url}`, content: await base64(item.file), entry: item.entry })));
-      this.active(session);
+      // Each file goes straight to GitHub, one at a time: the editor service only names them.
+      const media: EditorMediaUpload[] = [];
+      for (const [index, item] of referenced.entries()) {
+        const size = item.file.size >= 1024 * 1024 ? `${(item.file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(item.file.size / 1024))} KB`;
+        options.onProgress?.(`Uploading ${referenced.length > 1 ? `file ${index + 1} of ${referenced.length}` : 'the file'} (${size})…`);
+        media.push({ path: `public${item.url}`, blob: await this.uploadBlob(session, item.url, item.entry, item.file), size: item.file.size, entry: item.entry });
+        this.active(session);
+      }
+      if (referenced.length) options.onProgress?.('Publishing…');
       const message = options.message?.replace(/\s+/g, ' ').trim().slice(0, 200) || undefined;
       const value = await this.api(session.controller, '/editor/publish', { baseCommit: session.snapshot.head, changes, media, deletions, ...(message ? { message } : {}) });
       this.active(session);

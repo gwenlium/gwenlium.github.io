@@ -64,11 +64,18 @@ function send(response, status, value) {
   response.end(JSON.stringify(value));
 }
 
-async function body(request) {
+async function bytesOf(request) {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  return Buffer.concat(chunks);
 }
+
+async function body(request) {
+  return JSON.parse((await bytesOf(request)).toString('utf8'));
+}
+
+// Uploaded media waits here until a publish names it, like blobs GitHub holds before a commit.
+const uploadedBlobs = new Map();
 
 export default function devEditor() {
   return {
@@ -85,6 +92,14 @@ export default function devEditor() {
             const content = await server.ssrLoadModule('/admin-auth/src/editor-content.ts');
             const current = await snapshot(root, content.contentPath);
             if (url.pathname === prefix && request.method === 'GET') return send(response, 200, current);
+            // Stands in for GitHub's create-blob API, which the browser calls directly in production.
+            if (url.pathname === `${prefix}/blob` && request.method === 'POST') {
+              const bytes = await bytesOf(request);
+              if (!bytes.length || bytes.length > content.maxMediaBytes) return send(response, 413, { message: 'The file is empty or too large.' });
+              const sha = blobSha(bytes);
+              uploadedBlobs.set(sha, bytes);
+              return send(response, 201, { sha });
+            }
             if (url.pathname === `${prefix}/file` && request.method === 'GET') {
               const file = url.searchParams.get('path');
               if (!content.contentPath(file, true)) return send(response, 400, { error: 'Not an editable content file.' });
@@ -147,7 +162,16 @@ export default function devEditor() {
                 if (await exists(candidate)) known.add(candidate);
               }
               content.validateContent(files, previews, candidate => known.has(candidate), siteOrigin);
-              for (const upload of payload.media) await fs.writeFile(path.join(root, upload.path), Buffer.from(upload.content, 'base64'));
+              const { checkPreparedMedia } = await server.ssrLoadModule('/src/lib/media-check.ts');
+              const staged = [];
+              for (const upload of payload.media) {
+                const bytes = uploadedBlobs.get(upload.blob);
+                if (!bytes || bytes.length !== upload.size) return send(response, 502, { error: 'An uploaded file is missing. Publish again to upload it again.' });
+                // Production checks these bytes in the browser; checking again here keeps local publishes honest.
+                await checkPreparedMedia(upload.path.slice(6), upload.entry, new Uint8Array(bytes));
+                staged.push([upload.path, bytes]);
+              }
+              for (const [file, bytes] of staged) await fs.writeFile(path.join(root, file), bytes);
               if (payload.media.length || removedMedia.length) {
                 const sorted = Object.fromEntries(Object.entries(previews).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
                 await fs.writeFile(registryFile, `${JSON.stringify({ files: sorted }, null, 2)}\n`);

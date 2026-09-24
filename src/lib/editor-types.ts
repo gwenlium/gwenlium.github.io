@@ -4,7 +4,8 @@ export interface EditorSnapshot { head: string; branch: string; repository: stri
 export interface EditorFile { path: string; sha: string; content: string }
 export interface EditorChange { path: string; content: string }
 export interface EditorMediaEntry { sha256: string; kind: 'image' | 'video' | 'audio'; width?: number; height?: number; duration?: number }
-export interface EditorMediaUpload { path: string; content: string; entry: EditorMediaEntry }
+/** A prepared file the browser already uploaded to GitHub: `blob` is its Git blob SHA, `size` its bytes. */
+export interface EditorMediaUpload { path: string; blob: string; size: number; entry: EditorMediaEntry }
 export interface EditorPublishRequest { baseCommit: string; changes: EditorChange[]; media: EditorMediaUpload[]; deletions?: string[]; message?: string }
 export interface EditorPublishResult { commit: string; htmlUrl: string }
 export interface EditorBinding { file: string; field: string; format: 'text' | 'markdown' | 'image'; label: string; altField?: string }
