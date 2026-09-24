@@ -59,7 +59,12 @@ const outputBytes = 32 * MiB;
 const maxEdge = 8192;
 const maxPixels = 40_000_000;
 const maxFrames = 1800;
-const maxAnimationPixels = 512_000_000;
+// Source pixels decoded across all frames; decoding is one frame at a time, so this bounds time, not memory.
+const maxAnimationPixels = 2_000_000_000;
+// GIF is heavy: animations are published at up to 800 px, at most 25 frames per second.
+const animationEdges = [800, 560, 400];
+const animationDelay = 40;
+const animationFrameBytes = 512 * MiB;
 const mediaDemuxers = 'mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,avi,ogg,mp3,wav,flac,aac,aiff,asf,mpeg,mpegts';
 const stripMetadata = ['-map_metadata', '-1', '-map_metadata:s', '-1', '-map_chapters', '-1', '-metadata', 'encoder='];
 const conversionError = 'This media could not be converted safely. It may be corrupt, use an unsupported codec, or exceed browser memory. Export a smaller supported copy locally; the original was not uploaded.';
@@ -597,7 +602,7 @@ async function video(file: File, options: Settings): Promise<Generated> {
 
 async function animation(data: ArrayBuffer, raster: Raster, options: Settings): Promise<Generated> {
   const delays = raster.delays!;
-  if (raster.width * raster.height * delays.length > maxAnimationPixels) fail('Animations may contain at most 512 million total frame pixels. Resize or shorten the animation locally first.');
+  if (raster.width * raster.height * delays.length > maxAnimationPixels) fail('This animation is too large to prepare in the browser. Trim it to a shorter clip or shrink it first.');
   // ImageDecoder is not yet declared in every TypeScript DOM library.
   const decoderGlobal: unknown = 'ImageDecoder' in globalThis ? globalThis.ImageDecoder : undefined;
   const Decoder = typeof decoderGlobal === 'function' && 'isTypeSupported' in decoderGlobal && typeof decoderGlobal.isTypeSupported === 'function'
@@ -617,7 +622,14 @@ async function animation(data: ArrayBuffer, raster: Raster, options: Settings): 
     if (elapsed >= end) break;
   }
   if (!excerpt.length) fail('Choose an offset inside the first animation cycle and an excerpt of at least 0.01 seconds.');
-  const duration = excerpt.reduce((sum, frame) => sum + frame.delay, 0) / 1000;
+  // Faster than 25 frames per second: fold frames into their predecessor. Timing stays exact.
+  const frames: Array<{ index: number; delay: number }> = [];
+  for (const frame of excerpt) {
+    const last = frames.at(-1);
+    if (last && last.delay < animationDelay) last.delay += frame.delay;
+    else frames.push({ ...frame });
+  }
+  const duration = frames.reduce((sum, frame) => sum + frame.delay, 0) / 1000;
   const decoder = new Decoder({ data, type: raster.mime, preferAnimation: true });
   const close = () => decoder.close();
   options.signal?.addEventListener('abort', close, { once: true });
@@ -629,13 +641,13 @@ async function animation(data: ArrayBuffer, raster: Raster, options: Settings): 
       const concat = ['ffconcat version 1.0'];
       let frameBytes = 0;
       let size: Dimensions | undefined;
-      for (const [position, frame] of excerpt.entries()) {
+      for (const [position, frame] of frames.entries()) {
         checkAbort(options.signal);
         const decoded = await abortable(decoder.decode({ frameIndex: frame.index, completeFramesOnly: true }), options.signal, (value) => value.image.close());
         try {
           if (!decoded.complete || decoded.image.displayWidth !== raster.width || decoded.image.displayHeight !== raster.height) fail('The browser returned an incomplete or unexpectedly oriented animation frame. Export an orientation-normalized animation locally.');
           if (!surfaces.frame) {
-            size = bounded(decoded.image.displayWidth, decoded.image.displayHeight, 1600);
+            size = bounded(decoded.image.displayWidth, decoded.image.displayHeight, animationEdges[0]);
             surfaces.frame = canvas(size);
             surfaces.mark = await watermark(options.creator, size);
           }
@@ -645,40 +657,49 @@ async function animation(data: ArrayBuffer, raster: Raster, options: Settings): 
           surface.context.drawImage(mark!, surface.element.width - mark!.width, surface.element.height - mark!.height);
           const blob = await encodeCanvas(surface.element, 'image/png', options.signal);
           frameBytes += blob.size;
-          if (frameBytes > videoBytes) fail('The animation needs more than 128 MiB of intermediate frames. Choose a shorter excerpt or resize it locally.');
+          if (frameBytes > animationFrameBytes) fail('This animation has too many frames to prepare in the browser. Trim it to a shorter clip first.');
           const name = `frame-${position}.png`;
           await ffmpeg.writeFile(name, new Uint8Array(await bytes(blob, options.signal)));
           concat.push(`file ${name}`, 'option framerate 100', `duration ${(frame.delay / 1000).toFixed(3)}`);
         } finally { decoded.image.close(); }
-        progress(options, (position + 1) / excerpt.length * 0.55);
+        progress(options, (position + 1) / frames.length * 0.55);
       }
       await ffmpeg.writeFile('frames.ffconcat', concat.join('\n') + '\n');
       // This concat file contains only generated constant-prefix filenames, never user input.
       const sequence = ['-protocol_whitelist', 'file,pipe', '-format_whitelist', 'concat,png_pipe,image2', '-f', 'concat', '-safe', '0', '-i', 'frames.ffconcat'];
-      // Two passes avoid buffering every decoded frame while a global palette is built.
-      await execute(ffmpeg, [...sequence, '-vf', 'palettegen=reserve_transparent=1', '-frames:v', '1', '-an', '-sn', '-dn', ...stripMetadata, 'palette.png']);
-      progress(options, 0.7);
-      const update = ({ time }: { time: number }) => progress(options, 0.7 + Math.min(1, Math.max(0, time / (duration * 1_000_000))) * 0.2);
-      ffmpeg.on('progress', update);
-      try {
-        await execute(ffmpeg, [...sequence, ...input('palette.png', 'png_pipe'),
-          '-filter_complex', '[0:v][1:v]paletteuse=dither=sierra2_4a[preview]',
-          '-map', '[preview]', '-vsync', 'vfr', '-enc_time_base', '1:100', '-an', '-sn', '-dn', ...stripMetadata,
-          '-loop', '0', '-final_delay', String(excerpt.at(-1)!.delay / 10), '-fs', String(outputBytes + 1), 'preview.gif']);
-      } finally { ffmpeg.off('progress', update); }
-      const output = await binary(ffmpeg, 'preview.gif');
-      if (!output.length || output.length > outputBytes) fail('The generated GIF exceeds the 32 MiB limit or is empty. Choose a shorter excerpt.');
-      const verified = inspectRaster(output);
-      const actualDuration = (verified.delays ?? []).reduce((sum, delay) => sum + delay, 0) / 1000;
-      if (!size || verified.width !== size.width || verified.height !== size.height || actualDuration <= 0 || (!options.fullLength && actualDuration > 60) || Math.abs(actualDuration - duration) > 0.011) {
-        fail('The generated GIF failed its dimension or timing bounds. Nothing was prepared.');
+      // A GIF over the publish limit is tried again smaller before giving up.
+      for (const [attempt, edge] of animationEdges.entries()) {
+        const target = bounded(size!.width, size!.height, edge);
+        const scale = target.width === size!.width && target.height === size!.height ? 'null' : `scale=${target.width}:${target.height}:flags=lanczos`;
+        const palette = `palette-${attempt}.png`;
+        const name = `preview-${attempt}.gif`;
+        const share = 0.45 / animationEdges.length;
+        // Two passes avoid buffering every decoded frame while a global palette is built.
+        await execute(ffmpeg, [...sequence, '-vf', `${scale},palettegen=reserve_transparent=1`, '-frames:v', '1', '-an', '-sn', '-dn', ...stripMetadata, palette]);
+        const update = ({ time }: { time: number }) => progress(options, 0.55 + share * attempt + Math.min(1, Math.max(0, time / (duration * 1_000_000))) * share);
+        ffmpeg.on('progress', update);
+        try {
+          await execute(ffmpeg, [...sequence, ...input(palette, 'png_pipe'),
+            '-filter_complex', `[0:v]${scale}[frames];[frames][1:v]paletteuse=dither=sierra2_4a[preview]`,
+            '-map', '[preview]', '-vsync', 'vfr', '-enc_time_base', '1:100', '-an', '-sn', '-dn', ...stripMetadata,
+            '-loop', '0', '-final_delay', String(frames.at(-1)!.delay / 10), '-fs', String(outputBytes + 1), name]);
+        } finally { ffmpeg.off('progress', update); }
+        const output = await binary(ffmpeg, name);
+        if (!output.length) fail('The generated GIF is empty. Nothing was prepared.');
+        if (output.length > outputBytes) continue;
+        const verified = inspectRaster(output);
+        const actualDuration = (verified.delays ?? []).reduce((sum, delay) => sum + delay, 0) / 1000;
+        if (verified.width !== target.width || verified.height !== target.height || actualDuration <= 0 || (!options.fullLength && actualDuration > 60) || Math.abs(actualDuration - duration) > 0.011) {
+          fail('The generated GIF failed its dimension or timing bounds. Nothing was prepared.');
+        }
+        const blob = new Blob([output], { type: 'image/gif' });
+        const bitmap = await decodeBitmap(blob, options.signal);
+        try {
+          if (bitmap.width !== target.width || bitmap.height !== target.height) fail('This browser cannot display the generated GIF correctly.');
+        } finally { bitmap.close(); }
+        return { blob, extension: 'gif', entry: { kind: 'image', ...target, duration: actualDuration } };
       }
-      const blob = new Blob([output], { type: 'image/gif' });
-      const bitmap = await decodeBitmap(blob, options.signal);
-      try {
-        if (bitmap.width !== size.width || bitmap.height !== size.height) fail('This browser cannot display the generated GIF correctly.');
-      } finally { bitmap.close(); }
-      return { blob, extension: 'gif', entry: { kind: 'image', ...size, duration: actualDuration } };
+      return fail('Even at 400 pixels this animation is over the 32 MiB publishing limit. Trim it to a shorter clip first; a few seconds works best as a GIF.');
     });
   } finally {
     options.signal?.removeEventListener('abort', close);
