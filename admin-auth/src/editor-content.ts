@@ -345,14 +345,17 @@ export function validateContent(files: Map<string, string>, previews: Record<str
       const document = parseDocument(match[1], { uniqueKeys: true, strict: true });
       requireValue(!document.errors.length && !document.warnings.length, 'Invalid or unsupported YAML frontmatter.');
       const post = object(document.toJS({ maxAliasCount: 0 }));
-      keys(post, ['title', 'permalink', 'date', 'excerpt', 'draft', 'section', 'tags', 'cover', 'coverAlt', 'featured', 'photos', 'media']);
+      keys(post, ['title', 'permalink', 'date', 'publishAt', 'excerpt', 'draft', 'section', 'tags', 'cover', 'coverAlt', 'featured', 'photos', 'media']);
       for (const field of ['title', 'permalink', 'date', 'excerpt', 'cover', 'coverAlt']) text(post[field]);
       for (const field of ['draft', 'featured']) requireValue(post[field] === undefined || typeof post[field] === 'boolean', 'Post flags must be booleans.');
       requireValue(post.section === undefined || typeof post.section === 'string' && ['devlog', 'life'].includes(post.section), 'Invalid post section.');
       let validDate = false;
       if (typeof post.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(post.date)) { const date = new Date(`${post.date}T00:00:00.000Z`); validDate = Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === post.date; }
+      // Optional go-live moment in UTC; the entry is public only after it.
+      requireValue(post.publishAt === undefined || (typeof post.publishAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?Z$/.test(post.publishAt) && Number.isFinite(Date.parse(post.publishAt))), 'Use a UTC time such as 2026-09-26T16:00:00Z for the go-live time.');
+      const due = post.publishAt === undefined || Date.parse(String(post.publishAt)) <= Date.now();
       if (post.draft === false) { text(post.title, true); requireValue(validDate && typeof post.permalink === 'string' && slug.test(post.permalink), 'Published posts need a valid calendar date and permalink.'); }
-      if (text(post.permalink)) { requireValue(slug.test(post.permalink) && !posts.has(post.permalink), 'Invalid or duplicate post permalink.'); posts.set(post.permalink, { section: String(post.section ?? 'devlog'), published: post.draft === false && validDate && new Date(String(post.date)).getTime() <= Date.now() }); }
+      if (text(post.permalink)) { requireValue(slug.test(post.permalink) && !posts.has(post.permalink), 'Invalid or duplicate post permalink.'); posts.set(post.permalink, { section: String(post.section ?? 'devlog'), published: post.draft === false && validDate && due && new Date(String(post.date)).getTime() <= Date.now() }); }
       strings(post.tags); image(post.cover, post.coverAlt); photos(post.photos); media(post.media); markdown(match[2]);
     } catch (error) { throw new EditorError(`${path}: ${error instanceof EditorError ? error.message : 'Invalid content structure.'}`); }
   }

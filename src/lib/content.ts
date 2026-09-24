@@ -21,7 +21,8 @@ export async function getPosts(section?: 'devlog' | 'life'): Promise<Post[]> {
   }
 
   return posts
-    .filter(({ data }) => (!section || data.section === section) && !data.draft && Number.isFinite(data.date.getTime()) && data.date.getTime() <= now)
+    .filter(({ data }) => (!section || data.section === section) && !data.draft && Number.isFinite(data.date.getTime()) && data.date.getTime() <= now
+      && (data.publishAt === undefined || data.publishAt.getTime() <= now))
     .sort((a, b) => b.data.date.getTime() - a.data.date.getTime()
       || (a.data.permalink < b.data.permalink ? -1 : a.data.permalink > b.data.permalink ? 1 : 0));
 }

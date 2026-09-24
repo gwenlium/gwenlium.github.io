@@ -122,9 +122,19 @@ export function isoDate(value) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
 }
 
+/** The optional go-live moment: undefined when unset, null when malformed. YAML readers may give a Date. */
+export function publishTime(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?Z$/.test(value)) return null;
+  const time = new Date(value);
+  return Number.isFinite(time.getTime()) ? time : null;
+}
+
 export function isPublishedPost(data, now = new Date()) {
   const date = isoDate(data.date);
-  return data.draft === false && date !== null && date.getTime() <= now.getTime();
+  const time = publishTime(data.publishAt);
+  return data.draft === false && date !== null && date.getTime() <= now.getTime() && time !== null && (time === undefined || time.getTime() <= now.getTime());
 }
 
 export function readPosts(root, report) {
@@ -358,7 +368,9 @@ export function validateSource(root = projectRoot, now = new Date()) {
     if (data.draft !== undefined && typeof data.draft !== 'boolean') report(file, 'draft', 'Use the YAML boolean true or false, not quoted text. Omitted draft defaults to true.');
     if (data.section !== undefined && !['devlog', 'life'].includes(data.section)) report(file, 'section', 'Choose devlog or life.');
     const date = isoDate(data.date);
-    if (data.draft !== false || (date && date.getTime() > now.getTime())) continue;
+    const time = publishTime(data.publishAt);
+    if (time === null) report(file, 'publishAt', 'Use a UTC time such as 2026-09-26T16:00:00Z, or remove it.');
+    if (data.draft !== false || (date && date.getTime() > now.getTime()) || (time && time.getTime() > now.getTime())) continue;
     text(data.title, file, 'title', true);
     if (typeof data.permalink !== 'string' || !permalinkPattern.test(data.permalink)) report(file, 'permalink', 'Provide a lowercase slug containing letters, digits and single hyphens, for example my-post.');
     if (!date) report(file, 'date', 'Provide a real calendar date in YYYY-MM-DD format.');

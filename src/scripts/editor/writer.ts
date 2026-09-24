@@ -12,7 +12,7 @@ import '../../styles/owner-editor.css';
 type Section = 'devlog' | 'life';
 type MediaItem = { type: 'image' | 'video' | 'audio'; src: string; alt: string; caption: string; poster: string };
 type Model = {
-  section: Section; draft: boolean; title: string; permalink: string; date: string; excerpt: string;
+  section: Section; draft: boolean; title: string; permalink: string; date: string; publishAt: string; excerpt: string;
   tags: string[]; featured: boolean; cover: string; coverAlt: string; media: MediaItem[]; body: string;
 };
 
@@ -51,6 +51,7 @@ function readModel(content: string): { model: Model; photos: string[] } {
       title: stringValue(data.title),
       permalink: stringValue(data.permalink),
       date,
+      publishAt: data.publishAt instanceof Date ? data.publishAt.toISOString() : stringValue(data.publishAt),
       excerpt: stringValue(data.excerpt),
       tags: Array.isArray(data.tags) ? data.tags.filter((tag): tag is string => typeof tag === 'string') : [],
       featured: data.featured === true,
@@ -78,6 +79,7 @@ function composePost(original: string | null, before: Model | undefined, model: 
   assign('title', model.title, false);
   assign('permalink', model.permalink, !model.permalink);
   assign('date', model.date, !model.date);
+  assign('publishAt', model.publishAt, !model.publishAt);
   assign('excerpt', model.excerpt, !model.excerpt.trim());
   assign('tags', model.tags, !model.tags.length);
   assign('featured', model.featured, !model.featured);
@@ -266,9 +268,9 @@ class Writer {
     this.refreshChrome();
   }
 
-  private badge(entry: { draft: boolean; date: string }): HTMLElement {
+  private badge(entry: { draft: boolean; date: string; publishAt?: string }): HTMLElement {
     if (entry.draft) return node('span', 'Hidden', 'writer-badge writer-badge--hidden');
-    if (entry.date > today()) return node('span', `Scheduled`, 'writer-badge writer-badge--scheduled');
+    if (entry.date > today() || (entry.publishAt && Date.parse(entry.publishAt) > Date.now())) return node('span', `Scheduled`, 'writer-badge writer-badge--scheduled');
     return node('span', 'Public', 'writer-badge writer-badge--public');
   }
 
@@ -294,7 +296,7 @@ class Writer {
     this.path = undefined;
     this.mediaTouched = true;
     this.slugTouched = false;
-    this.model = { section, draft: false, title: '', permalink: '', date: today(), excerpt: '', tags: [], featured: false, cover: '', coverAlt: '', media: [], body: '' };
+    this.model = { section, draft: false, title: '', permalink: '', date: today(), publishAt: '', excerpt: '', tags: [], featured: false, cover: '', coverAlt: '', media: [], body: '' };
     this.render(true);
   }
 
@@ -473,12 +475,16 @@ class Writer {
       return group;
     };
     const visibilityHint = node('p', '', 'owner-hint');
+    const localTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'full', timeStyle: 'short' });
     const describeVisibility = () => {
+      const at = model.publishAt ? Date.parse(model.publishAt) : NaN;
       visibilityHint.textContent = model.draft
         ? 'Hidden entries are saved to GitHub so you can keep working on any device, but they do not show on the website. The repository is public, so the text can be read there.'
-        : model.date > today()
-          ? `Scheduled: it appears on ${formatDate(model.date)}. The website rebuilds every night just after midnight (UTC).`
-          : 'Shows on the website when you publish.';
+        : at > Date.now()
+          ? `Scheduled: it goes live ${localTime.format(at)} (your time). The website checks every 15 minutes, so allow a few minutes after that.`
+          : model.date > today()
+            ? `Scheduled: it appears on ${formatDate(model.date)}, shortly after midnight UTC.`
+            : 'Shows on the website when you publish.';
     };
     body.append(
       segmented('Journal', [['devlog', 'Devlog'], ['life', 'Life']], model.section, value => { model.section = value; this.changed(); this.syncAddress(); }),
@@ -491,7 +497,40 @@ class Writer {
     date.addEventListener('change', () => { model.date = date.value || today(); date.value = model.date; describeVisibility(); this.changed(); });
     const dateField = node('label', undefined, 'writer-field');
     dateField.append(node('span', 'Date', 'writer-field__label'), date);
-    body.append(dateField, this.tagsField());
+    // A go-live time, entered in local time and stored in UTC; the shown date follows it.
+    const localValue = (iso: string) => { const time = new Date(iso); const offset = time.getTimezoneOffset() * 60000; return new Date(time.getTime() - offset).toISOString().slice(0, 16); };
+    const timed = node('label', undefined, 'owner-check');
+    const timedBox = node('input');
+    timedBox.type = 'checkbox';
+    timedBox.checked = Boolean(model.publishAt);
+    timed.append(timedBox, node('span', 'Go live at a set time'));
+    const when = node('input', undefined, 'owner-field');
+    when.type = 'datetime-local';
+    when.setAttribute('aria-label', 'Go-live time');
+    when.hidden = !model.publishAt;
+    if (model.publishAt) when.value = localValue(model.publishAt);
+    const applyTime = () => {
+      const time = when.value ? new Date(when.value) : undefined;
+      if (!time || !Number.isFinite(time.getTime())) return;
+      model.publishAt = time.toISOString().replace(/\.\d{3}Z$/, 'Z');
+      model.date = when.value.slice(0, 10);
+      date.value = model.date;
+      describeVisibility();
+      this.changed();
+    };
+    timedBox.addEventListener('change', () => {
+      when.hidden = !timedBox.checked;
+      if (timedBox.checked) {
+        // Start from the next full hour, or 09:00 on the chosen day if that is later.
+        const next = new Date(); next.setMinutes(0, 0, 0); next.setHours(next.getHours() + 1);
+        const morning = new Date(`${model.date}T09:00`);
+        when.value = localValue((morning > next ? morning : next).toISOString());
+        applyTime();
+        when.focus();
+      } else { model.publishAt = ''; describeVisibility(); this.changed(); }
+    });
+    when.addEventListener('change', applyTime);
+    body.append(dateField, timed, when, this.tagsField());
     const featured = node('label', undefined, 'owner-check');
     const box = node('input');
     box.type = 'checkbox';

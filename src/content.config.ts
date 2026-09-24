@@ -21,6 +21,8 @@ const posts = defineCollection({
     title: z.string().default(''),
     permalink: z.string().default(''),
     date: z.union([z.string(), z.date()]).optional().transform(calendarDate),
+    // Optional go-live moment (UTC). The entry stays off the site until a build after it.
+    publishAt: z.union([z.string(), z.date()]).optional().transform(value => (value === undefined || value === '' ? undefined : new Date(value))),
     excerpt: z.string().default(''),
     draft: z.boolean().default(true),
     section: z.enum(['devlog', 'life']).default('devlog'),
@@ -38,7 +40,7 @@ const posts = defineCollection({
     })).default([]),
   }).superRefine((post, context) => {
     // Unfinished excluded entries must not stop the public site from building.
-    if (post.draft || post.date.getTime() > Date.now()) return;
+    if (post.draft || post.date.getTime() > Date.now() || !(post.publishAt === undefined || post.publishAt.getTime() <= Date.now())) return;
     const required = (path: string, message: string) => {
       context.addIssue({ code: 'custom', path: [path], message });
     };

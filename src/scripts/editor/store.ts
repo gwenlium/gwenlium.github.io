@@ -40,6 +40,7 @@ export type EntrySummary = {
   section: 'devlog' | 'life';
   draft: boolean;
   date: string;
+  publishAt: string;
   cover: string;
   changed: boolean;
   isNew: boolean;
@@ -230,6 +231,7 @@ function entryFrom(path: string, content: string, changed: boolean, isNew: boole
     section: data.section === 'life' ? 'life' : 'devlog',
     draft: data.draft !== false,
     date,
+    publishAt: data.publishAt instanceof Date ? data.publishAt.toISOString() : typeof data.publishAt === 'string' ? data.publishAt : '',
     cover: typeof data.cover === 'string' ? data.cover : '',
   };
 }

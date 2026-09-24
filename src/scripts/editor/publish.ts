@@ -29,10 +29,12 @@ function describe(file: EditorDraftFile): Change {
     let wasPublic = false;
     try { wasPublic = file.baseContent !== null && (bindingDocument(file.baseContent, true).value as Record<string, unknown>).draft === false; } catch { /* Unknown. */ }
     const isPublic = data.draft === false;
+    const dateValue = data.date instanceof Date ? data.date.toISOString().slice(0, 10) : String(data.date ?? '');
+    const scheduled = isPublic && (Date.parse(String(data.publishAt ?? '')) > Date.now() || dateValue > new Date().toISOString().slice(0, 10));
     if (file.deleted) return { file, label: `Delete “${title}”`, detail: `${journal} entry${wasPublic ? ', removed from the website' : ''}`, problems: [], summary: `Delete ${journal} entry: ${title}` };
     const detail = [
       `${journal}`,
-      file.baseContent === null ? (isPublic ? 'new, public' : 'new, hidden draft') : isPublic && !wasPublic ? 'now public' : !isPublic && wasPublic ? 'now hidden' : isPublic ? 'public' : 'hidden draft',
+      scheduled ? (file.baseContent === null ? 'new, scheduled' : 'scheduled') : file.baseContent === null ? (isPublic ? 'new, public' : 'new, hidden draft') : isPublic && !wasPublic ? 'now public' : !isPublic && wasPublic ? 'now hidden' : isPublic ? 'public' : 'hidden draft',
     ].join(', ');
     if (isPublic && !String(data.title ?? '').trim()) problems.push('Give it a title.');
     const missing = missingPictureDescriptions(body);

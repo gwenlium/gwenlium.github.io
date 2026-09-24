@@ -117,6 +117,14 @@ export async function GET(): Promise<Response> {
           if ((hasGameContent || hasWindowOverride('game-trailer')) && !game.description && !gameLinks.length) return undefined;
           break;
         case 'post-related': if (!relatedPost) return undefined; break;
+        // Same rule as the entry page: only entries with media have a media window.
+        case 'post-media': {
+          const newest = posts[0];
+          const media = newest && (newest.data.cover || newest.data.photos.length || newest.data.media.length
+            || /!\[|<(?:img|video|audio|iframe)\b/i.test(newest.rendered?.html ?? newest.body ?? '') || hasWindowOverride('post-media'));
+          if (!media) return undefined;
+          break;
+        }
       }
     }
     const page = builtin

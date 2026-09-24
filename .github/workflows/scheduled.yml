@@ -1,0 +1,27 @@
+name: Publish scheduled entries
+
+# Every 15 minutes: if an entry's date or go-live time passed since the live build,
+# start the normal build and deploy. Nothing is built when nothing is due.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+      - id: due
+        run: node scripts/scheduled-due.mjs
+      - if: steps.due.outputs.build == 'true'
+        run: gh workflow run deploy.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
