@@ -321,6 +321,8 @@ function navigateHistory(event: HashChangeEvent) {
 window.addEventListener('hashchange', navigateHistory, listenerOptions);
 window.addEventListener('pagehide', disposeReaders, listenerOptions);
 window.addEventListener('pageshow', initializeReaders, listenerOptions);
+// Crossing the paired-layout width moves pictures into or out of the text; rebuild the reading steps.
+pairedDesktop.addEventListener('change', () => { disposeReaders(); initializeReaders(); }, listenerOptions);
 document.addEventListener('astro:before-swap', disposeReaders, listenerOptions);
 document.addEventListener('astro:page-load', initializeReaders, listenerOptions);
 initializeReaders();

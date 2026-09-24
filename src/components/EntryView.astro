@@ -130,6 +130,7 @@ const { section, title, date, dateLabel, tags, excerpt, sourceFile, contents, me
   .article-layout { display: grid; align-items: start; gap: 1.5rem; max-width: 60rem; margin-inline: auto; }
   .article-main { display: grid; gap: 1.5rem; min-width: 0; }
   .article-window, .article-media-slot, .article-related-slot { min-width: 0; }
+  .article-media-slot[data-entry-media-none] { display: none; }
   .article-window:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))), .article-media-slot:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))), .article-related-slot:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))) { display: none; }
   .entry { max-width: 48rem; margin: 0 auto; padding: clamp(.25rem, 2cqi, 1.5rem); }
   .entry-header { margin-bottom: clamp(1.25rem, 4cqi, 2rem); }

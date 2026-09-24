@@ -2,6 +2,8 @@ type SceneDetail = { viewerId: string; itemId?: string; active: boolean };
 type Relocation = { node: HTMLElement; marker: HTMLSpanElement; container: HTMLElement };
 type Viewer = {
   source: HTMLElement;
+  /** Whether pictures from the text were moved into this window (only beside the text). */
+  pulled: boolean;
   select: (itemId: string) => void;
   reveal: (target: HTMLElement) => HTMLElement | undefined;
   setPrinting: (printing: boolean) => void;
@@ -11,6 +13,10 @@ type Viewer = {
 const viewers = new Map<HTMLElement, Viewer>();
 const lifetime = new AbortController();
 const listenerOptions = { signal: lifetime.signal };
+// The media window sits beside the text only on wide screens (EntryView's paired layout, the same
+// width dialogue-reader pairs at). Narrower, it stacks under the whole entry, so pictures in the
+// text stay where they were written.
+const sideBySide = window.matchMedia('(min-width: 1000px)');
 
 function pauseMedia(root: HTMLElement) {
   root.querySelectorAll<HTMLMediaElement>('video, audio').forEach(media => media.pause());
@@ -66,6 +72,7 @@ function createViewer(root: HTMLElement, source: HTMLElement): Viewer | undefine
   const reader = source.closest('[data-dialogue-reader]');
   const sources = source.matches('[data-dialogue-blocks]') ? [source] : Array.from(source.querySelectorAll<HTMLElement>('[data-dialogue-blocks]'));
   let inlineIndex = 0;
+  const pulled = sideBySide.matches;
 
   function move(node: HTMLElement, container: HTMLElement, item: HTMLElement, blocks: HTMLElement) {
     let block = node;
@@ -80,7 +87,7 @@ function createViewer(root: HTMLElement, source: HTMLElement): Viewer | undefine
     mediaOnly.add(block === node ? marker : block);
   }
 
-  for (const blocks of sources) {
+  for (const blocks of pulled ? sources : []) {
     for (const candidate of blocks.querySelectorAll<HTMLElement>('figure, picture, img, video, audio, iframe')) {
       const excluded = candidate.closest('script, style, noscript, template, [hidden]:not([data-dialogue-hidden])');
       if (!blocks.contains(candidate) || candidate.closest('[data-dialogue-blocks]') !== blocks
@@ -117,6 +124,9 @@ function createViewer(root: HTMLElement, source: HTMLElement): Viewer | undefine
   }
 
   const items = Array.from(list.children).filter((item): item is HTMLElement => item instanceof HTMLElement && item.hasAttribute('data-entry-media-item'));
+  // Stacked under the text with nothing of its own to show, the window would only say it is empty.
+  const slot = root.closest<HTMLElement>('.article-media-slot');
+  if (slot && !pulled && !items.length) slot.dataset.entryMediaNone = '';
   const autoplay = Array.from(list.querySelectorAll<HTMLMediaElement>('video[autoplay], audio[autoplay]'));
   autoplay.forEach(media => { media.autoplay = false; });
   pauseMedia(list);
@@ -194,6 +204,7 @@ function createViewer(root: HTMLElement, source: HTMLElement): Viewer | undefine
 
   return {
     source,
+    pulled,
     select,
     setPrinting,
     reveal(target) {
@@ -219,6 +230,7 @@ function createViewer(root: HTMLElement, source: HTMLElement): Viewer | undefine
       controls.hidden = selection.hidden = empty.hidden = true;
       status.textContent = '';
       delete root.dataset.entryMediaReady;
+      if (slot) delete slot.dataset.entryMediaNone;
     },
   };
 }
@@ -246,7 +258,8 @@ export function initializeEntryMedia(): void {
     return;
   }
   for (const [root, viewer] of viewers) {
-    if (!root.isConnected || !viewer.source.isConnected || document.getElementById(root.dataset.entryMediaSource || '') !== viewer.source) {
+    if (!root.isConnected || !viewer.source.isConnected || document.getElementById(root.dataset.entryMediaSource || '') !== viewer.source
+      || viewer.pulled !== sideBySide.matches) {
       viewer.dispose();
       viewers.delete(root);
     }
