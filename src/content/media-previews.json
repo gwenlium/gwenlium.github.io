@@ -60,6 +60,13 @@
       "width": 800,
       "height": 450
     },
+    "/media/c-2026-09-22-22-55-15-7-preview-bd79c321eaee25ccdc65e1e9574a6e4a.mp4": {
+      "sha256": "bd79c321eaee25ccdc65e1e9574a6e4a7f56a15993754e18a15cd92e0d5a1908",
+      "kind": "video",
+      "width": 1280,
+      "height": 720,
+      "duration": 34.197
+    },
     "/media/gwendolyn-drawing-preview-34802e58d25184674929d847caa7e270.webp": {
       "sha256": "3989b02c6d274b8e41a7eb750aa1b49fb9d6272c63afd5245a67675e67c8b75c",
       "kind": "image",

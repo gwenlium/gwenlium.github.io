@@ -8,6 +8,11 @@ excerpt: A first but very early build of the combat phrases of the Memory Blade.
 tags:
   - Proto:ReCompute
 featured: true
+media:
+  - type: video
+    src: /media/c-2026-09-22-22-55-15-7-preview-bd79c321eaee25ccdc65e1e9574a6e4a.mp4
+    alt: Combat Demo 1
+    caption: ""
 ---
 The Memory Blade is the first weapon the player gets introduced to. Ever played DMC or the 3D Zelda games? Well if you do you'll feel the familiarity while playing. I took inspiration of the stylish combat animations of The Wind Waker while crossing it with the VFX of the DMC series. The result is snappy! You got your light attack combos, heavy attack combos, variation of these two and an air launcher with its dedicated aerial combo phrases:  
 
