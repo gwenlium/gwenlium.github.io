@@ -11,6 +11,8 @@ interface Props {
   sizes?: string;
   loop?: boolean;
   muted?: boolean;
+  /** For thumbnails: show an animation's still first frame (opening it still plays the animation). */
+  still?: boolean;
   editFile?: string;
   editField?: string;
   editAltField?: string;
@@ -24,15 +26,20 @@ interface ImageRecord {
   height: number;
   src: string;
   sources: { avif: ImageVariant[]; webp: ImageVariant[] };
+  /** The variants are an animation's still first frame (see scripts/prepare-media.mjs). */
+  still?: boolean;
 }
 
-const { src, alt = '', caption = '', type = 'image', poster = '', eager = false, loop = false, muted = false } = Astro.props;
+const { src, alt = '', caption = '', type = 'image', poster = '', eager = false, loop = false, muted = false, still = false } = Astro.props;
 const { editFile, editField, editAltField, editCaptionField, editLabel = 'Image' } = Astro.props;
 let sourceKey = src;
 try { sourceKey = decodeURIComponent(new URL(src, Astro.site || 'https://gwenlium.dev').pathname); }
 catch { /* Keep malformed escape sequences as authored. */ }
 const images = manifest as Record<string, ImageRecord>;
-const image = images[src] || (src.startsWith('/media/') ? images[sourceKey] : undefined);
+const record = images[src] || (src.startsWith('/media/') ? images[sourceKey] : undefined);
+// An animation's variants are still frames: use them only where a still was asked for.
+const image = record?.still && !still ? undefined : record;
+const frame = record?.still && still ? record.sources.webp.at(-1)?.src : undefined;
 const srcset = (variants: ImageVariant[]) => variants.map((variant) => `${variant.src} ${variant.width}w`).join(', ');
 const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px) 85vw, 1200px';
 ---
@@ -49,7 +56,7 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
           data-site-edit-alt-field={editAltField}
           data-site-edit-format={editFile && editField ? 'image' : undefined}
           data-site-edit-label={editFile && editField ? editLabel : undefined}
-          src={image?.src || src}
+          src={frame || image?.src || src}
           alt={alt}
           width={image?.width}
           height={image?.height}

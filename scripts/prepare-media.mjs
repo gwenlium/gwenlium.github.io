@@ -47,11 +47,45 @@ async function walk(directory) {
   return files;
 }
 
+/** AVIF and WebP widths of one picture (a GIF's first frame when given one); undefined if encoding failed. */
+async function variants(input, sourceUrl, width, key) {
+  const maximum = Math.min(width, options.maxWidth);
+  const widths = options.widths.filter((candidate) => candidate <= maximum);
+  if (!widths.includes(maximum)) widths.push(maximum);
+  const hash = createHash('sha256').update(input).update(key).digest('hex').slice(0, 32);
+  const sources = { avif: [], webp: [] };
+  for (const format of ['avif', 'webp']) {
+    for (const variantWidth of widths) {
+      const name = `${hash}-${variantWidth}.${format}`;
+      const destination = path.join(outputDirectory, name);
+      if (await exists(destination)) counts.cached++;
+      else {
+        const temporary = `${destination}.tmp-${process.pid}`;
+        try {
+          const image = sharp(input).rotate().resize({ width: variantWidth, withoutEnlargement: true });
+          await image[format](options[format]).toFile(temporary);
+          await rename(temporary, destination);
+          counts.generated++;
+        } catch (error) {
+          // A format unsupported by this sharp build must not make a valid original unusable.
+          if (['EACCES', 'EPERM', 'ENOSPC', 'EROFS'].includes(error.code)) throw error;
+          console.warn(`[media] Could not encode ${sourceUrl} as ${format}; preview source preserved. ${error.message}`);
+          return undefined;
+        } finally {
+          await rm(temporary, { force: true });
+        }
+      }
+      sources[format].push({ src: `/_generated/media/${name}`, width: variantWidth });
+    }
+  }
+  return sources;
+}
+
+const counts = { generated: 0, cached: 0 };
+
 async function prepareMedia() {
   const files = await walk(mediaDirectory);
   const manifest = {};
-  let generated = 0;
-  let cached = 0;
   let preserved = 0;
   await mkdir(outputDirectory, { recursive: true });
 
@@ -67,7 +101,27 @@ async function prepareMedia() {
       }
       continue;
     }
-    // GIF and SVG are intentionally never converted or flattened.
+    // GIFs are never converted or flattened; places that only need a thumbnail (post cards,
+    // link previews) get still first-frame variants instead, so a list never downloads a whole
+    // animation. `still: true` marks those variants: Media uses them only when asked for a still.
+    if (extension === '.gif') {
+      const input = await readFile(filename);
+      let metadata;
+      try { metadata = await sharp(input).metadata(); }
+      catch (error) {
+        console.warn(`[media] Could not inspect ${sourceUrl}; no still preview. ${error.message}`);
+        preserved++;
+        continue;
+      }
+      const width = metadata.width;
+      const height = metadata.pageHeight || metadata.height;
+      if (!width || !height) { preserved++; continue; }
+      const sources = await variants(input, sourceUrl, width, `${optionKey}:still`);
+      if (!sources) { preserved++; continue; }
+      manifest[sourceKey] = { width, height, src: sourceUrl, sources, still: true };
+      continue;
+    }
+    // SVG is intentionally never converted.
     if (!Object.hasOwn(imageExtensions, extension)) continue;
 
     const input = await readFile(filename);
@@ -87,40 +141,8 @@ async function prepareMedia() {
     const rotatesDimensions = [5, 6, 7, 8].includes(metadata.orientation || 1);
     const width = rotatesDimensions ? metadata.height : metadata.width;
     const height = rotatesDimensions ? metadata.width : metadata.height;
-    const maximum = Math.min(width, options.maxWidth);
-    const widths = options.widths.filter((candidate) => candidate <= maximum);
-    if (!widths.includes(maximum)) widths.push(maximum);
-    const hash = createHash('sha256').update(input).update(optionKey).digest('hex').slice(0, 32);
-    const sources = { avif: [], webp: [] };
-    let failed = false;
-
-    for (const format of ['avif', 'webp']) {
-      for (const variantWidth of widths) {
-        const name = `${hash}-${variantWidth}.${format}`;
-        const destination = path.join(outputDirectory, name);
-        if (await exists(destination)) cached++;
-        else {
-          const temporary = `${destination}.tmp-${process.pid}`;
-          try {
-            const image = sharp(input).rotate().resize({ width: variantWidth, withoutEnlargement: true });
-            await image[format](options[format]).toFile(temporary);
-            await rename(temporary, destination);
-            generated++;
-          } catch (error) {
-            // A format unsupported by this sharp build must not make a valid original unusable.
-            if (['EACCES', 'EPERM', 'ENOSPC', 'EROFS'].includes(error.code)) throw error;
-            console.warn(`[media] Could not encode ${sourceUrl} as ${format}; preview source preserved. ${error.message}`);
-            failed = true;
-          } finally {
-            await rm(temporary, { force: true });
-          }
-        }
-        if (failed) break;
-        sources[format].push({ src: `/_generated/media/${name}`, width: variantWidth });
-      }
-      if (failed) break;
-    }
-    if (failed) { preserved++; continue; }
+    const sources = await variants(input, sourceUrl, width, optionKey);
+    if (!sources) { preserved++; continue; }
     manifest[sourceKey] = { width, height, src: sourceUrl, sources };
   }
 
@@ -148,7 +170,7 @@ async function prepareMedia() {
       await rename(temporary, manifestPath);
     } finally { await rm(temporary, { force: true }); }
   }
-  console.log(`[media] ${Object.keys(manifest).length} images; ${generated} variants generated, ${cached} cached${preserved ? `, ${preserved} originals preserved without variants` : ''}.`);
+  console.log(`[media] ${Object.keys(manifest).length} images; ${counts.generated} variants generated, ${counts.cached} cached${preserved ? `, ${preserved} originals preserved without variants` : ''}.`);
 }
 
 prepareMedia().catch((error) => {

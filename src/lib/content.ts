@@ -2,6 +2,8 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import { load } from 'cheerio';
 import { relative, resolve, sep } from 'node:path';
 import { previewText } from './preview-text.mjs';
+import { mediaKindOf } from './embed.mjs';
+import manifest from '../generated/media.json';
 
 export type Post = CollectionEntry<'posts'>;
 
@@ -52,6 +54,25 @@ function postBodyText(post: Post): string {
 
 export function postSearchText(post: Post): string {
   return [post.data.title, post.data.excerpt, ...post.data.tags, postBodyText(post)].join(' ').replace(/\s+/g, ' ');
+}
+
+/**
+ * The picture that stands for a post in lists and link previews: its cover, otherwise the first
+ * picture it has (media list, then text). `still` is a small first frame for an animation.
+ */
+export function postPicture(post: Post): { src: string; alt: string; derived: boolean; still?: string } | undefined {
+  const found = (src: string, alt: string, derived: boolean) => {
+    const record = (manifest as Record<string, { still?: boolean; sources?: { webp?: { src: string; width: number }[] } }>)[src];
+    const still = record?.still ? record.sources?.webp?.at(-1)?.src : undefined;
+    return { src, alt, derived, ...(still ? { still } : {}) };
+  };
+  if (post.data.cover) return found(post.data.cover, post.data.coverAlt ?? '', false);
+  if (post.data.photos[0]) return found(post.data.photos[0], '', true);
+  const media = post.data.media.find(item => item.type === 'image' && item.src);
+  if (media) return found(media.src, media.alt ?? '', true);
+  for (const match of (post.body ?? '').matchAll(/!\[((?:\\.|[^\]\\])*)\]\(\s*<?([^\s)>]+)>?(?:\s+"[^"]*")?\s*\)/g)) {
+    if (mediaKindOf(match[2]) === 'image') return found(match[2], match[1].replace(/\\(.)/g, '$1'), true);
+  }
 }
 
 export function postPreview(post: Post): string {

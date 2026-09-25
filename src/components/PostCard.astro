@@ -1,17 +1,20 @@
 ---
 import Media from './Media.astro';
 import Icon from './Icon.astro';
-import { formatDate, postUrl, postSourceFile, postPreview, type Post } from '../lib/content';
+import { formatDate, postUrl, postSourceFile, postPreview, postPicture, type Post } from '../lib/content';
 
 interface Props { post: Post; compact?: boolean }
 const { post, compact = false } = Astro.props;
-const { title, date, cover, coverAlt, tags } = post.data;
+const { title, date, tags } = post.data;
 const sourceFile = postSourceFile(post);
 const preview = postPreview(post);
+// Without a cover, the post's first picture stands in (an animation as its still first frame).
+const picture = postPicture(post);
+const edit = picture && !picture.derived ? { editFile: sourceFile, editField: '/cover', editAltField: '/coverAlt', editLabel: 'Post cover' } : {};
 ---
 
-<article class:list={['post-card', { 'has-cover': cover, 'post-card--compact': compact }]}>
-  {cover && <div class="post-cover">{compact ? <a href={postUrl(post)} aria-label={`Read ${title}`}><Media src={cover} alt={coverAlt} sizes="80px" editFile={sourceFile} editField="/cover" editAltField="/coverAlt" editLabel="Post cover" /></a> : <Media src={cover} alt={coverAlt} editFile={sourceFile} editField="/cover" editAltField="/coverAlt" editLabel="Post cover" />}</div>}
+<article class:list={['post-card', { 'has-cover': picture, 'post-card--compact': compact }]}>
+  {picture && <div class="post-cover">{compact ? <a href={postUrl(post)} aria-label={`Read ${title}`}><Media src={picture.src} alt={picture.alt} sizes="80px" still {...edit} /></a> : <Media src={picture.src} alt={picture.alt} still {...edit} />}</div>}
   <div class="post-details">
     <a class="tag" href={`/${post.data.section}/`}>{post.data.section === 'life' ? 'Life' : 'Devlog'}</a>
     <time datetime={date.toISOString().slice(0, 10)}>{formatDate(date)}</time>

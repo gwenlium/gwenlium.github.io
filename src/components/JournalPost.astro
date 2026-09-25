@@ -2,7 +2,7 @@
 import { render } from 'astro:content';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import EntryView from './EntryView.astro';
-import { getPosts, postUrl, postSourceFile, postPreview, formatDate, type Post } from '../lib/content';
+import { getPosts, postUrl, postSourceFile, postPreview, postPicture, formatDate, type Post } from '../lib/content';
 import { hasWindowOverride } from '../lib/windows';
 
 interface Props { post: Post; newer?: Post; older?: Post }
@@ -24,10 +24,12 @@ const mediaItems = [
   ...post.data.photos.map((src, index) => ({ src, type: 'image' as const, alt: '', editFile: sourceFile, editField: `/photos/${index}`, editLabel: 'Post photo' })),
   ...post.data.media.map((item, index) => ({ ...item, editFile: sourceFile, editField: `/media/${index}/src`, editAltField: `/media/${index}/alt`, editCaptionField: `/media/${index}/caption` })),
 ];
+const picture = postPicture(post);
 const hasEntryMedia = mediaItems.length > 0 || /!\[|<(?:img|video|audio|iframe)\b/i.test(post.rendered?.html ?? post.body ?? '') || hasWindowOverride('post-media');
 ---
 
-<SiteLayout title={post.data.title} description={postPreview(post)} image={post.data.cover} imageAlt={post.data.coverAlt} article>
+{/* Link previews use the cover, else the first picture; an animation as its still first frame. */}
+<SiteLayout title={post.data.title} description={postPreview(post)} image={picture && (picture.still ?? picture.src)} imageAlt={picture?.alt} article>
   <EntryView section={post.data.section} title={post.data.title} date={post.data.date} dateLabel={formatDate(post.data.date)} tags={post.data.tags}
     excerpt={post.data.excerpt} sourceFile={sourceFile} contents={contents} mediaItems={mediaItems} hasEntryMedia={hasEntryMedia}
     shareUrl={shareUrl} older={link(older)} newer={link(newer)} related={related}><Content /></EntryView>

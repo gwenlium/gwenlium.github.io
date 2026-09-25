@@ -12,6 +12,8 @@ const coverSource = (src: string, minimumWidth: number) => {
   try { sourceKey = decodeURIComponent(new URL(src, Astro.site || 'https://gwenlium.dev').pathname); }
   catch { /* Keep malformed escape sequences as authored. */ }
   const image = images[src] || (src.startsWith('/media/') ? images[sourceKey] : undefined);
+  // An animated cover keeps playing: its variants are only a still first frame.
+  if ((image as { still?: boolean } | undefined)?.still) return src;
   const variants = image?.sources.webp.length ? image.sources.webp : image?.sources.avif;
   if (!variants?.length) return src;
   const suitable = variants.filter((variant) => variant.width >= minimumWidth);
