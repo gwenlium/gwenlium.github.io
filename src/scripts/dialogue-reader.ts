@@ -39,7 +39,8 @@ function scrollReaderTarget(root: HTMLElement, target: HTMLElement, block: 'star
 }
 
 function isIllustration(block: HTMLElement): boolean {
-  if (!(block.matches('img') || block.querySelector('img')) || block.querySelector('video, audio, iframe')) return false;
+  const picture = 'img, video[data-animation]';
+  if (!(block.matches(picture) || block.querySelector(picture)) || block.querySelector('video:not([data-animation]), audio, iframe')) return false;
   const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
   let node: Node | null;
   while ((node = walker.nextNode())) {

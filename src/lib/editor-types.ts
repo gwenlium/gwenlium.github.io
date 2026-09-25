@@ -3,7 +3,11 @@ export interface EditorFileInfo { path: string; sha: string; size: number }
 export interface EditorSnapshot { head: string; branch: string; repository: string; owner: EditorOwner; files: EditorFileInfo[] }
 export interface EditorFile { path: string; sha: string; content: string }
 export interface EditorChange { path: string; content: string }
-export interface EditorMediaEntry { sha256: string; kind: 'image' | 'video' | 'audio'; width?: number; height?: number; duration?: number }
+/**
+ * A prepared file's registry entry. `loop` marks a video that plays like a GIF (muted, looping,
+ * no controls); `poster` is its registered still first frame (a WebP preview).
+ */
+export interface EditorMediaEntry { sha256: string; kind: 'image' | 'video' | 'audio'; width?: number; height?: number; duration?: number; loop?: true; poster?: string }
 /** A prepared file the browser already uploaded to GitHub: `blob` is its Git blob SHA, `size` its bytes. */
 export interface EditorMediaUpload { path: string; blob: string; size: number; entry: EditorMediaEntry }
 export interface EditorPublishRequest { baseCommit: string; changes: EditorChange[]; media: EditorMediaUpload[]; deletions?: string[]; message?: string }

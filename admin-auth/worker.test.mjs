@@ -397,6 +397,39 @@ test('editor never force-updates a racing publication or reports a rejected ref 
   }
 });
 
+test('editor publishes an animation (looping video) together with its still, and refuses broken animation entries', async t => {
+  const hex = (character, length) => character.repeat(length);
+  const stillUrl = `/media/clip-still-preview-${hex('1', 32)}.webp`;
+  const videoUrl = `/media/clip-preview-${hex('2', 32)}.mp4`;
+  const still = { path: `public${stillUrl}`, blob: hex('a', 40), size: 2048, entry: { sha256: hex('1', 64), kind: 'image', width: 800, height: 450 } };
+  const video = { path: `public${videoUrl}`, blob: hex('b', 40), size: 409600, entry: { sha256: hex('2', 64), kind: 'video', width: 800, height: 450, duration: 3.3, loop: true, poster: stillUrl } };
+  const post = { path: 'src/content/posts/clip.md', content: `---\ntitle: Clip\ndraft: false\npermalink: clip\ndate: 2026-09-24\nsection: devlog\n---\n**Label**\n\n![A looping clip](${videoUrl})\n` };
+  {
+    const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
+    const response = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ changes: [post], media: [still, video] }) });
+    assert.equal(response.status, 200, await response.clone().text());
+    const tree = fixture.writes.find(write => write.path.endsWith('/git/trees')).body.tree;
+    assert.equal(tree.find(item => item.path === video.path).sha, video.blob);
+    assert.equal(tree.find(item => item.path === still.path).sha, still.blob);
+    const registry = JSON.parse(tree.find(item => item.path === 'src/content/media-previews.json').content).files;
+    assert.deepEqual(registry[videoUrl], video.entry);
+    assert.deepEqual(registry[stillUrl], still.entry);
+  }
+  const broken = [
+    { media: [video] },
+    { media: [still, { ...video, entry: { ...video.entry, poster: `/media/clip-still-preview-${hex('3', 32)}.webp` } }] },
+    { media: [{ ...still, entry: { ...still.entry, loop: true } }] },
+    { media: [still, { ...video, entry: { ...video.entry, loop: undefined } }] },
+    { media: [{ ...video, entry: { ...video.entry, poster: `/media/clip-still-preview-${hex('1', 32)}.gif` } }] },
+  ];
+  for (const body of broken) {
+    const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
+    const response = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ changes: [post], ...body }) });
+    assert.equal(response.status, 400, JSON.stringify(body));
+    assert.deepEqual(fixture.writes, []);
+  }
+});
+
 test('editor publishes text, prepared media and server-merged registry in one atomic commit', async t => {
   const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
   const sha256 = createHash('sha256').update(preparedBytes).digest('hex');

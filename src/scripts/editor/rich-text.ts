@@ -13,6 +13,8 @@ export type RichTextOptions = {
   /** Prepare local files and stage them; resolves with the staged picture URLs. */
   addPictures(files: File[]): Promise<string[]>;
   chooseFromLibrary(): Promise<string | undefined>;
+  /** Which prepared videos are animations (shown looping and muted, like on the site). */
+  mediaInfo?(src: string): { loop?: true; poster?: string } | undefined;
   /** Crop or turn a picture in the text; `open` resolves with the new picture's address. */
   crop?: { available(src: string): boolean; open(src: string): Promise<string | undefined> };
   onChange(markdown: string): void;
@@ -150,6 +152,13 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
         const render = () => {
           const src = String(node.attrs.src ?? '');
           if (image.dataset.src !== src) { image.dataset.src = src; (image as HTMLImageElement | HTMLMediaElement).src = options.resolveMedia(src); }
+          if (image instanceof HTMLVideoElement) {
+            const info = options.mediaInfo?.(src);
+            const animated = Boolean(info?.loop);
+            Object.assign(image, { muted: animated, loop: animated, autoplay: animated, playsInline: true, controls: !animated });
+            if (info?.poster) image.poster = options.resolveMedia(info.poster);
+            if (animated && image.paused) void image.play().catch(() => undefined);
+          }
           if (image instanceof HTMLImageElement) image.alt = String(node.attrs.alt ?? '');
           if (document.activeElement !== input) input.value = String(node.attrs.alt ?? '');
           dom.classList.toggle('is-missing', !String(node.attrs.alt ?? '').trim());

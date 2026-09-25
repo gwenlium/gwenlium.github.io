@@ -436,6 +436,7 @@ class Writer {
       resolveMedia: url => this.store.resolveMedia(url),
       addPictures: async files => (await stageFiles(this.store, files, text => { this.status.textContent = text; })).map(file => file.url),
       chooseFromLibrary: () => chooseFromLibrary(this.store, true),
+      mediaInfo: url => this.store.mediaInfo(url),
       crop: { available: canCrop, open: src => cropPicture(this.store, src, text => { this.status.textContent = text; }) },
       onChange: markdown => { model.body = markdown; this.changed(); },
       onStatus: text => { this.status.textContent = text; },

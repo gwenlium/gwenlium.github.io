@@ -53,6 +53,8 @@ export async function stageFiles(store: SiteEditorStore, files: File[], onStatus
         onStatus(`That ${noun} was too long to publish in full, so the first minute was kept.`);
       }
     } else prepared = await preparePreview(file, { creator, name, signal, onProgress });
+    // An animation's still goes in first: the video's registry entry names it.
+    if (prepared.poster) await store.addMedia(prepared.poster);
     const url = await store.addMedia(prepared);
     if (kind === 'image') rememberOriginal(url, file);
     staged.push({ url, kind: prepared.entry.kind, name: file.name.replace(/\.[^.]+$/, '') });

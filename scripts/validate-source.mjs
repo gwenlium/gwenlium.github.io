@@ -39,7 +39,9 @@ export function readMediaPreviews(root, report) {
       report(file, field, `Use only importer-generated /media/name-preview-hash.webp, .gif, .mp3 or .mp4 paths. ${importInstruction}`);
       continue;
     }
-    if (!isObject(entry) || Object.keys(entry).some((key) => !['sha256', 'kind', 'width', 'height', 'duration'].includes(key)) ||
+    if (!isObject(entry) || Object.keys(entry).some((key) => !['sha256', 'kind', 'width', 'height', 'duration', 'loop', 'poster'].includes(key)) ||
+        (entry.loop !== undefined && (entry.loop !== true || entry.kind !== 'video')) ||
+        (entry.poster !== undefined && (entry.loop !== true || typeof entry.poster !== 'string' || previewPathPattern.exec(entry.poster)?.[2] !== 'webp')) ||
         typeof entry.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(entry.sha256) || entry.kind !== previewKinds[match[2]] ||
         ['width', 'height'].some((key) => entry[key] !== undefined && (!Number.isSafeInteger(entry[key]) || entry[key] <= 0)) ||
         (entry.duration !== undefined && (typeof entry.duration !== 'number' || !Number.isFinite(entry.duration) || entry.duration <= 0))) {
@@ -47,6 +49,10 @@ export function readMediaPreviews(root, report) {
       continue;
     }
     previews[url] = entry;
+  }
+  // An animation's poster must itself be a registered still picture.
+  for (const [url, entry] of Object.entries(previews)) {
+    if (entry.poster && previews[entry.poster]?.kind !== 'image') report(file, `files[${JSON.stringify(url)}].poster`, `The poster ${entry.poster} is not a registered still picture. ${importInstruction}`);
   }
   return previews;
 }

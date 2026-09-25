@@ -61,11 +61,20 @@ function metadata(path: string, value: unknown): EditorMediaEntry {
   const match = previewPattern.exec(path);
   requireValue(match && match[1].length <= 64, 'Only prepared preview media paths are allowed.');
   const entry = object(value);
-  keys(entry, ['sha256', 'kind', 'width', 'height', 'duration']);
+  keys(entry, ['sha256', 'kind', 'width', 'height', 'duration', 'loop', 'poster']);
   requireValue(typeof entry.sha256 === 'string' && /^[a-f0-9]{64}$/.test(entry.sha256) && entry.kind === kinds[match[3]], 'Invalid preview digest or media kind.');
   for (const field of ['width', 'height']) if (entry[field] !== undefined) requireValue(Number.isSafeInteger(entry[field]) && Number(entry[field]) > 0 && Number(entry[field]) <= 8192, 'Invalid preview dimensions.');
   if (entry.duration !== undefined) requireValue(typeof entry.duration === 'number' && Number.isFinite(entry.duration) && entry.duration > 0 && entry.duration <= 86400, 'Invalid preview duration.');
+  // Animations are looping videos with a still first frame for thumbnails.
+  requireValue(entry.loop === undefined || (entry.loop === true && entry.kind === 'video'), 'Only videos can loop like an animation.');
+  requireValue(entry.poster === undefined || (entry.loop === true && typeof entry.poster === 'string' && previewPattern.exec(entry.poster)?.[3] === 'webp'), 'An animation poster must be a prepared WebP still.');
   return entry as unknown as EditorMediaEntry;
+}
+
+/** Posters count as used while the animation that shows them is used. */
+export function withPosters(used: Set<string>, previews: Record<string, EditorMediaEntry>): Set<string> {
+  for (const [url, entry] of Object.entries(previews)) if (entry.poster && used.has(url)) used.add(entry.poster);
+  return used;
 }
 export function previewRegistry(content: string): Record<string, EditorMediaEntry> {
   const registry = parseJson(content);
@@ -118,6 +127,7 @@ export function publishPayload(value: unknown): EditorPublishRequest {
 }
 
 export function validateContent(files: Map<string, string>, previews: Record<string, EditorMediaEntry>, exists: (path: string) => boolean, siteOrigin: string): void {
+  for (const entry of Object.values(previews)) requireValue(!entry.poster || previews[entry.poster]?.kind === 'image', 'An animation poster must be a registered still picture.');
   const text = (value: unknown, required = false): value is string => {
     requireValue(value === undefined && !required || typeof value === 'string' && (!required || value.trim()), required ? 'A required text field is missing.' : 'Expected a text field.');
     return typeof value === 'string' && value.trim().length > 0;

@@ -163,11 +163,17 @@ function fill(): void {
   excerpt.hidden = !payload.excerpt.trim();
 
   const body = root.querySelector<HTMLElement>('[data-preview-body]')!;
-  body.replaceChildren(renderMarkdownPreview(payload.body));
+  body.replaceChildren(renderMarkdownPreview(payload.body, undefined, url => ownerStore().mediaInfo(url)));
   for (const image of body.querySelectorAll('img')) {
     image.dataset.previewSrc = image.getAttribute('src') ?? '';
     image.decoding = 'async';
     image.dataset.zoom = '';
+  }
+  // Video and audio in the text (animations too) play the draft's files as well.
+  for (const media of body.querySelectorAll<HTMLMediaElement>('video, audio')) {
+    media.dataset.previewSrc = media.getAttribute('src') ?? '';
+    const poster = media.getAttribute('poster');
+    if (poster) media.dataset.previewPoster = poster;
   }
   const slug = slugger();
   const headings = [...body.querySelectorAll<HTMLHeadingElement>('h2, h3')];

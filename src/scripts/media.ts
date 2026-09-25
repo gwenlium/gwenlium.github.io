@@ -22,6 +22,9 @@ const interactionStyles = `
 
 let pageController: AbortController | undefined;
 let videoObserver: IntersectionObserver | undefined;
+// Animations (prepared looping videos) play like GIFs while in view; with reduced motion they
+// wait, with controls, for the reader to start them.
+const calmMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let lightbox: HTMLDialogElement | undefined;
 let lightboxTrigger: HTMLElement | undefined;
 let previousOverflow = '';
@@ -167,12 +170,18 @@ function initializeMedia() {
   const videos = document.querySelectorAll<HTMLVideoElement>('video:not(.media-dialog video)');
   if ('IntersectionObserver' in window) {
     videoObserver = new IntersectionObserver((entries) => {
-      for (const entry of entries) if (!entry.isIntersecting) (entry.target as HTMLVideoElement).pause();
+      for (const entry of entries) {
+        const video = entry.target as HTMLVideoElement;
+        if (!entry.isIntersecting) video.pause();
+        else if (video.hasAttribute('data-animation') && !calmMotion.matches && !video.closest('[hidden]')) void video.play().catch(() => undefined);
+      }
     }, { threshold: 0 });
     videos.forEach((video) => videoObserver!.observe(video));
   }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) document.querySelectorAll('video').forEach((video) => video.pause());
+    // Back on the tab: observing again restarts the animations that are in view.
+    else videos.forEach((video) => { videoObserver?.unobserve(video); videoObserver?.observe(video); });
   }, { signal });
 
   document.querySelectorAll<HTMLButtonElement>('[data-copy-feed]').forEach((button) => {
@@ -202,3 +211,15 @@ function beforePageSwap() {
 document.addEventListener('astro:before-swap', beforePageSwap);
 document.addEventListener('astro:page-load', initializeMedia);
 initializeMedia();
+
+// Reduced motion: animations stop and offer controls. Otherwise the observer above plays them.
+function settleAnimations(): void {
+  for (const video of document.querySelectorAll<HTMLVideoElement>('video[data-animation]')) {
+    video.autoplay = !calmMotion.matches;
+    video.controls = calmMotion.matches;
+    if (calmMotion.matches) video.pause();
+    else if (videoObserver) { videoObserver.unobserve(video); videoObserver.observe(video); }
+  }
+}
+document.addEventListener('astro:page-load', settleAnimations);
+calmMotion.addEventListener('change', settleAnimations);

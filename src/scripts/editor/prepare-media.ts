@@ -6,7 +6,7 @@ import { normalizeWatermarkCredit, watermarkCreditError, watermarkLayout } from 
 
 type PreviewMetadata =
   | { kind: 'image'; width: number; height: number; duration?: number }
-  | { kind: 'video'; width: number; height: number; duration: number }
+  | { kind: 'video'; width: number; height: number; duration: number; loop?: true; poster?: string }
   | { kind: 'audio'; duration: number };
 export type PreviewInputKind = 'image' | 'animation' | 'audio' | 'video';
 
@@ -14,6 +14,8 @@ export type PreparedPreview = {
   file: File;
   url: string;
   entry: PreviewMetadata & { sha256: string };
+  /** An animation's still first frame, staged before the video that names it. */
+  poster?: PreparedPreview;
 };
 
 type PreviewOptions = {
@@ -32,7 +34,7 @@ type Settings = PreviewOptions & { start: number; duration: number };
 type Dimensions = { width: number; height: number };
 type CanvasSurface = { element: HTMLCanvasElement; context: CanvasRenderingContext2D };
 type Raster = Dimensions & { mime: string; delays?: number[] };
-type Generated = { blob: Blob; extension: 'webp' | 'gif' | 'mp4' | 'mp3'; entry: PreviewMetadata };
+type Generated = { blob: Blob; extension: 'webp' | 'gif' | 'mp4' | 'mp3'; entry: PreviewMetadata; poster?: Blob };
 type ImageFrame = CanvasImageSource & { displayWidth: number; displayHeight: number; close(): void };
 type AnimationDecoder = {
   tracks: { ready: Promise<void>; selectedTrack?: { frameCount: number } };
@@ -381,6 +383,27 @@ async function watermark(creator: string, size: Dimensions): Promise<HTMLCanvasE
   return mark.element;
 }
 
+/** A frame with (almost) nothing on it, judged away from the watermark corner. */
+function nearlyBlank(frame: HTMLCanvasElement): boolean {
+  const sample = canvas({ width: 32, height: 18 });
+  try {
+    sample.context.drawImage(frame, 0, 0, frame.width * 0.75, frame.height * 0.75, 0, 0, 32, 18);
+    const { data } = sample.context.getImageData(0, 0, 32, 18);
+    let sum = 0; let squares = 0;
+    for (let index = 0; index < data.length; index += 4) {
+      const luma = 0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2];
+      sum += luma; squares += luma * luma;
+    }
+    const count = data.length / 4;
+    return Math.sqrt(Math.max(0, squares / count - (sum / count) ** 2)) < 6;
+  } finally { sample.element.width = sample.element.height = 1; }
+}
+
+async function bitmapSize(blob: Blob, signal?: AbortSignal): Promise<Dimensions> {
+  const bitmap = await decodeBitmap(blob, signal);
+  try { return { width: bitmap.width, height: bitmap.height }; } finally { bitmap.close(); }
+}
+
 async function decodeBitmap(blob: Blob, signal?: AbortSignal, resizeWidth?: number): Promise<ImageBitmap> {
   if (typeof createImageBitmap !== 'function') fail('This browser needs createImageBitmap support to prepare image previews safely.');
   return abortable(createImageBitmap(blob, { imageOrientation: 'from-image', ...(resizeWidth ? { resizeWidth, resizeQuality: 'high' as const } : {}) }), signal, (image) => image.close());
@@ -684,6 +707,8 @@ async function animation(data: ArrayBuffer, raster: Raster, options: Settings): 
   const close = () => decoder.close();
   options.signal?.addEventListener('abort', close, { once: true });
   const surfaces: { frame?: CanvasSurface; mark?: HTMLCanvasElement } = {};
+  let poster: Blob | undefined;
+  let firstStill: Blob | undefined;
   try {
     await abortable(decoder.tracks.ready, options.signal);
     if (decoder.tracks.selectedTrack?.frameCount !== delays.length) fail('The browser could not identify every animation frame. Nothing was flattened or prepared.');
@@ -702,9 +727,18 @@ async function animation(data: ArrayBuffer, raster: Raster, options: Settings): 
             surfaces.mark = await watermark(options.creator, size);
           }
           const { frame: surface, mark } = surfaces;
-          surface.context.clearRect(0, 0, surface.element.width, surface.element.height);
+          // Video has no transparency: see-through parts of a GIF become white.
+          surface.context.fillStyle = '#fff';
+          surface.context.fillRect(0, 0, surface.element.width, surface.element.height);
           surface.context.drawImage(decoded.image, 0, 0, surface.element.width, surface.element.height);
           surface.context.drawImage(mark!, surface.element.width - mark!.width, surface.element.height - mark!.height);
+          // The still that lists and link previews show: the first frame with something on it
+          // (clips often open on a blank or faded frame), else the very first one.
+          if (!poster) {
+            const still = async () => new Blob([stripWebpMetadata(new Uint8Array(await bytes(await encodeCanvas(surface.element, 'image/webp', options.signal), options.signal)))], { type: 'image/webp' });
+            if (position === 0) firstStill = await still();
+            if (!nearlyBlank(surface.element)) poster = position === 0 ? firstStill : await still();
+          }
           const blob = await encodeCanvas(surface.element, 'image/png', options.signal);
           frameBytes += blob.size;
           if (frameBytes > animationFrameBytes) fail('This animation has too many frames to prepare in the browser. Trim it to a shorter clip first.');
@@ -714,42 +748,40 @@ async function animation(data: ArrayBuffer, raster: Raster, options: Settings): 
         } finally { decoded.image.close(); }
         progress(options, (position + 1) / frames.length * 0.55);
       }
+      poster ??= firstStill;
+      // The concat demuxer drops the last listed duration unless that frame is listed once more.
+      concat.push(`file frame-${frames.length - 1}.png`);
       await ffmpeg.writeFile('frames.ffconcat', concat.join('\n') + '\n');
       // This concat file contains only generated constant-prefix filenames, never user input.
       const sequence = ['-protocol_whitelist', 'file,pipe', '-format_whitelist', 'concat,png_pipe,image2', '-f', 'concat', '-safe', '0', '-i', 'frames.ffconcat'];
-      // A GIF over the publish limit is tried again smaller before giving up.
+      // A short looping video: a tenth of the size of the same GIF. Over the limit, try smaller.
       for (const [attempt, edge] of animationEdges.entries()) {
-        const target = bounded(size!.width, size!.height, edge);
-        const scale = target.width === size!.width && target.height === size!.height ? 'null' : `scale=${target.width}:${target.height}:flags=lanczos`;
-        const palette = `palette-${attempt}.png`;
-        const name = `preview-${attempt}.gif`;
+        const bound = bounded(size!.width, size!.height, edge);
+        const target = { width: Math.max(2, bound.width - (bound.width % 2)), height: Math.max(2, bound.height - (bound.height % 2)) };
+        const name = `preview-${attempt}.mp4`;
         const share = 0.45 / animationEdges.length;
-        // Two passes avoid buffering every decoded frame while a global palette is built.
-        await execute(ffmpeg, [...sequence, '-vf', `${scale},palettegen=reserve_transparent=1`, '-frames:v', '1', '-an', '-sn', '-dn', ...stripMetadata, palette]);
         const update = ({ time }: { time: number }) => progress(options, 0.55 + share * attempt + Math.min(1, Math.max(0, time / (duration * 1_000_000))) * share);
         ffmpeg.on('progress', update);
         try {
-          await execute(ffmpeg, [...sequence, ...input(palette, 'png_pipe'),
-            '-filter_complex', `[0:v]${scale}[frames];[frames][1:v]paletteuse=dither=sierra2_4a[preview]`,
-            '-map', '[preview]', '-vsync', 'vfr', '-enc_time_base', '1:100', '-an', '-sn', '-dn', ...stripMetadata,
-            '-loop', '0', '-final_delay', String(frames.at(-1)!.delay / 10), '-fs', String(outputBytes + 1), name]);
+          await execute(ffmpeg, [...sequence, '-vf', `scale=${target.width}:${target.height}:flags=lanczos,format=yuv420p`, '-vsync', 'vfr',
+            '-an', '-sn', '-dn', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p',
+            ...stripMetadata, '-metadata:s:v:0', 'rotate=0', '-fs', String(outputBytes + 1), '-movflags', '+faststart', name]);
         } finally { ffmpeg.off('progress', update); }
         const output = await binary(ffmpeg, name);
-        if (!output.length) fail('The generated GIF is empty. Nothing was prepared.');
+        if (!output.length) fail('The generated animation is empty. Nothing was prepared.');
         if (output.length > outputBytes) continue;
-        const verified = inspectRaster(output);
-        const actualDuration = (verified.delays ?? []).reduce((sum, delay) => sum + delay, 0) / 1000;
-        if (verified.width !== target.width || verified.height !== target.height || actualDuration <= 0 || (!options.fullLength && actualDuration > 60) || Math.abs(actualDuration - duration) > 0.011) {
-          fail('The generated GIF failed its dimension or timing bounds. Nothing was prepared.');
+        const result = await probe(ffmpeg, name);
+        const stream = result.streams?.find((item) => item.codec_type === 'video');
+        const blob = new Blob([output], { type: 'video/mp4' });
+        const visible = await viewableMedia(blob, options.signal);
+        if (stream?.width !== target.width || stream.height !== target.height || visible.width !== target.width || visible.height !== target.height
+          || !Number.isFinite(visible.duration) || visible.duration <= 0 || (!options.fullLength && visible.duration > 60) || Math.abs(visible.duration - duration) > 0.25) {
+          fail('The generated animation failed its dimension or timing bounds. Nothing was prepared.');
         }
-        const blob = new Blob([output], { type: 'image/gif' });
-        const bitmap = await decodeBitmap(blob, options.signal);
-        try {
-          if (bitmap.width !== target.width || bitmap.height !== target.height) fail('This browser cannot display the generated GIF correctly.');
-        } finally { bitmap.close(); }
-        return { blob, extension: 'gif', entry: { kind: 'image', ...target, duration: actualDuration } };
+        if (!poster) fail('The animation still could not be made. Nothing was prepared.');
+        return { blob, extension: 'mp4', entry: { kind: 'video', ...target, duration: visible.duration, loop: true }, poster };
       }
-      return fail('Even at 400 pixels this animation is over the 32 MiB publishing limit. Trim it to a shorter clip first; a few seconds works best as a GIF.');
+      return fail('Even at 400 pixels this animation is over the 32 MiB publishing limit. Trim it to a shorter clip first.');
     });
   } finally {
     options.signal?.removeEventListener('abort', close);
@@ -791,10 +823,19 @@ async function prepare(file: File, options: Settings, hasTiming: boolean): Promi
   const digest = await abortable(crypto.subtle.digest('SHA-256', await bytes(generated.blob, options.signal)), options.signal);
   const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
   checkAbort(options.signal);
+  let poster: PreparedPreview | undefined;
+  if (generated.poster) {
+    const still = await bitmapSize(generated.poster, options.signal);
+    const posterDigest = await abortable(crypto.subtle.digest('SHA-256', await bytes(generated.poster, options.signal)), options.signal);
+    const posterSha = Array.from(new Uint8Array(posterDigest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    const posterName = `${(options.name || 'animation').slice(0, 58).replace(/-+$/, '')}-still-preview-${posterSha.slice(0, 32)}.webp`;
+    poster = { file: new File([generated.poster], posterName, { type: 'image/webp', lastModified: 0 }), url: `/media/${posterName}`, entry: { sha256: posterSha, kind: 'image', ...still } };
+  }
   const name = `${options.name || generated.entry.kind}-preview-${sha256.slice(0, 32)}.${generated.extension}`;
   const output = new File([generated.blob], name, { type: generated.blob.type, lastModified: 0 });
   progress(options, 1);
-  return { file: output, url: `/media/${name}`, entry: { sha256, ...generated.entry } };
+  const entry = { sha256, ...generated.entry, ...(poster ? { poster: poster.url } : {}) } as PreparedPreview['entry'];
+  return { file: output, url: `/media/${name}`, entry, ...(poster ? { poster } : {}) };
 }
 
 /** Only re-encoded listening/viewing copies are returned; this module never uploads media. */

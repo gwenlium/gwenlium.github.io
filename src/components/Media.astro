@@ -1,5 +1,6 @@
 ---
 import manifest from '../generated/media.json';
+import registry from '../content/media-previews.json';
 
 interface Props {
   src: string;
@@ -40,6 +41,9 @@ const record = images[src] || (src.startsWith('/media/') ? images[sourceKey] : u
 // An animation's variants are still frames: use them only where a still was asked for.
 const image = record?.still && !still ? undefined : record;
 const frame = record?.still && still ? record.sources.webp.at(-1)?.src : undefined;
+// A prepared animation: a looping, muted video without controls (like a GIF).
+const animation = type === 'video' ? (registry.files as Record<string, { loop?: boolean; poster?: string; width?: number; height?: number }>)[src] : undefined;
+const animated = animation?.loop === true;
 const srcset = (variants: ImageVariant[]) => variants.map((variant) => `${variant.src} ${variant.width}w`).join(', ');
 const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px) 85vw, 1200px';
 ---
@@ -69,6 +73,9 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
           data-zoom-caption={caption}
         />
       </picture>
+    ) : animated ? (
+      <video class="media-animation" src={src} poster={poster || animation?.poster} width={animation?.width} height={animation?.height}
+        autoplay muted loop playsinline preload="metadata" disablepictureinpicture draggable="false" aria-label={alt || caption || 'Animation'} data-animation></video>
     ) : type === 'video' ? (
       <div class="media-video">
         <video

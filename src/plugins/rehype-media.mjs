@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { mediaKindOf, videoEmbed } from '../lib/embed.mjs';
 
 const manifestFile = new URL('../generated/media.json', import.meta.url);
+const registryFile = new URL('../content/media-previews.json', import.meta.url);
 const sizes = '(min-width: 1200px) 960px, (min-width: 800px) calc(100vw - 280px), calc(100vw - 48px)';
 
 /** Add responsive sources without rendering Markdown or changing author-owned links/captions. */
@@ -13,6 +14,11 @@ export default function rehypeMedia() {
     if (error.code !== 'ENOENT') throw new Error(`Cannot read the generated media manifest: ${error.message}`, { cause: error });
     manifest = {};
   }
+
+  // Which prepared videos are animations (looping, muted, no controls) and their stills.
+  let registry = {};
+  try { registry = JSON.parse(fs.readFileSync(registryFile, 'utf8')).files ?? {}; }
+  catch (error) { if (error.code !== 'ENOENT') throw new Error(`Cannot read the media registry: ${error.message}`, { cause: error }); }
 
   return (tree) => {
     const visit = (parent) => {
@@ -46,8 +52,14 @@ export default function rehypeMedia() {
         const kind = mediaKindOf(original);
         if (kind !== 'image') {
           const label = typeof properties.alt === 'string' ? properties.alt : '';
+          const entry = registry[original];
           parent.children[index] = {
-            type: 'element', tagName: kind, properties: {
+            type: 'element', tagName: kind, properties: entry?.loop ? {
+              // An animation: plays like a GIF (src/scripts/media.ts pauses it for reduced motion).
+              src: original, dataAnimation: '', autoPlay: true, muted: true, loop: true, playsInline: true, preload: 'metadata',
+              disablePictureInPicture: true, ...(entry.poster ? { poster: entry.poster } : {}), ...(entry.width ? { width: entry.width, height: entry.height } : {}),
+              ...(label ? { ariaLabel: label } : {}),
+            } : {
               src: original, controls: true, preload: 'none', ...(kind === 'video' ? { playsInline: true, controlslist: 'nodownload' } : {}),
               ...(label ? { ariaLabel: label } : {}),
             }, children: [],

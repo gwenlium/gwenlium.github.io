@@ -482,6 +482,7 @@ class OwnerControls {
       resolveMedia: url => this.store.resolveMedia(url),
       addPictures: async files => (await stageFiles(this.store, files, text => { status.textContent = text; })).map(file => file.url),
       chooseFromLibrary: () => chooseFromLibrary(this.store, true),
+      mediaInfo: url => this.store.mediaInfo(url),
       crop: { available: canCrop, open: src => cropPicture(this.store, src, text => { status.textContent = text; }) },
       onChange: () => undefined,
       onStatus: text => { status.textContent = text; },
@@ -657,7 +658,7 @@ class OwnerControls {
           if (!text.trim()) {
             const source = String(await this.store.get({ ...target, field: '/body' }) ?? '');
             if (version !== this.rendering || !element.isConnected) return;
-            const fragment = renderMarkdownPreview(source, url => this.store.resolveMedia(url));
+            const fragment = renderMarkdownPreview(source, url => this.store.resolveMedia(url), url => this.store.mediaInfo(url));
             fragment.querySelectorAll('p, li, pre, blockquote, h1, h2, h3, h4, h5, h6, br').forEach(block => block.append(' '));
             text = fragment.textContent ?? '';
           }
@@ -665,7 +666,7 @@ class OwnerControls {
         } else if (element.dataset.siteEditTemplate === 'post-summary') {
           element.replaceChildren(...String(value ?? '').split(/\n\s*\n/).map(text => node('p', text, 'entry-excerpt')));
         } else if (target.format === 'markdown') {
-          element.replaceChildren(renderMarkdownPreview(String(value ?? ''), url => this.store.resolveMedia(url)));
+          element.replaceChildren(renderMarkdownPreview(String(value ?? ''), url => this.store.resolveMedia(url), url => this.store.mediaInfo(url)));
         } else {
           const text = String(value ?? '');
           const shown = element.dataset.siteEditTemplate === 'site-name'
@@ -734,7 +735,7 @@ class OwnerControls {
       if (body && item.content === 'text') {
         const prose = node('div', undefined, 'prose window-authored-text');
         annotate(prose, binding(windowsFile, `/windows/@${item.id}/body`, 'Window text', 'markdown'));
-        prose.append(renderMarkdownPreview(item.body, url => this.store.resolveMedia(url)));
+        prose.append(renderMarkdownPreview(item.body, url => this.store.resolveMedia(url), url => this.store.mediaInfo(url)));
         body.replaceChildren(prose);
       }
       document.dispatchEvent(new CustomEvent('gwenlium:editor-windows-changed'));

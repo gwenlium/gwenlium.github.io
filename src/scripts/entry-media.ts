@@ -157,6 +157,9 @@ function createViewer(root: HTMLElement, source: HTMLElement): Viewer | undefine
     }
     selected = index;
     items[index].hidden = false;
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      for (const animation of items[index].querySelectorAll<HTMLVideoElement>('video[data-animation]')) void animation.play().catch(() => undefined);
+    }
     buttons[index].setAttribute('aria-pressed', 'true');
     previous!.disabled = index === 0;
     next!.disabled = index === items.length - 1;

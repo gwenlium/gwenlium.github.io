@@ -4,6 +4,7 @@ import { relative, resolve, sep } from 'node:path';
 import { previewText } from './preview-text.mjs';
 import { mediaKindOf } from './embed.mjs';
 import manifest from '../generated/media.json';
+import registry from '../content/media-previews.json';
 
 export type Post = CollectionEntry<'posts'>;
 
@@ -66,12 +67,20 @@ export function postPicture(post: Post): { src: string; alt: string; derived: bo
     const still = record?.still ? record.sources?.webp?.at(-1)?.src : undefined;
     return { src, alt, derived, ...(still ? { still } : {}) };
   };
+  // An animation (a prepared looping video) stands in with its registered still.
+  const posterOf = (src: string) => (registry.files as Record<string, { loop?: boolean; poster?: string }>)[src]?.poster;
   if (post.data.cover) return found(post.data.cover, post.data.coverAlt ?? '', false);
   if (post.data.photos[0]) return found(post.data.photos[0], '', true);
-  const media = post.data.media.find(item => item.type === 'image' && item.src);
-  if (media) return found(media.src, media.alt ?? '', true);
+  for (const item of post.data.media) {
+    if (item.type === 'image' && item.src) return found(item.src, item.alt ?? '', true);
+    const poster = item.type === 'video' ? posterOf(item.src) : undefined;
+    if (poster) return found(poster, item.alt ?? '', true);
+  }
   for (const match of (post.body ?? '').matchAll(/!\[((?:\\.|[^\]\\])*)\]\(\s*<?([^\s)>]+)>?(?:\s+"[^"]*")?\s*\)/g)) {
-    if (mediaKindOf(match[2]) === 'image') return found(match[2], match[1].replace(/\\(.)/g, '$1'), true);
+    const alt = match[1].replace(/\\(.)/g, '$1');
+    if (mediaKindOf(match[2]) === 'image') return found(match[2], alt, true);
+    const poster = mediaKindOf(match[2]) === 'video' ? posterOf(match[2]) : undefined;
+    if (poster) return found(poster, alt, true);
   }
 }
 

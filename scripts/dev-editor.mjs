@@ -132,7 +132,7 @@ export default function devEditor() {
               const previews = content.previewRegistry(await fs.readFile(path.join(root, content.registryPath), 'utf8'));
               const texts = [];
               for (const file of current.files) if (file.path !== content.registryPath) texts.push(await fs.readFile(path.join(root, file.path), 'utf8'));
-              const used = await mediaInUse(root, texts);
+              const used = content.withPosters(await mediaInUse(root, texts), previews);
               return send(response, 200, { head: current.head, media: Object.entries(previews).filter(([mediaUrl]) => !used.has(mediaUrl)).map(([mediaUrl, entry]) => ({ url: mediaUrl, entry })) });
             }
             if (url.pathname === `${prefix}/publish` && request.method === 'POST') {
@@ -151,7 +151,7 @@ export default function devEditor() {
               }
               for (const change of payload.changes) files.set(change.path, change.content);
               if (removedMedia.length) {
-                const used = await mediaInUse(root, [...files.values()]);
+                const used = content.withPosters(await mediaInUse(root, [...files.values()]), previews);
                 const blocked = removedMedia.find(file => used.has(file.slice(6)));
                 if (blocked) return send(response, 400, { error: `${blocked.slice(13)} is still used, so it cannot be deleted.` });
               }

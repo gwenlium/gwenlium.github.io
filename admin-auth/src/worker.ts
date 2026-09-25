@@ -1,4 +1,4 @@
-import { contentPath, decodeBase64, EditorError, maxRequestBytes, maxTextBytes, mediaFilePattern, previewRegistry, publishPayload, registryPath, shaPattern, validateContent } from './editor-content';
+import { contentPath, decodeBase64, EditorError, maxRequestBytes, maxTextBytes, mediaFilePattern, previewRegistry, publishPayload, registryPath, shaPattern, validateContent, withPosters } from './editor-content';
 import type { EditorFileInfo, EditorMediaEntry, EditorOwner } from '../../src/lib/editor-types';
 
 interface Env {
@@ -859,7 +859,7 @@ async function publishEditor(request: Request, repository: EditorRepository, tok
   for (const [path, content] of await editorFiles(repository, unchanged, token)) files.set(path, content);
   for (const change of payload.changes) files.set(change.path, change.content);
   if (removedMedia.length) {
-    const used = await mediaInUse(repository, token, files);
+    const used = withPosters(await mediaInUse(repository, token, files), previews);
     for (const path of removedMedia) {
       const url = path.slice(6);
       if (!used.has(url)) continue;
@@ -1010,7 +1010,7 @@ async function editor(request: Request, url: URL, config: Configuration): Promis
       const contents = await editorFiles(repository, [...contentPaths, registryPath], token);
       const previews = previewRegistry(contents.get(registryPath)!);
       contents.delete(registryPath);
-      const used = await mediaInUse(repository, token, contents);
+      const used = withPosters(await mediaInUse(repository, token, contents), previews);
       const media = Object.entries(previews).filter(([url]) => !used.has(url) && regularFile(repository, `public${url}`)).map(([url, entry]) => ({ url, entry }));
       return analyticsJson({ head: repository.head, media }, 200, config);
     }

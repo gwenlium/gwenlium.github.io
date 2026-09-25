@@ -242,6 +242,7 @@ export async function openAboutDetails(store: SiteEditorStore, onSaved: () => Pr
     resolveMedia: url => store.resolveMedia(url),
     addPictures: async files => (await stageFiles(store, files, onStatus)).map(file => file.url),
     chooseFromLibrary: () => chooseFromLibrary(store, true),
+    mediaInfo: url => store.mediaInfo(url),
     crop: { available: canCrop, open: src => cropPicture(store, src, onStatus) },
     onChange: () => undefined, onStatus,
   });

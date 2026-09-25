@@ -181,7 +181,9 @@ function mediaEntry(value: unknown, url: string, staged = true): EditorMediaEntr
   if (!match || !entry || typeof entry !== 'object' || Array.isArray(entry)
     || typeof entry.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(entry.sha256) || (staged && !entry.sha256.startsWith(match[1]))
     || !['image', 'video', 'audio'].includes(entry.kind)
-    || Object.keys(entry).some(key => !['sha256', 'kind', 'width', 'height', 'duration'].includes(key))
+    || Object.keys(entry).some(key => !['sha256', 'kind', 'width', 'height', 'duration', 'loop', 'poster'].includes(key))
+    || (entry.loop !== undefined && (entry.loop !== true || entry.kind !== 'video'))
+    || (entry.poster !== undefined && (entry.loop !== true || typeof entry.poster !== 'string' || previewPath.exec(entry.poster)?.[2] !== 'webp'))
     || (entry.kind === 'image' && !['webp', 'gif'].includes(match[2]))
     || (entry.kind === 'video' && match[2] !== 'mp4') || (entry.kind === 'audio' && match[2] !== 'mp3')) {
     throw new Error('Only prepared media previews can be staged.');
@@ -437,6 +439,8 @@ export class SiteEditorStore {
       this.session = session;
       this.warning = undefined;
       this.emit();
+      // Learn which published videos are animations, so editors show them the way the site does.
+      void this.media().then(() => this.emit(), () => undefined);
       // Drafts made against an older version are re-based quietly when nothing conflicts.
       if (session.files.size && session.snapshot.head !== verified.head) void this.refresh().catch(() => undefined);
     } finally {
@@ -662,6 +666,7 @@ export class SiteEditorStore {
     const [raw, site] = await Promise.all([this.source(session, registryPath), this.source(session, sitePath)]);
     this.active(session);
     const registry = registryFrom(raw);
+    this.knownMedia = registry.files;
     for (const media of session.media.values()) {
       const existing = registry.files[media.url];
       if (existing && existing.sha256 !== media.entry.sha256) throw new Error('A private preview conflicts with the published media registry.');
@@ -673,6 +678,13 @@ export class SiteEditorStore {
     if (!creator) throw new Error('Set your site display name or watermark text before adding pictures.');
     return { registry, creator };
   }
+
+  /** A prepared file's entry if known here (staged in this draft, or seen in the published registry). */
+  mediaInfo(url: string): EditorMediaEntry | undefined {
+    return this.session?.media.get(url)?.entry ?? this.knownMedia[url];
+  }
+
+  private knownMedia: Record<string, EditorMediaEntry> = {};
 
   mediaKind(url: string): EditorMediaEntry['kind'] | undefined {
     return this.session?.media.get(url)?.entry.kind ?? (previewPath.exec(url)?.[2] === 'mp4' ? 'video' : previewPath.exec(url)?.[2] === 'mp3' ? 'audio' : previewPath.test(url) ? 'image' : undefined);
@@ -724,6 +736,8 @@ export class SiteEditorStore {
         collectMediaReferences(parsed.value, references);
         if (parsed.parts) collectMediaReferences(parsed.parts.body, references);
       }
+      // An animation brings its still along (the registry entry names it, the text does not).
+      for (const media of session.media.values()) if (references.has(media.url) && media.entry.poster) references.add(media.entry.poster);
       const referenced = Array.from(session.media.values()).filter(media => references.has(media.url));
       return { session, baseCommit: session.snapshot.head, changes, deletions, references, referenced };
     });

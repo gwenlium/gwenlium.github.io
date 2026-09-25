@@ -16,7 +16,8 @@ function safeURL(value: string, media: boolean, localBlob = false): boolean {
   }
 }
 
-export function renderMarkdownPreview(markdown: string, resolveMedia?: (url: string) => string): DocumentFragment {
+/** `mediaInfo` says which prepared videos are animations (looping, muted, no controls) and their stills. */
+export function renderMarkdownPreview(markdown: string, resolveMedia?: (url: string) => string, mediaInfo?: (url: string) => { loop?: true; poster?: string } | undefined): DocumentFragment {
   const fragment = DOMPurify.sanitize(marked.parse(markdown, { async: false }), {
     RETURN_DOM_FRAGMENT: true,
     ALLOWED_TAGS: [
@@ -41,6 +42,11 @@ export function renderMarkdownPreview(markdown: string, resolveMedia?: (url: str
     const player = document.createElement(kind);
     player.setAttribute('src', image.getAttribute('src') ?? '');
     if (image.alt) player.setAttribute('aria-label', image.alt);
+    const info = kind === 'video' ? mediaInfo?.(image.getAttribute('src') ?? '') : undefined;
+    if (info?.loop) {
+      player.dataset.animation = '';
+      if (info.poster) player.setAttribute('poster', info.poster);
+    }
     image.replaceWith(player);
   }
   for (const paragraph of fragment.querySelectorAll('p')) {
@@ -77,7 +83,10 @@ export function renderMarkdownPreview(markdown: string, resolveMedia?: (url: str
     }
     if (element instanceof HTMLAnchorElement) element.rel = 'noopener noreferrer';
     if (element instanceof HTMLImageElement) element.loading = 'lazy';
-    if (element instanceof HTMLMediaElement) {
+    if (element instanceof HTMLVideoElement && element.hasAttribute('data-animation')) {
+      // Plays like a GIF: muted and looping, without controls.
+      Object.assign(element, { muted: true, loop: true, autoplay: true, playsInline: true, controls: false, preload: 'auto' });
+    } else if (element instanceof HTMLMediaElement) {
       element.controls = true;
       element.preload = 'none';
     }
