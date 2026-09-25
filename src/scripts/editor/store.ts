@@ -692,12 +692,25 @@ export class SiteEditorStore {
     return url;
   }
 
+  /** Progress of a publish that is running (shown in the taskbar); undefined when none is. */
+  publishing?: string;
+
   /**
    * Publish all changes, or only the listed files (and the new media they use).
    * `mediaDeletions` removes unused prepared media files (as /media/... URLs) in the same commit.
+   * It runs in the background: what goes live is fixed when it starts, uploads happen outside the
+   * edit queue so editing and saving keep working, and later edits stay as drafts.
    */
   publish(paths?: string[], options: { message?: string; mediaDeletions?: string[]; onProgress?: (text: string) => void } = {}): Promise<EditorPublishResult> {
-    return this.enqueue(async session => {
+    if (this.publishing !== undefined) return Promise.reject(failure('A publish is already running. Wait for it to finish.'));
+    const progress = (text: string) => { this.publishing = text; this.emit(); options.onProgress?.(text); };
+    progress('Publishing…');
+    return this.publishInBackground(paths, options, progress).finally(() => { this.publishing = undefined; this.emit(); });
+  }
+
+  private async publishInBackground(paths: string[] | undefined, options: { message?: string; mediaDeletions?: string[] }, progress: (text: string) => void): Promise<EditorPublishResult> {
+    // 1. Fix what goes live, from the saved drafts.
+    const plan = await this.enqueue(async session => {
       const selected = Array.from(session.files.values()).filter(file => !paths || paths.includes(file.path));
       const changes = selected.filter(file => !file.deleted).map(({ path, content }) => ({ path, content }));
       const deletions = [
@@ -712,17 +725,23 @@ export class SiteEditorStore {
         if (parsed.parts) collectMediaReferences(parsed.parts.body, references);
       }
       const referenced = Array.from(session.media.values()).filter(media => references.has(media.url));
-      // Each file goes straight to GitHub, one at a time: the editor service only names them.
-      const media: EditorMediaUpload[] = [];
-      for (const [index, item] of referenced.entries()) {
-        const size = item.file.size >= 1024 * 1024 ? `${(item.file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(item.file.size / 1024))} KB`;
-        options.onProgress?.(`Uploading ${referenced.length > 1 ? `file ${index + 1} of ${referenced.length}` : 'the file'} (${size})…`);
-        media.push({ path: `public${item.url}`, blob: await this.uploadBlob(session, item.url, item.entry, item.file), size: item.file.size, entry: item.entry });
-        this.active(session);
-      }
-      if (referenced.length) options.onProgress?.('Publishing…');
+      return { session, baseCommit: session.snapshot.head, changes, deletions, references, referenced };
+    });
+    // 2. Each file goes straight to GitHub, one at a time: the editor service only names them.
+    const media: EditorMediaUpload[] = [];
+    for (const [index, item] of plan.referenced.entries()) {
+      const size = item.file.size >= 1024 * 1024 ? `${(item.file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(item.file.size / 1024))} KB`;
+      progress(`Uploading ${plan.referenced.length > 1 ? `${index + 1} of ${plan.referenced.length}` : 'the file'} (${size})…`);
+      media.push({ path: `public${item.url}`, blob: await this.uploadBlob(plan.session, item.url, item.entry, item.file), size: item.file.size, entry: item.entry });
+      this.active(plan.session);
+    }
+    progress('Publishing…');
+    // 3. Commit, then move everything else onto the new version.
+    return this.enqueue(async session => {
+      if (session !== plan.session) throw failure('The editor reconnected while publishing. Nothing was published; publish again.');
       const message = options.message?.replace(/\s+/g, ' ').trim().slice(0, 200) || undefined;
-      const value = await this.api(session.controller, '/editor/publish', { baseCommit: session.snapshot.head, changes, media, deletions, ...(message ? { message } : {}) });
+      // The base is the version the plan was made from: a publish from elsewhere meanwhile is a conflict.
+      const value = await this.api(session.controller, '/editor/publish', { baseCommit: plan.baseCommit, changes: plan.changes, media, deletions: plan.deletions, ...(message ? { message } : {}) });
       this.active(session);
       const result = value as EditorPublishResult;
       if (!result || !/^[a-f0-9]{40}$/.test(result.commit) || typeof result.htmlUrl !== 'string'
@@ -736,16 +755,15 @@ export class SiteEditorStore {
         const status = (error as { status?: number })?.status;
         throw failure(`Published, but the editor could not reload the latest version. Reload the page before editing more. ${error instanceof Error ? error.message : ''}`, status);
       }
-      // Unselected changes stay as drafts, now based on the new version.
-      const published = new Set(selected.map(file => file.path));
+      // Unselected changes, and edits made while uploading, stay as drafts on the new version.
+      const published = new Map<string, string | null>([...plan.changes.map(change => [change.path, change.content] as const), ...plan.deletions.map(path => [path, null] as const)]);
       const remaining = new Map<string, EditorDraftFile>();
       for (const [path, file] of session.files) {
-        if (published.has(path)) continue;
-        const base = snapshot.files.some(item => item.path === path) ? await this.remote(session, snapshot, path, new Map()) : null;
+        const base = published.has(path) ? published.get(path)! : snapshot.files.some(item => item.path === path) ? await this.remote(session, snapshot, path, new Map()) : null;
         if (file.deleted) { if (base !== null) remaining.set(path, { ...file, baseContent: base }); }
         else if (file.content !== base) remaining.set(path, { ...file, baseContent: base });
       }
-      const keep = new Map(Array.from(session.media).filter(([url]) => !references.has(url)));
+      const keep = new Map(Array.from(session.media).filter(([url]) => !plan.references.has(url)));
       await this.save(session, snapshot, remaining, keep);
       this.active(session);
       // Files the publish did not touch keep their loaded content.

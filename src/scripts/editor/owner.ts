@@ -12,6 +12,7 @@ import { openPublish, resumeLiveCheck } from './publish';
 import { openAnalytics } from './analytics';
 import { openAboutDetails, openGallery, openMusic, openSiteSettings, windowContentField } from './manage';
 import { anchoredPanel, button, confirmAction, errorText, node, openDialog, toast } from './ui';
+import { navigate } from 'astro:transitions/client';
 import { hasOwnerHint } from './auth';
 import '../../styles/owner-editor.css';
 
@@ -109,7 +110,8 @@ class OwnerControls {
       void this.applyDraft();
     });
     document.addEventListener('gwenlium:editor-window-layout', event => this.saveLayout(event));
-    addEventListener('beforeunload', event => { if (this.busy || this.inline) event.preventDefault(); });
+    // Leaving the page would stop a publish that is still uploading.
+    addEventListener('beforeunload', event => { if (this.busy || this.inline || this.store.publishing !== undefined) event.preventDefault(); });
   }
 
   async start(interactive: boolean): Promise<void> {
@@ -171,10 +173,12 @@ class OwnerControls {
     const signedIn = this.store.authenticated;
     for (const control of target.querySelectorAll<HTMLElement>('[data-owner-editor]')) control.hidden = !signedIn && !this.connecting;
     const count = this.store.draftFiles.length;
+    const progress = this.store.publishing;
     for (const publish of target.querySelectorAll<HTMLButtonElement>('[data-owner-publish]')) {
-      publish.hidden = !signedIn || !count;
-      publish.textContent = this.store.local ? `Save to files (${count})` : `Publish (${count})`;
-      publish.title = count === 1 ? '1 unpublished change' : `${count} unpublished changes`;
+      publish.hidden = !signedIn || (!count && progress === undefined);
+      publish.disabled = progress !== undefined;
+      publish.textContent = progress ?? (this.store.local ? `Save to files (${count})` : `Publish (${count})`);
+      publish.title = progress !== undefined ? 'Publishing in the background' : count === 1 ? '1 unpublished change' : `${count} unpublished changes`;
     }
     if (target === document && !signedIn && this.editing) this.setEditing(false);
   }
@@ -216,7 +220,7 @@ class OwnerControls {
       element.append(node('strong', label), node('small', hint));
       return element;
     };
-    const go = (href: string) => { location.href = href; };
+    const go = (href: string) => { void navigate(href); };
     panel.append(node('p', this.store.local ? 'Editing local files' : 'Edit website', 'owner-menu__heading'));
     panel.append(item('New entry', `Write a new ${currentSection() === 'life' ? 'Life' : 'Devlog'} post`, () => go(writerUrl({ fresh: true, section: currentSection() })), true));
     if (entry) panel.append(item('Edit this entry', 'Text, pictures, tags and visibility', () => go(writerUrl({ entry }))));
@@ -377,7 +381,7 @@ class OwnerControls {
 
   private async edit(element: HTMLElement, target: EditorBinding, event: MouseEvent): Promise<void> {
     await this.inline?.finish(true);
-    if (isPostPath(target.file)) { location.href = writerUrl({ entry: target.file }); return; }
+    if (isPostPath(target.file)) { void navigate(writerUrl({ entry: target.file })); return; }
     try {
       if (target.format === 'markdown') await this.editRichText(element, target);
       else if (target.format === 'image') await this.editPicture(element, target);

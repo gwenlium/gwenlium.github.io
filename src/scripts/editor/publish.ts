@@ -72,8 +72,9 @@ export function commitMessage(summaries: string[]): string {
 
 /** Review what will go live, choose what to include, and publish it in one step. */
 export async function openPublish(store: SiteEditorStore, onPublished: () => Promise<void> | void, only?: string[]): Promise<void> {
+  if (store.publishing !== undefined) { toast('A publish is already running. The taskbar shows its progress.'); return; }
   const changes = store.draftFiles.map(describe);
-  const { dialog, body, footer, status } = openDialog(store.local ? 'Save changes to your files' : 'Publish changes', { wide: true });
+  const { dialog, body, footer } = openDialog(store.local ? 'Save changes to your files' : 'Publish changes', { wide: true });
   if (!changes.length) {
     body.append(node('p', 'There is nothing new to publish.'));
     footer.append(button('Close', () => dialog.close()));
@@ -127,37 +128,25 @@ export async function openPublish(store: SiteEditorStore, onPublished: () => Pro
   count();
   footer.append(button('Cancel', () => dialog.close()), publish);
 
-  async function run() {
+  function run() {
     const paths = [...boxes].filter(([, box]) => box.checked).map(([path]) => path);
-    footer.querySelectorAll('button').forEach(item => { item.disabled = true; });
-    boxes.forEach(box => { box.disabled = true; });
-    status.textContent = store.local ? 'Saving…' : 'Publishing… keep this page open for a moment.';
-    try {
-      const result = await store.publish(paths, {
-        message: commitMessage(changes.filter(change => paths.includes(change.file.path)).map(change => change.summary)),
-        onProgress: text => { status.textContent = `${text} Keep this page open.`; },
-      });
-      await onPublished();
-      body.replaceChildren();
-      footer.replaceChildren(button('Done', () => dialog.close(), 'owner-button owner-button--primary'));
-      status.textContent = '';
-      if (store.local) {
-        body.append(node('p', 'Saved to your local files. The dev server shows the change right away.'));
-        return;
-      }
-      body.append(node('p', 'Published. The website rebuilds itself, which usually takes a minute or two. You will get a note here when it is live.'));
-      const commit = node('a', 'See the change on GitHub', 'owner-link');
-      commit.href = result.htmlUrl; commit.target = '_blank'; commit.rel = 'noopener noreferrer';
-      body.append(commit);
+    const message = commitMessage(changes.filter(change => paths.includes(change.file.path)).map(change => change.summary));
+    // Publishing continues in the background: the taskbar shows the progress on every page.
+    const publishing = store.publish(paths, { message });
+    dialog.close();
+    toast(store.local ? 'Saving to your files…' : 'Publishing in the background. Keep working; the taskbar shows the progress.');
+    void publishing.then(async result => {
+      try { await onPublished(); } catch { /* The page that asked may be gone. */ }
+      if (store.local) { toast('Saved to your local files. The dev server shows the change right away.'); return; }
+      toast('Published. The website rebuilds itself in a minute or two; you will get a note when it is live.', { action: { label: 'See it on GitHub', href: result.htmlUrl } });
       startLiveCheck(result.commit, store.snapshot?.repository);
-    } catch (error) {
-      status.textContent = errorText(error);
-      footer.replaceChildren(button('Close', () => dialog.close()));
+    }, error => {
       if ((error as { status?: number }).status === 409) {
-        status.textContent = 'The website changed since you started (maybe from another device). Update to the latest version, then publish again.';
-        footer.append(button('Update and review', () => { dialog.close(); void resolveConflicts(store, onPublished); }, 'owner-button owner-button--primary'));
-      }
-    }
+        toast('Not published: the website changed since you started (maybe from another device). Update to the latest version, then publish again.', {
+          sticky: true, action: { label: 'Update and review', run: () => void resolveConflicts(store, onPublished) },
+        });
+      } else toast(`Not published. ${errorText(error)}`, { sticky: true, action: { label: 'Try again', run: () => void openPublish(store, onPublished, paths) } });
+    });
   }
 }
 

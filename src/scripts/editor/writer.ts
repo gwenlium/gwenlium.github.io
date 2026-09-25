@@ -385,8 +385,8 @@ class Writer {
     const publish = this.root.querySelector<HTMLButtonElement>('[data-writer-publish]');
     if (publish) {
       const dirty = Boolean(this.path && this.store.draftFiles.some(file => file.path === this.path));
-      publish.disabled = !dirty;
-      publish.textContent = this.store.local ? 'Save to files' : !dirty ? 'Published' : this.model?.draft ? 'Save hidden draft' : this.isNew || !this.wasPublished ? 'Publish' : 'Publish changes';
+      publish.disabled = !dirty || this.store.publishing !== undefined;
+      publish.textContent = this.store.publishing ?? (this.store.local ? 'Save to files' : !dirty ? 'Published' : this.model?.draft ? 'Save hidden draft' : this.isNew || !this.wasPublished ? 'Publish' : 'Publish changes');
     }
     const revert = this.root.querySelector<HTMLButtonElement>('[data-writer-revert]');
     if (revert) revert.hidden = !this.path || this.isNew || !this.store.draftFiles.some(file => file.path === this.path);
@@ -790,8 +790,10 @@ class Writer {
     }
     const path = this.path;
     await openPublish(this.store, async () => {
+      // The publish may finish after this writing desk was left.
+      if (!this.root.isConnected || this.lifetime.signal.aborted) return;
       this.entries = await this.store.entries();
-      if (this.store.exists(path)) await this.open(path);
+      if (this.store.exists(path) && this.path === path) await this.open(path);
     }, [path]);
   }
 
