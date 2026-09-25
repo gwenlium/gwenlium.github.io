@@ -1,7 +1,7 @@
 import type { TypewriterRevealDetail } from './typewriter';
 import { animateWindow, cancelWindowAnimation } from './window-motion';
 import { playInterfaceSound } from './interface-audio';
-import { initializeEntryMedia } from './entry-media';
+import { initializeEntryMedia, resetEntryMedia } from './entry-media';
 
 type Reader = { setEnabled: (enabled: boolean) => void; content: HTMLElement; leave: () => void; dispose: () => void };
 type Chunk = { blocks: HTMLElement[]; scene?: HTMLElement[]; mediaId?: string };
@@ -345,6 +345,8 @@ function navigateHistory(event: HashChangeEvent) {
 window.addEventListener('hashchange', navigateHistory, listenerOptions);
 window.addEventListener('pagehide', disposeReaders, listenerOptions);
 window.addEventListener('pageshow', initializeReaders, listenerOptions);
+// The owner's editor showed an unpublished draft of the text: the old blocks are gone, rebuild from the new ones.
+document.addEventListener('gwenlium:entry-content-replaced', () => { disposeReaders(); resetEntryMedia(); initializeReaders(); }, listenerOptions);
 // Crossing the paired-layout width moves pictures into or out of the text; rebuild the reading steps.
 pairedDesktop.addEventListener('change', () => { disposeReaders(); initializeReaders(); }, listenerOptions);
 document.addEventListener('astro:before-swap', disposeReaders, listenerOptions);

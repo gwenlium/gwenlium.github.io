@@ -281,6 +281,11 @@ export function initializeEntryMedia(): void {
   if (initialized) revealFragment(fragmentTarget());
 }
 
+/** The entry's text was replaced (an unpublished draft shown in place): start over from it. */
+export function resetEntryMedia(): void {
+  disposeViewers();
+}
+
 function disposeViewers() {
   for (const viewer of viewers.values()) viewer.dispose();
   viewers.clear();

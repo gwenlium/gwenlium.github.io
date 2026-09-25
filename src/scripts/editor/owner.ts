@@ -636,6 +636,8 @@ class OwnerControls {
       // Only files with unpublished changes differ from what the page already shows.
       const changed = new Set(this.store.draftFiles.filter(file => !file.deleted).map(file => file.path));
       const targets = [...document.querySelectorAll<HTMLElement>('[data-site-edit-file][data-site-edit-field]')];
+      // Dialogue mode and the media window hold on to the entry's blocks; they rebuild when these change.
+      let replacedEntryContent = false;
       await Promise.all(targets.map(async element => {
         const target = sourceBinding(element);
         if (!target || element.classList.contains('owner-inline') || !changed.has(target.file)) return;
@@ -665,8 +667,10 @@ class OwnerControls {
           element.textContent = previewText(text);
         } else if (element.dataset.siteEditTemplate === 'post-summary') {
           element.replaceChildren(...String(value ?? '').split(/\n\s*\n/).map(text => node('p', text, 'entry-excerpt')));
+          replacedEntryContent ||= Boolean(element.closest('[data-dialogue-reader]'));
         } else if (target.format === 'markdown') {
           element.replaceChildren(renderMarkdownPreview(String(value ?? ''), url => this.store.resolveMedia(url), url => this.store.mediaInfo(url)));
+          replacedEntryContent ||= Boolean(element.closest('[data-dialogue-reader]'));
         } else {
           const text = String(value ?? '');
           const shown = element.dataset.siteEditTemplate === 'site-name'
@@ -677,6 +681,7 @@ class OwnerControls {
         }
       }));
       document.dispatchEvent(new CustomEvent('gwenlium:editor-windows-changed'));
+      if (replacedEntryContent) document.dispatchEvent(new CustomEvent('gwenlium:entry-content-replaced'));
     } catch (error) {
       if (version === this.rendering) toast(errorText(error, 'Some unpublished changes could not be shown on this page.'));
     }
