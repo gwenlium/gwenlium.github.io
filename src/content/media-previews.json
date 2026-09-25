@@ -1,32 +1,64 @@
 {
   "files": {
-    "/media/2026-09-22-22-55-15-3-preview-f3721abb9d86e79c72ca846ad2820159.gif": {
-      "sha256": "f3721abb9d86e79c72ca846ad2820159a450aba6ab10782d55d7f7c2f16b8423",
-      "kind": "image",
+    "/media/2026-09-22-22-55-15-3-preview-134743090dfcd2ffef711dfbbf5361a6.mp4": {
+      "sha256": "134743090dfcd2ffef711dfbbf5361a6a62db8e1524d99fa1a14c6d332a34d1e",
+      "kind": "video",
       "width": 800,
       "height": 450,
-      "duration": 3.32
+      "duration": 3.32,
+      "loop": true,
+      "poster": "/media/2026-09-22-22-55-15-3-still-preview-50ae4dacf985a1cc5d2361c885803a0e.webp"
     },
-    "/media/2026-09-22-22-55-15-4-preview-92ffbde5a43d9b834f203f6a74807a4e.gif": {
-      "sha256": "92ffbde5a43d9b834f203f6a74807a4e4cd63188d5cebbaf96938e976af24639",
+    "/media/2026-09-22-22-55-15-3-still-preview-50ae4dacf985a1cc5d2361c885803a0e.webp": {
+      "sha256": "50ae4dacf985a1cc5d2361c885803a0e6dd182b03518250eae29ec7a327b9ecc",
       "kind": "image",
       "width": 800,
-      "height": 450,
-      "duration": 3.56
+      "height": 450
     },
-    "/media/2026-09-22-22-55-15-5-preview-2362f7342627a7eaf52918168f3888a1.gif": {
-      "sha256": "2362f7342627a7eaf52918168f3888a12354931092dd86570d393ff0120b7611",
-      "kind": "image",
+    "/media/2026-09-22-22-55-15-4-preview-2b6efbdc872748bb1b9464c0b0479dc1.mp4": {
+      "sha256": "2b6efbdc872748bb1b9464c0b0479dc124bd865585d856bd7b00c0e6b74b9c77",
+      "kind": "video",
       "width": 800,
       "height": 450,
-      "duration": 3.74
+      "duration": 3.56,
+      "loop": true,
+      "poster": "/media/2026-09-22-22-55-15-4-still-preview-1dd24272aa31e8a75495d3bed45c005f.webp"
     },
-    "/media/2026-09-22-22-55-15-6-compressed-preview-f5dfbeef729e2604b9b41b1eda8a55b0.gif": {
-      "sha256": "f5dfbeef729e2604b9b41b1eda8a55b0561bf498bbbd236bcb51b0d7097b0761",
+    "/media/2026-09-22-22-55-15-4-still-preview-1dd24272aa31e8a75495d3bed45c005f.webp": {
+      "sha256": "1dd24272aa31e8a75495d3bed45c005fec247b77cf0e96d0a5fb3bdc502baf7d",
       "kind": "image",
       "width": 800,
+      "height": 450
+    },
+    "/media/2026-09-22-22-55-15-5-preview-935ebbda29e68d95fb4771f93f451b6c.mp4": {
+      "sha256": "935ebbda29e68d95fb4771f93f451b6cf42d1c8d83142c579775fc44d780e121",
+      "kind": "video",
+      "width": 800,
       "height": 450,
-      "duration": 4.86
+      "duration": 3.76,
+      "loop": true,
+      "poster": "/media/2026-09-22-22-55-15-5-still-preview-f1a89a0f44f8abf77b70780a4530c352.webp"
+    },
+    "/media/2026-09-22-22-55-15-5-still-preview-f1a89a0f44f8abf77b70780a4530c352.webp": {
+      "sha256": "f1a89a0f44f8abf77b70780a4530c3525554aab19582c6ba79163e3c2b93d139",
+      "kind": "image",
+      "width": 800,
+      "height": 450
+    },
+    "/media/2026-09-22-22-55-15-6-compressed-preview-35d75602d9fe22b89b05461179a5f1c4.mp4": {
+      "sha256": "35d75602d9fe22b89b05461179a5f1c40250c17f333437b3d4118043b0116f17",
+      "kind": "video",
+      "width": 800,
+      "height": 450,
+      "duration": 4.88,
+      "loop": true,
+      "poster": "/media/2026-09-22-22-55-15-6-compressed-still-preview-7762a66282b676c70afe46dd653318c2.webp"
+    },
+    "/media/2026-09-22-22-55-15-6-compressed-still-preview-7762a66282b676c70afe46dd653318c2.webp": {
+      "sha256": "7762a66282b676c70afe46dd653318c293e84e97429ce359d3567d2a88ab5fab",
+      "kind": "image",
+      "width": 800,
+      "height": 450
     },
     "/media/gwendolyn-drawing-preview-34802e58d25184674929d847caa7e270.webp": {
       "sha256": "3989b02c6d274b8e41a7eb750aa1b49fb9d6272c63afd5245a67675e67c8b75c",

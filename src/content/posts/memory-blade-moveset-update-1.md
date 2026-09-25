@@ -13,19 +13,19 @@ The memory blade is the first weapon the player gets introduced to. Ever played 
 
 **The light attack has 5 phrases**
 
-![Fast anticipation and quick transitions](/media/2026-09-22-22-55-15-3-preview-f3721abb9d86e79c72ca846ad2820159.gif)
+![Fast anticipation and quick transitions](/media/2026-09-22-22-55-15-3-preview-134743090dfcd2ffef711dfbbf5361a6.mp4)
 
 **The heavy attack has 3 phrases**
 
-![This is much slower but also deals more damage](/media/2026-09-22-22-55-15-4-preview-92ffbde5a43d9b834f203f6a74807a4e.gif)
+![This is much slower but also deals more damage](/media/2026-09-22-22-55-15-4-preview-2b6efbdc872748bb1b9464c0b0479dc1.mp4)
 
 **The variation has 4 phrases**
 
-![Maybe you can tell which ones are light and heavy attacks?](/media/2026-09-22-22-55-15-5-preview-2362f7342627a7eaf52918168f3888a1.gif)
+![Maybe you can tell which ones are light and heavy attacks?](/media/2026-09-22-22-55-15-5-preview-935ebbda29e68d95fb4771f93f451b6c.mp4)
 
 **The aerial has 6 phrases with an heavy attack going back to the ground**
 
-![I've come to like this one a lot!](/media/2026-09-22-22-55-15-6-compressed-preview-f5dfbeef729e2604b9b41b1eda8a55b0.gif)
+![I've come to like this one a lot!](/media/2026-09-22-22-55-15-6-compressed-preview-35d75602d9fe22b89b05461179a5f1c4.mp4)
 
 The abilities on the right are still WIP and cannot be used yet, but the Memory Blade will have four distinctive abilities that can be cast (and later upgraded via the skill tree) plus a special attack.
 
