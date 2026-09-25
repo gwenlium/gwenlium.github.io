@@ -9,7 +9,7 @@ tags:
   - Proto:ReCompute
 featured: true
 ---
-The memory blade is the first weapon the player gets introduced to. Ever played DMC or the 3D Zelda games? Well if you do you'll feel the familiarity while playing. I took inspiration of the stylish combat animations of The Wind Waker while crossing it with the VFX of the DMC series. The result is snappy! You got your light attack combos, heavy attack combos, variation of these two and an air launcher with its dedicated aerial combo phrases:  
+The Memory Blade is the first weapon the player gets introduced to. Ever played DMC or the 3D Zelda games? Well if you do you'll feel the familiarity while playing. I took inspiration of the stylish combat animations of The Wind Waker while crossing it with the VFX of the DMC series. The result is snappy! You got your light attack combos, heavy attack combos, variation of these two and an air launcher with its dedicated aerial combo phrases:  
 
 **The light attack has 5 phrases**
 
@@ -23,7 +23,7 @@ The memory blade is the first weapon the player gets introduced to. Ever played 
 
 ![Maybe you can tell which ones are light and heavy attacks?](/media/2026-09-22-22-55-15-5-preview-935ebbda29e68d95fb4771f93f451b6c.mp4)
 
-**The aerial has 6 phrases with an heavy attack going back to the ground**
+**The aerial has 6 phrases with another heavy attack going back to the ground**
 
 ![I've come to like this one a lot!](/media/2026-09-22-22-55-15-6-compressed-preview-35d75602d9fe22b89b05461179a5f1c4.mp4)
 
