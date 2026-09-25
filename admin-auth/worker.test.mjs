@@ -397,7 +397,7 @@ test('editor never force-updates a racing publication or reports a rejected ref 
   }
 });
 
-test('editor publishes an animation (looping video) together with its still, and refuses broken animation entries', async t => {
+test('editor publishes a video (looping or not) together with its still, and refuses broken poster entries', async t => {
   const hex = (character, length) => character.repeat(length);
   const stillUrl = `/media/clip-still-preview-${hex('1', 32)}.webp`;
   const videoUrl = `/media/clip-preview-${hex('2', 32)}.mp4`;
@@ -415,11 +415,22 @@ test('editor publishes an animation (looping video) together with its still, and
     assert.deepEqual(registry[videoUrl], video.entry);
     assert.deepEqual(registry[stillUrl], still.entry);
   }
+  {
+    // A plain video (with sound and controls) shows its still before it plays.
+    const { loop, ...plain } = video.entry;
+    const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
+    const response = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ changes: [post], media: [still, { ...video, entry: plain }] }) });
+    assert.equal(response.status, 200, await response.clone().text());
+    const tree = fixture.writes.find(write => write.path.endsWith('/git/trees')).body.tree;
+    const registry = JSON.parse(tree.find(item => item.path === 'src/content/media-previews.json').content).files;
+    assert.deepEqual(registry[videoUrl], plain);
+    assert.equal(loop, true);
+  }
   const broken = [
     { media: [video] },
     { media: [still, { ...video, entry: { ...video.entry, poster: `/media/clip-still-preview-${hex('3', 32)}.webp` } }] },
     { media: [{ ...still, entry: { ...still.entry, loop: true } }] },
-    { media: [still, { ...video, entry: { ...video.entry, loop: undefined } }] },
+    { media: [{ ...still, entry: { ...still.entry, poster: stillUrl } }] },
     { media: [{ ...video, entry: { ...video.entry, poster: `/media/clip-still-preview-${hex('1', 32)}.gif` } }] },
   ];
   for (const body of broken) {

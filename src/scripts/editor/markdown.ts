@@ -43,10 +43,8 @@ export function renderMarkdownPreview(markdown: string, resolveMedia?: (url: str
     player.setAttribute('src', image.getAttribute('src') ?? '');
     if (image.alt) player.setAttribute('aria-label', image.alt);
     const info = kind === 'video' ? mediaInfo?.(image.getAttribute('src') ?? '') : undefined;
-    if (info?.loop) {
-      player.dataset.animation = '';
-      if (info.poster) player.setAttribute('poster', info.poster);
-    }
+    if (info?.loop) player.dataset.animation = '';
+    if (info?.poster) player.setAttribute('poster', info.poster);
     image.replaceWith(player);
   }
   for (const paragraph of fragment.querySelectorAll('p')) {

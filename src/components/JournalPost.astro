@@ -22,7 +22,7 @@ const link = (entry?: Post) => entry && { url: postUrl(entry), title: entry.data
 const mediaItems = [
   ...(post.data.cover ? [{ src: post.data.cover, type: 'image' as const, alt: post.data.coverAlt, eager: true, editFile: sourceFile, editField: '/cover', editAltField: '/coverAlt', editLabel: 'Post cover' }] : []),
   ...post.data.photos.map((src, index) => ({ src, type: 'image' as const, alt: '', editFile: sourceFile, editField: `/photos/${index}`, editLabel: 'Post photo' })),
-  ...post.data.media.map((item, index) => ({ ...item, editFile: sourceFile, editField: `/media/${index}/src`, editAltField: `/media/${index}/alt`, editCaptionField: `/media/${index}/caption` })),
+  ...post.data.media.map((item, index) => ({ ...item, attached: true, editFile: sourceFile, editField: `/media/${index}/src`, editAltField: `/media/${index}/alt`, editCaptionField: `/media/${index}/caption` })),
 ];
 const picture = postPicture(post);
 const hasEntryMedia = mediaItems.length > 0 || /!\[|<(?:img|video|audio|iframe)\b/i.test(post.rendered?.html ?? post.body ?? '') || hasWindowOverride('post-media');

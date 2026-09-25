@@ -60,7 +60,8 @@ export default function rehypeMedia() {
               disablePictureInPicture: true, ...(entry.poster ? { poster: entry.poster } : {}), ...(entry.width ? { width: entry.width, height: entry.height } : {}),
               ...(label ? { ariaLabel: label } : {}),
             } : {
-              src: original, controls: true, preload: 'none', ...(kind === 'video' ? { playsInline: true, controlslist: 'nodownload' } : {}),
+              src: original, controls: true, preload: kind === 'video' && !entry?.poster ? 'metadata' : 'none',
+              ...(kind === 'video' ? { playsInline: true, controlslist: 'nodownload', ...(entry?.poster ? { poster: entry.poster } : {}), ...(entry?.width ? { width: entry.width, height: entry.height } : {}) } : {}),
               ...(label ? { ariaLabel: label } : {}),
             }, children: [],
           };

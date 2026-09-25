@@ -14,7 +14,7 @@ export type PreparedPreview = {
   file: File;
   url: string;
   entry: PreviewMetadata & { sha256: string };
-  /** An animation's still first frame, staged before the video that names it. */
+  /** A video's still (an animation's first frame with something on it), staged before the video that names it. */
   poster?: PreparedPreview;
 };
 
@@ -669,8 +669,33 @@ async function video(file: File, options: Settings): Promise<Generated> {
     if (resultStream?.width !== size.width || resultStream.height !== size.height || visible.width !== size.width || visible.height !== size.height) {
       fail('The generated video failed its dimension bounds. Nothing was prepared.');
     }
-    return { blob, extension: 'mp4', entry: { kind: 'video', width: size.width, height: size.height, duration: visible.duration } };
+    const poster = await videoStill(ffmpeg, visible.duration, size, options);
+    return { blob, extension: 'mp4', entry: { kind: 'video', width: size.width, height: size.height, duration: visible.duration }, poster };
   });
+}
+
+/**
+ * The still a video shows before it plays, taken from the prepared (watermarked) preview: the
+ * first of a few early moments with something on it (clips often open on black), else the first.
+ */
+async function videoStill(ffmpeg: FFmpeg, duration: number, size: Dimensions, options: Settings): Promise<Blob> {
+  const surface = canvas(size);
+  let first: Blob | undefined;
+  try {
+    for (const time of [0, 0.5, 1, 2, 4, duration * 0.1].filter((value, index, all) => value < duration && all.indexOf(value) === index)) {
+      checkAbort(options.signal);
+      await execute(ffmpeg, ['-ss', time.toFixed(3), ...input('preview.mp4'), '-frames:v', '1', '-an', '-sn', '-dn', ...stripMetadata, 'still.png']);
+      const frame = await binary(ffmpeg, 'still.png');
+      await ffmpeg.deleteFile('still.png');
+      if (!frame.length) continue;
+      const bitmap = await decodeBitmap(new Blob([frame], { type: 'image/png' }), options.signal);
+      try { surface.context.drawImage(bitmap, 0, 0, surface.element.width, surface.element.height); } finally { bitmap.close(); }
+      const still = new Blob([stripWebpMetadata(new Uint8Array(await bytes(await encodeCanvas(surface.element, 'image/webp', options.signal), options.signal)))], { type: 'image/webp' });
+      first ??= still;
+      if (!nearlyBlank(surface.element)) return still;
+    }
+    return first ?? fail('The video still could not be made. Nothing was prepared.');
+  } finally { surface.element.width = surface.element.height = 1; }
 }
 
 async function animation(data: ArrayBuffer, raster: Raster, options: Settings): Promise<Generated> {
@@ -828,7 +853,7 @@ async function prepare(file: File, options: Settings, hasTiming: boolean): Promi
     const still = await bitmapSize(generated.poster, options.signal);
     const posterDigest = await abortable(crypto.subtle.digest('SHA-256', await bytes(generated.poster, options.signal)), options.signal);
     const posterSha = Array.from(new Uint8Array(posterDigest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-    const posterName = `${(options.name || 'animation').slice(0, 58).replace(/-+$/, '')}-still-preview-${posterSha.slice(0, 32)}.webp`;
+    const posterName = `${(options.name || (generated.entry.kind === 'video' && generated.entry.loop ? 'animation' : 'video')).slice(0, 58).replace(/-+$/, '')}-still-preview-${posterSha.slice(0, 32)}.webp`;
     poster = { file: new File([generated.poster], posterName, { type: 'image/webp', lastModified: 0 }), url: `/media/${posterName}`, entry: { sha256: posterSha, kind: 'image', ...still } };
   }
   const name = `${options.name || generated.entry.kind}-preview-${sha256.slice(0, 32)}.${generated.extension}`;

@@ -183,7 +183,7 @@ function mediaEntry(value: unknown, url: string, staged = true): EditorMediaEntr
     || !['image', 'video', 'audio'].includes(entry.kind)
     || Object.keys(entry).some(key => !['sha256', 'kind', 'width', 'height', 'duration', 'loop', 'poster'].includes(key))
     || (entry.loop !== undefined && (entry.loop !== true || entry.kind !== 'video'))
-    || (entry.poster !== undefined && (entry.loop !== true || typeof entry.poster !== 'string' || previewPath.exec(entry.poster)?.[2] !== 'webp'))
+    || (entry.poster !== undefined && (entry.kind !== 'video' || typeof entry.poster !== 'string' || previewPath.exec(entry.poster)?.[2] !== 'webp'))
     || (entry.kind === 'image' && !['webp', 'gif'].includes(match[2]))
     || (entry.kind === 'video' && match[2] !== 'mp4') || (entry.kind === 'audio' && match[2] !== 'mp3')) {
     throw new Error('Only prepared media previews can be staged.');

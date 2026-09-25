@@ -44,6 +44,8 @@ const frame = record?.still && still ? record.sources.webp.at(-1)?.src : undefin
 // A prepared animation: a looping, muted video without controls (like a GIF).
 const animation = type === 'video' ? (registry.files as Record<string, { loop?: boolean; poster?: string; width?: number; height?: number }>)[src] : undefined;
 const animated = animation?.loop === true;
+// The still a video shows before it plays; without one, load just enough to show its first frame.
+const videoPoster = poster || animation?.poster || '';
 const srcset = (variants: ImageVariant[]) => variants.map((variant) => `${variant.src} ${variant.width}w`).join(', ');
 const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px) 85vw, 1200px';
 ---
@@ -80,12 +82,14 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
       <div class="media-video">
         <video
           src={src}
-          poster={poster || undefined}
+          poster={videoPoster || undefined}
+          width={animation?.width}
+          height={animation?.height}
           controls
           controlslist="nodownload"
           draggable="false"
           playsinline
-          preload="none"
+          preload={videoPoster ? 'none' : 'metadata'}
           loop={loop}
           muted={muted}
           aria-label={alt || caption || 'Video'}
@@ -99,7 +103,7 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
           data-zoom-video={src}
           data-zoom-caption={caption}
           data-zoom-alt={alt}
-          data-zoom-poster={poster}
+          data-zoom-poster={videoPoster}
           aria-haspopup="dialog"
           aria-label={`Expand video${alt ? `: ${alt}` : ''}`}
         >Expand video</button>

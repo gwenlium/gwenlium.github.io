@@ -73,6 +73,9 @@ function createViewer(root: HTMLElement, source: HTMLElement): Viewer | undefine
   const sources = source.matches('[data-dialogue-blocks]') ? [source] : Array.from(source.querySelectorAll<HTMLElement>('[data-dialogue-blocks]'));
   let inlineIndex = 0;
   const pulled = sideBySide.matches;
+  // Reading order: the cover first, then the pictures as the text shows them, then the entry's media list.
+  const attached = list.querySelector<HTMLElement>(':scope > [data-entry-media-attached]');
+  const numbered = new Map<HTMLElement, string | null>();
 
   function move(node: HTMLElement, container: HTMLElement, item: HTMLElement, blocks: HTMLElement) {
     let block = node;
@@ -99,10 +102,8 @@ function createViewer(root: HTMLElement, source: HTMLElement): Viewer | undefine
       const item = document.createElement('div');
       do { item.id = `${root.id}-inline-${++inlineIndex}`; } while (document.getElementById(item.id));
       item.dataset.entryMediaItem = '';
-      item.dataset.entryMediaLabel = mediaLabel(node, list.children.length);
       item.setAttribute('role', 'group');
-      item.setAttribute('aria-label', `${list.children.length + 1}: ${item.dataset.entryMediaLabel}`);
-      list.append(item);
+      list.insertBefore(item, attached);
       inlineItems.push(item);
 
       // Keep a text-bearing link in its paragraph; only its link shell accompanies the media.
@@ -124,6 +125,11 @@ function createViewer(root: HTMLElement, source: HTMLElement): Viewer | undefine
   }
 
   const items = Array.from(list.children).filter((item): item is HTMLElement => item instanceof HTMLElement && item.hasAttribute('data-entry-media-item'));
+  items.forEach((item, index) => {
+    if (inlineItems.includes(item)) item.dataset.entryMediaLabel = mediaLabel(item, index);
+    else numbered.set(item, item.getAttribute('aria-label'));
+    item.setAttribute('aria-label', `${index + 1}: ${item.dataset.entryMediaLabel || mediaLabel(item, index)}`);
+  });
   // Stacked under the text with nothing of its own to show, the window would only say it is empty.
   const slot = root.closest<HTMLElement>('.article-media-slot');
   if (slot && !pulled && !items.length) slot.dataset.entryMediaNone = '';
@@ -228,6 +234,10 @@ function createViewer(root: HTMLElement, source: HTMLElement): Viewer | undefine
       setPrinting(true);
       for (const item of inlineItems) item.remove();
       for (const item of items) item.hidden = false;
+      for (const [item, label] of numbered) {
+        if (label === null) item.removeAttribute('aria-label');
+        else item.setAttribute('aria-label', label);
+      }
       for (const media of autoplay) media.autoplay = true;
       selection.replaceChildren();
       controls.hidden = selection.hidden = empty.hidden = true;

@@ -65,7 +65,14 @@
       "kind": "video",
       "width": 1280,
       "height": 720,
-      "duration": 34.197
+      "duration": 34.197,
+      "poster": "/media/c-2026-09-22-22-55-15-7-still-preview-45199c9f6c5650dfc32a21131f850019.webp"
+    },
+    "/media/c-2026-09-22-22-55-15-7-still-preview-45199c9f6c5650dfc32a21131f850019.webp": {
+      "sha256": "45199c9f6c5650dfc32a21131f85001914f0d790c9d7148dbcfc228d66193bb3",
+      "kind": "image",
+      "width": 1280,
+      "height": 720
     },
     "/media/gwendolyn-drawing-preview-34802e58d25184674929d847caa7e270.webp": {
       "sha256": "3989b02c6d274b8e41a7eb750aa1b49fb9d6272c63afd5245a67675e67c8b75c",

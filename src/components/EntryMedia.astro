@@ -11,6 +11,8 @@ interface Props {
     caption?: string;
     poster?: string;
     eager?: boolean;
+    /** From the entry's media list: pictures from the text are shown before these. */
+    attached?: boolean;
   editFile?: string;
   editField?: string;
   editAltField?: string;
@@ -27,7 +29,7 @@ const labelFor = (item: Props['items'][number], index: number) =>
 
 <section id={id} class="entry-media-viewer" aria-label="Entry media" data-entry-media data-entry-media-source={sourceId}>
   <div id={`${id}-items`} class="entry-media-items" data-entry-media-items>
-    {media.map((item, index) => <div id={`${id}-item-${index + 1}`} data-entry-media-item data-entry-media-label={labelFor(item, index)} role="group" aria-label={`${index + 1}: ${labelFor(item, index)}`}>
+    {media.map(({ attached, ...item }, index) => <div id={`${id}-item-${index + 1}`} data-entry-media-item data-entry-media-attached={attached ? '' : undefined} data-entry-media-label={labelFor(item, index)} role="group" aria-label={`${index + 1}: ${labelFor(item, index)}`}>
       <Media {...item} />
     </div>)}
   </div>

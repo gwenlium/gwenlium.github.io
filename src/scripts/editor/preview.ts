@@ -64,14 +64,15 @@ function mediaFigure(item: PreviewMedia, eager: boolean): HTMLElement {
     const wrap = node('div');
     wrap.className = 'media-video';
     const video = node('video');
+    const poster = item.poster || ownerStore().mediaInfo(item.src)?.poster;
     video.controls = true;
     video.playsInline = true;
-    video.preload = 'none';
+    video.preload = poster ? 'none' : 'metadata';
     video.setAttribute('controlslist', 'nodownload');
     video.setAttribute('aria-label', item.alt || item.caption || 'Video');
     video.dataset.mediaVideo = '';
     video.dataset.previewSrc = item.src;
-    if (item.poster) video.dataset.previewPoster = item.poster;
+    if (poster) video.dataset.previewPoster = poster;
     const expand = node('button', 'Expand video');
     expand.type = 'button';
     expand.className = 'media-expand button-secondary';
@@ -193,8 +194,8 @@ function fill(): void {
   contents.hidden = headings.length < 2;
 
   const media = [
-    ...(payload.cover ? [{ type: 'image' as const, src: payload.cover, alt: payload.coverAlt, caption: '', poster: '' }] : []),
-    ...payload.media,
+    ...(payload.cover ? [{ type: 'image' as const, src: payload.cover, alt: payload.coverAlt, caption: '', poster: '', attached: false }] : []),
+    ...payload.media.map(item => ({ ...item, attached: true })),
   ];
   const slot = root.querySelector<HTMLElement>('[data-preview-media]');
   const inline = body.querySelector('img, video, audio, iframe');
@@ -210,6 +211,7 @@ function fill(): void {
       const wrap = node('div');
       wrap.id = `entry-media-viewer-item-${index + 1}`;
       wrap.dataset.entryMediaItem = '';
+      if (item.attached) wrap.dataset.entryMediaAttached = '';
       wrap.dataset.entryMediaLabel = label;
       wrap.setAttribute('role', 'group');
       wrap.setAttribute('aria-label', `${index + 1}: ${label}`);

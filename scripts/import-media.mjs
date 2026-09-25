@@ -327,9 +327,9 @@ async function readManifest(filename) {
     if (!match || !entry || typeof entry !== 'object' || Array.isArray(entry) || entry.kind !== outputKinds[match[1]] || typeof entry.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(entry.sha256)) throw new Error(`Invalid registered preview ${url}; repair the manifest before importing.`);
     for (const [field, value] of Object.entries(entry)) {
       if (field === 'kind' || field === 'sha256') continue;
-      // Animations from the site editor: a looping video and its registered still.
+      // From the site editor: animations loop, and any video can name its registered still.
       if (field === 'loop' && value === true && entry.kind === 'video') continue;
-      if (field === 'poster' && entry.loop === true && typeof value === 'string' && previewUrl.test(value)) continue;
+      if (field === 'poster' && entry.kind === 'video' && typeof value === 'string' && previewUrl.test(value)) continue;
       if (!['width', 'height', 'duration'].includes(field) || typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || (field !== 'duration' && !Number.isInteger(value))) throw new Error(`Invalid preview metadata for ${url}; only public dimensions, duration, kind and sha256 are allowed.`);
     }
   }
