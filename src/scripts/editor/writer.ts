@@ -145,13 +145,19 @@ class Writer {
   }
 
   async start(): Promise<void> {
-    this.root.replaceChildren(node('p', 'Opening the editor…', 'writer-loading'));
+    const loading = node('p', 'Opening the editor…', 'writer-loading');
+    this.root.replaceChildren(loading);
+    const retry = () => button('Try again', () => location.reload(), 'owner-button');
+    // Connecting normally takes a second or two; never leave a silent wait on screen.
+    const slow = setTimeout(() => loading.replaceChildren('Still connecting to GitHub… ', retry()), 8000);
     try {
       if (!await this.store.restore()) { this.signIn(); return; }
     } catch (error) {
-      this.root.replaceChildren(node('p', errorText(error, 'The editor could not connect.'), 'writer-loading'));
+      const failed = node('p', `${errorText(error, 'The editor could not connect.')} `, 'writer-loading');
+      failed.append(retry());
+      this.root.replaceChildren(failed);
       return;
-    }
+    } finally { clearTimeout(slow); }
     this.unsubscribe = this.store.subscribe(() => this.refreshChrome());
     await this.route();
     requestAnimationFrame(() => this.makeRoom());

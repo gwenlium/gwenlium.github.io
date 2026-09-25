@@ -219,6 +219,7 @@ async function reach(controller: AbortController, url: string, init: RequestInit
   try { return await fetch(url, init); }
   catch (error) {
     if (controller.signal.aborted) throw error;
+    if ((error as { name?: string })?.name === 'TimeoutError') throw failure('The editor service took too long to answer. Try again in a moment; your changes are still saved here.', 0);
     throw failure(message, 0);
   }
 }
@@ -357,7 +358,8 @@ export class SiteEditorStore {
     const token = await this.auth.token(retried);
     const response = await reach(controller, `${this.authOrigin}${path}`, {
       method: body ? 'POST' : 'GET', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error',
-      signal: controller.signal,
+      // A stalled request would otherwise leave "Opening the editor…" up forever.
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(body ? 90_000 : 30_000)]),
       headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
     }, 'The editor service could not be reached. Check your connection and try again; your changes are still saved here.');

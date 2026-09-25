@@ -81,11 +81,17 @@ export class BrowserOwnerAuth implements OwnerAuth {
       if (!saved.session) throw authFailure('Your sign-in expired. Sign in with GitHub again.');
       const timestamp = now();
       const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, saved.keys.privateKey, encoder.encode(`${sessionLabel}\n${saved.session}\n${timestamp}`));
-      const response = await fetch(`${this.authOrigin}/editor/session`, {
-        method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session: saved.session, timestamp, signature: base64url(signature) }),
-      });
+      let response: Response;
+      try {
+        // A stalled renewal would hold the lock below and freeze every tab on "Opening the editor…".
+        response = await fetch(`${this.authOrigin}/editor/session`, {
+          method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error',
+          headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(20_000),
+          body: JSON.stringify({ session: saved.session, timestamp, signature: base64url(signature) }),
+        });
+      } catch {
+        throw authFailure('Renewing the sign-in did not get an answer. Check your connection and try again.', 0);
+      }
       let value: unknown;
       try { value = await response.json(); } catch { value = undefined; }
       if (!response.ok) {
@@ -98,7 +104,14 @@ export class BrowserOwnerAuth implements OwnerAuth {
       return issued.token;
     };
     // Refresh tokens are single use: two tabs renewing at once would sign each other out.
-    return 'locks' in navigator ? navigator.locks.request('gwenlium-owner-auth', renew) : renew();
+    // So never steal the lock; if another tab holds it too long, say so instead of waiting forever.
+    if (!('locks' in navigator)) return renew();
+    try {
+      return await navigator.locks.request('gwenlium-owner-auth', { signal: AbortSignal.timeout(30_000) }, renew);
+    } catch (error) {
+      if ((error as { name?: string })?.name !== 'TimeoutError') throw error;
+      throw authFailure('Another gwenlium.dev tab is still renewing the sign-in. Close other tabs of the site, then try again.', 0);
+    }
   }
 
   private issued(value: unknown): Issued {
