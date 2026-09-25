@@ -254,6 +254,33 @@ function apply(entry: Layout, bounds = workspace()): void {
   style.setProperty('--window-height', `${rect.height}px`);
 }
 
+/** Put a window behind all others. */
+function lower(entry: Layout): void {
+  const others = [...layouts].filter(([root]) => root !== entry.root);
+  layouts.clear();
+  layouts.set(entry.root, entry);
+  for (const [root, other] of others) layouts.set(root, other);
+  let layer = 10;
+  for (const window of layouts.values()) window.root.style.setProperty('--window-layer', String(layer++));
+  // In the top layer the last popover shown is in front, whatever its z-index:
+  // show the others again, in order, so they stay in front of this one.
+  if (!entry.root.matches(':popover-open') || document.querySelector('dialog[open]')) return;
+  const focused = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+  raising = true;
+  try {
+    for (const other of layouts.values()) {
+      if (other === entry || !other.root.hasAttribute('popover') || !other.root.matches(':popover-open')) continue;
+      other.root.hidePopover();
+      other.root.showPopover();
+    }
+  } finally { raising = false; }
+  focused?.focus({ preventScroll: true });
+}
+
+// On a phone, windows moved up only because they did not fit below would cover the page's
+// main window (the Pictures & media window over the entry text). There they tuck behind.
+const phone = matchMedia('(max-width: 760px)');
+
 function raise(entry: Layout): void {
   if (raising) return;
   raising = true;
@@ -304,10 +331,10 @@ export function registerWindow(root: HTMLElement, options: { floating?: boolean 
     handle.setAttribute('aria-hidden', 'true');
     root.append(handle);
   }
-  if (restoreLayout(entry)) apply(entry);
-  else resetWindowLayout(root, false);
+  const cascaded = restoreLayout(entry) ? (apply(entry), false) : resetWindowLayout(root, false);
   if (editing()) captureVisitorLayout(entry);
-  raise(entry);
+  if (cascaded && phone.matches) lower(entry);
+  else raise(entry);
 }
 
 export function setWindowMaximized(root: HTMLElement, maximized: boolean): void {
@@ -326,9 +353,10 @@ export function setWindowMaximized(root: HTMLElement, maximized: boolean): void 
   apply(entry);
 }
 
-export function resetWindowLayout(root: HTMLElement, remember = true): void {
+/** Returns whether the window had to be moved up into view (it did not fit where the page put it). */
+export function resetWindowLayout(root: HTMLElement, remember = true): boolean {
   const entry = layouts.get(root);
-  if (!entry) return;
+  if (!entry) return false;
   cancelWindowAnimation(root);
   entry.rect = entry.snap = entry.freeRect = entry.beforeMaximum = undefined;
   entry.maximized = false;
@@ -349,7 +377,8 @@ export function resetWindowLayout(root: HTMLElement, remember = true): void {
     if (authoredX !== undefined && Number.isFinite(Number(authoredX))) x = bounds.x + Number(authoredX);
     if (authoredY !== undefined && Number.isFinite(Number(authoredY))) y = bounds.y + Number(authoredY);
   }
-  if (y < bounds.y || y > bounds.y + bounds.height - 140) {
+  const cascaded = y < bounds.y || y > bounds.y + bounds.height - 140;
+  if (cascaded) {
     let slot = 0;
     for (const candidate of layouts.values()) { if (candidate === entry) break; slot++; }
     const offset = (slot % 7) * 24;
@@ -359,6 +388,7 @@ export function resetWindowLayout(root: HTMLElement, remember = true): void {
   entry.rect = bounded({ x, y, width: rect.width, height: Math.min(rect.height, Math.max(140, bounds.y + bounds.height - y)) }, bounds);
   apply(entry, bounds);
   if (remember && editing()) rememberLayout(entry);
+  return cascaded;
 }
 
 document.addEventListener('gwenlium:editor-apply-layout', (event) => {

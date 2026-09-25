@@ -271,6 +271,8 @@ const definition = getWindowDefinition('music-player')!;
       this.panel = this.querySelector('#music-player')!;
       this.maximizeButton = this.querySelector('[data-player-maximize]')!;
       this.visibility = this.dataset.playerState === 'closed' ? 'closed' : 'open';
+      // On a phone the open player would cover the whole page; start it in the taskbar instead.
+      if (this.visibility === 'open' && matchMedia('(max-width: 760px)').matches) this.visibility = 'collapsed';
       try {
         const visibility = localStorage.getItem('gwenlium:player:visibility');
         if (visibility === 'open' || visibility === 'collapsed' || visibility === 'closed') this.visibility = visibility;
