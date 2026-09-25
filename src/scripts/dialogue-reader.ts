@@ -48,6 +48,16 @@ function isIllustration(block: HTMLElement): boolean {
   return true;
 }
 
+/** A short line that introduces what follows it: all bold (a label), or ending with a colon. */
+function introduces(block: HTMLElement): boolean {
+  if (!block.matches('p')) return false;
+  const text = block.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  if (!text || text.length > 160) return false;
+  if (text.endsWith(':')) return true;
+  const strong = block.querySelector<HTMLElement>(':scope > strong, :scope > b');
+  return strong?.textContent?.replace(/\s+/g, ' ').trim() === text;
+}
+
 function collectChunks(sources: HTMLElement[]): Chunk[] {
   const blocks = sources.flatMap(source => {
     // Raw, unwrapped HTML text (or SVG) stays together rather than being lost or copied.
@@ -70,7 +80,13 @@ function collectChunks(sources: HTMLElement[]): Chunk[] {
     for (const marker of block.querySelectorAll<HTMLElement>('[data-entry-media-ref]')) {
       mediaId = marker.dataset.entryMediaRef || undefined;
     }
-    if (block.hasAttribute('data-entry-media-only')) continue;
+    const previous = chunks.at(-1);
+    // "**Light attack**" then its picture: the picture belongs to the label, not the text after it.
+    const introduced = !headings.length && previous && introduces(previous.blocks[previous.blocks.length - 1]);
+    if (block.hasAttribute('data-entry-media-only')) {
+      if (introduced) previous.mediaId = mediaId;
+      continue;
+    }
     if (isHeading) {
       headings.push(block);
     } else if (block.matches('figcaption') && !headings.length && chunks.length) {
@@ -79,9 +95,16 @@ function collectChunks(sources: HTMLElement[]): Chunk[] {
       previous.mediaId = mediaId;
       if (previous.scene && previous.blocks.includes(previous.scene[0])) previous.scene.push(block);
     } else {
+      if (introduced && isIllustration(block)) {
+        previous.blocks.push(block);
+        previous.mediaId = mediaId;
+        scene = [block];
+        continue;
+      }
       // A standalone picture establishes the scene; mixed text/media stays one authored passage.
+      // A label starts something new, so the previous picture does not follow it.
       if (isIllustration(block)) scene = [block];
-      else if (block.querySelector('img, video, audio, iframe')) scene = undefined;
+      else if (block.querySelector('img, video, audio, iframe') || introduces(block)) scene = undefined;
       chunks.push({ blocks: [...headings, block], scene, mediaId });
       headings = [];
     }
