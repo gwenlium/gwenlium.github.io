@@ -298,6 +298,8 @@ export class SiteEditorStore {
   }
 
   get authenticated(): boolean { return !!this.session; }
+  /** Drafts made against an older version that changed there too: the owner picks a version. */
+  get hasConflicts(): boolean { return Boolean(this.session?.conflicts?.length); }
   get dirty(): boolean { return !!this.session?.files.size; }
   get snapshot(): EditorSnapshot | undefined { return this.session ? structuredClone(this.session.snapshot) : undefined; }
   get draftFiles(): EditorDraftFile[] { return this.session ? Array.from(this.session.files.values(), file => ({ ...file })) : []; }
@@ -441,8 +443,9 @@ export class SiteEditorStore {
       this.emit();
       // Learn which published videos are animations, so editors show them the way the site does.
       void this.media().then(() => this.emit(), () => undefined);
-      // Drafts made against an older version are re-based quietly when nothing conflicts.
-      if (session.files.size && session.snapshot.head !== verified.head) void this.refresh().catch(() => undefined);
+      // Drafts made against an older version move onto the current one before anything reads
+      // files (the older version can no longer be read). Conflicts wait for the owner's choice.
+      if (session.files.size && session.snapshot.head !== verified.head) await this.refresh().catch(() => undefined);
     } finally {
       if (this.pendingAuth === controller) this.pendingAuth = undefined;
     }

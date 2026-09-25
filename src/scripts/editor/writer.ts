@@ -159,8 +159,29 @@ class Writer {
       return;
     } finally { clearTimeout(slow); }
     this.unsubscribe = this.store.subscribe(() => this.refreshChrome());
-    await this.route();
+    if (this.store.hasConflicts) { this.chooseVersions(); return; }
+    try { await this.route(); }
+    catch (error) {
+      // Never a silent "Opening the editor…": say what failed and offer a way on.
+      const failed = node('p', `${errorText(error, 'The editor could not load.')} `, 'writer-loading');
+      if ((error as { status?: number }).status === 409) failed.append(button('Update and review', () => this.chooseVersions(), 'owner-button owner-button--primary'), ' ');
+      failed.append(button('Try again', () => location.reload(), 'owner-button'));
+      this.root.replaceChildren(failed);
+      return;
+    }
     requestAnimationFrame(() => this.makeRoom());
+  }
+
+  /** Unpublished changes were made on an older version that changed there too: ask which to keep. */
+  private chooseVersions(): void {
+    const message = node('p', 'Some of your unpublished changes were made on an older version of the website, which has changed since. Choose which version to keep, then the editor opens. ', 'writer-loading');
+    message.append(button('Choose versions', () => this.chooseVersions(), 'owner-button owner-button--primary'));
+    this.root.replaceChildren(message);
+    void resolveConflicts(this.store, async () => {
+      if (this.lifetime.signal.aborted) return;
+      this.root.replaceChildren(node('p', 'Opening the editor…', 'writer-loading'));
+      try { await this.route(); } catch (error) { this.root.replaceChildren(node('p', errorText(error, 'The editor could not load.'), 'writer-loading')); }
+    });
   }
 
   /** Floating windows (like the music player) go to the taskbar while they cover the writing desk. */

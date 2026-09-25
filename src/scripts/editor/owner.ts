@@ -8,7 +8,7 @@ import { renderMarkdownPreview } from './markdown';
 import { createRichText, type RichTextHandle } from './rich-text';
 import { chooseFromLibrary, stageFiles } from './media';
 import { canCrop, cropPicture } from './crop';
-import { openPublish, resumeLiveCheck } from './publish';
+import { openPublish, resolveConflicts, resumeLiveCheck } from './publish';
 import { openAnalytics } from './analytics';
 import { openAboutDetails, openGallery, openMusic, openSiteSettings, windowContentField } from './manage';
 import { anchoredPanel, button, confirmAction, errorText, node, openDialog, toast } from './ui';
@@ -144,6 +144,11 @@ class OwnerControls {
     this.renderTaskbar();
     void this.applyDraft();
     resumeLiveCheck(this.store);
+    if (this.store.hasConflicts) {
+      toast('Some unpublished changes were made on an older version of the website, which changed since. Choose which version to keep.', {
+        sticky: true, action: { label: 'Choose versions', run: () => void resolveConflicts(this.store, () => this.applyDraft()) },
+      });
+    }
   }
 
   private signInPrompt(): void {
