@@ -121,6 +121,10 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
     {description && <meta name="twitter:description" content={description} />}
     <meta name="twitter:image" content={socialImage} />
     <meta name="twitter:image:alt" content={socialImageAlt} />
+    <script>
+      // Handle same-page mobile view history before Astro can replace the page.
+      import '../scripts/mobile-windows';
+    </script>
     <ClientRouter />
     {import.meta.env.PROD && !editor && Astro.url.hostname === siteUrl.hostname && /^[a-f0-9]{32}$/i.test(analytics.cloudflareBeaconToken) && <script is:inline data-beacon={JSON.stringify({ token: analytics.cloudflareBeaconToken })}>
       (() => {
@@ -158,14 +162,15 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
       <div class="player-region"><Player /></div>
       <Footer />
       <div class="taskbar" role="toolbar" aria-label="Desktop controls">
+        <button type="button" class="button-secondary" data-mobile-back aria-label="Back to previous view" disabled><span aria-hidden="true">←</span>Back</button>
         <button type="button" class="button-secondary start-trigger" data-open-start aria-controls="start-menu" aria-haspopup="dialog" aria-expanded="false">
-          <img src="/avatar.webp" alt="" width="22" height="22" /><span>{startWindow.title}</span>
+          <img src="/avatar.webp" alt="" width="22" height="22" /><span class="desktop-label">{startWindow.title}</span><span class="mobile-label">Menu</span>
         </button>
         <button type="button" class="button-secondary taskbar-control" data-open-settings aria-controls="site-settings" aria-expanded={!preferencesWindow.initiallyClosed} aria-label={preferencesWindow.title}>
           <Icon name="settings" size={17} /><span>{preferencesWindow.title}</span>
         </button>
         <button type="button" class="button-secondary taskbar-control" data-open-player aria-controls="music-player" aria-expanded={!playerWindow.initiallyClosed} aria-label={`${playerWindow.title} player`}>
-          <Icon name="music" size={17} /><span>{playerWindow.title}</span>
+          <Icon name="music" size={17} /><span class="desktop-label">{playerWindow.title}</span><span class="mobile-label">Music</span>
         </button>
         <button type="button" class="button-secondary taskbar-control owner-taskbar" data-owner-menu data-owner-editor aria-haspopup="menu" hidden><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m4 20 4-1 11-11-3-3L5 16l-1 4ZM14 7l3 3" /></svg><span>Edit</span></button>
         <button type="button" class="button owner-taskbar owner-taskbar--publish" data-owner-publish hidden>Publish</button>

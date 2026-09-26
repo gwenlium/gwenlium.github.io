@@ -149,7 +149,9 @@ function syncControls(): void {
   const music = document.getElementById('music-player');
   const musicControl = document.querySelector<HTMLElement>('[data-open-player]');
   if (musicControl) {
-    musicControl.setAttribute('aria-expanded', String(player?.dataset.playerState === 'open' && Boolean(music && !music.hidden)));
+    musicControl.setAttribute('aria-expanded', String(document.documentElement.hasAttribute('data-mobile-window-mode')
+      ? document.documentElement.dataset.mobileActiveWindow === 'music-player'
+      : player?.dataset.playerState === 'open' && Boolean(music && !music.hidden)));
     musicControl.dataset.windowState = music?.dataset.windowState || 'normal';
   }
   document.querySelector('[data-open-start]')?.setAttribute('aria-expanded', String(Boolean(document.querySelector<HTMLDialogElement>('#start-menu')?.open)));
@@ -296,6 +298,10 @@ window.addEventListener('popstate', (event) => {
     finishRestoration();
   });
 }, { ...listenerOptions, capture: true });
+document.addEventListener('gwenlium:mobile-history-traverse', event => {
+  adoptTraversal((event as CustomEvent<unknown>).detail);
+  finishRestoration();
+}, listenerOptions);
 window.addEventListener('hashchange', prepareFragment, listenerOptions);
 window.addEventListener('pagehide', persistScroll, listenerOptions);
 window.addEventListener('pageshow', queueGeometry, listenerOptions);

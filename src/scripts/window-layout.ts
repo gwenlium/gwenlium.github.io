@@ -6,6 +6,7 @@ type MovingElement = HTMLElement & { moveBefore?: (node: Node, reference: Node |
 type LayoutState = { rect?: Box; snap?: Snap; freeRect?: Box };
 type VisitorLayout = LayoutState & {
   defaultFloating: boolean;
+  initialized: boolean;
   maximized: boolean;
   x?: string;
   y?: string;
@@ -18,6 +19,8 @@ type Layout = {
   root: HTMLElement;
   host: HTMLElement;
   titlebar: HTMLElement;
+  initialized: boolean;
+  mobile?: boolean;
   defaultFloating: boolean;
   rect?: Box;
   snap?: Snap;
@@ -26,6 +29,8 @@ type Layout = {
   beforeMaximum?: { rect?: Box; snap?: Snap; freeRect?: Box };
   placement?: { parent: MovingElement; marker: HTMLElement; portaled: boolean };
   visitor?: VisitorLayout;
+  pendingEditorLayout?: EditorLayout;
+  pendingMaximized?: boolean;
 };
 type Gesture = {
   entry: Layout;
@@ -48,6 +53,7 @@ type Gesture = {
 const layouts = new Map<HTMLElement, Layout>();
 const interactive = 'button, a, input, select, textarea, [contenteditable="true"]';
 const storagePrefix = 'gwenlium:window-layout:';
+const phone = matchMedia('(max-width: 760px)');
 let gesture: Gesture | undefined;
 let moveFrame = 0;
 let resizeFrame = 0;
@@ -63,22 +69,25 @@ function captureVisitorLayout(entry: Layout): void {
   const normal = entry.maximized ? entry.beforeMaximum : entry;
   entry.visitor = {
     rect: normal?.rect, snap: normal?.snap, freeRect: normal?.freeRect,
-    defaultFloating: entry.defaultFloating, width: entry.root.style.width,
+    initialized: entry.initialized, defaultFloating: entry.defaultFloating, width: entry.root.style.width,
     maximized: entry.maximized, x: entry.root.dataset.windowDefaultX, y: entry.root.dataset.windowDefaultY,
     height: entry.root.style.height, sized: entry.root.hasAttribute('data-window-sized'),
   };
 }
 
 function synchronizeEditing(): void {
+  if (suspended) return;
   finishGesture(true);
   for (const entry of layouts.values()) {
     if (editing()) captureVisitorLayout(entry);
+    else if (phone.matches) entry.pendingEditorLayout = undefined;
     else if (entry.visitor) {
       if (entry.maximized) command(entry, 'restore');
       const visitor = entry.visitor;
       entry.rect = visitor.rect;
       entry.snap = visitor.snap;
       entry.freeRect = visitor.freeRect;
+      entry.initialized = visitor.initialized;
       entry.defaultFloating = visitor.defaultFloating;
       entry.root.style.width = visitor.width;
       entry.root.style.height = visitor.height;
@@ -89,6 +98,8 @@ function synchronizeEditing(): void {
       if (visitor.y === undefined) delete entry.root.dataset.windowDefaultY;
       else entry.root.dataset.windowDefaultY = visitor.y;
       entry.visitor = undefined;
+      entry.pendingEditorLayout = undefined;
+      entry.pendingMaximized = undefined;
       if (visitor.maximized) command(entry, 'maximize');
       else apply(entry);
     }
@@ -139,6 +150,7 @@ function restoreLayout(entry: Layout): boolean {
 }
 
 function rememberLayout(entry: Layout): void {
+  if (phone.matches || suspended) return;
   const id = entry.root.dataset.windowId;
   if (!id) return;
   if (editing()) {
@@ -159,6 +171,7 @@ function rememberLayout(entry: Layout): void {
 }
 
 function arrangeWindows(): void {
+  if (phone.matches || suspended) return;
   finishGesture(true);
   const open = [...layouts.values()].filter(entry => entry.root.isConnected && !entry.root.hidden && !entry.root.inert
     && entry.root.getClientRects().length && getComputedStyle(entry.root).visibility !== 'hidden');
@@ -204,7 +217,7 @@ function detach(entry: Layout): void {
 }
 
 function place(entry: Layout): void {
-  if (suspended || !entry.root.isConnected) return;
+  if (phone.matches || suspended || !entry.root.isConnected) return;
   if (!entry.placement && entry.host.parentElement !== document.body) {
     const parent = entry.host.parentElement as MovingElement;
     const marker = document.createElement('div');
@@ -234,11 +247,76 @@ function place(entry: Layout): void {
   }
 }
 
-function apply(entry: Layout, bounds = workspace()): void {
+function clearFloating(entry: Layout): void {
+  detach(entry);
+  delete entry.root.dataset.windowFloating;
+  delete entry.root.dataset.windowSnap;
+  for (const key of ['x', 'y', 'width', 'height']) entry.root.style.removeProperty(`--window-${key}`);
+}
+
+function setInteractions(entry: Layout): void {
+  const mobile = phone.matches;
+  if (entry.mobile === mobile) return;
+  entry.mobile = mobile;
+  const titlebar = entry.titlebar;
+  if (mobile) {
+    delete titlebar.dataset.windowDrag;
+    for (const attribute of ['tabindex', 'role', 'aria-label', 'title']) titlebar.removeAttribute(attribute);
+  } else {
+    titlebar.tabIndex = 0;
+    titlebar.setAttribute('role', 'group');
+    titlebar.setAttribute('aria-label', `${entry.root.dataset.windowTitle || 'Window'} position and size`);
+    titlebar.title = 'Drag to move; double-click to maximize. Arrow keys move; Shift + arrows resize; Alt + arrows snap. Escape cancels dragging. Positions and sizes are saved on this device.';
+    titlebar.dataset.windowDrag = '';
+  }
+  for (const handle of entry.root.querySelectorAll<HTMLElement>(':scope > [data-window-resize]')) {
+    handle.hidden = mobile;
+    if (mobile) handle.style.display = 'none';
+    else handle.style.removeProperty('display');
+  }
+}
+
+function initializeLayout(entry: Layout, bounds: Box): void {
+  clearFloating(entry);
+  const root = entry.root;
+  const hidden = root.hidden;
+  root.hidden = false;
+  const rect = root.getBoundingClientRect();
+  root.hidden = hidden;
+  let x = rect.left;
+  let y = rect.top;
+  if (entry.defaultFloating) {
+    const authoredX = root.dataset.windowDefaultX;
+    const authoredY = root.dataset.windowDefaultY;
+    if (authoredX !== undefined && Number.isFinite(Number(authoredX))) x = bounds.x + Number(authoredX);
+    if (authoredY !== undefined && Number.isFinite(Number(authoredY))) y = bounds.y + Number(authoredY);
+  }
+  if (y < bounds.y || y > bounds.y + bounds.height - 140) {
+    let slot = 0;
+    for (const candidate of layouts.values()) { if (candidate === entry) break; slot++; }
+    const offset = (slot % 7) * 24;
+    x = bounds.x + offset;
+    y = bounds.y + Math.min(80, bounds.height * .12) + offset;
+  }
+  entry.rect = bounded({ x, y, width: rect.width, height: Math.min(rect.height, Math.max(140, bounds.y + bounds.height - y)) }, bounds);
+  // A player can restore its maximized state before its first desktop render.
+  // Its normal rectangle must come from the desktop, never the phone viewport.
+  if (entry.maximized) entry.beforeMaximum = { rect: entry.rect };
+  entry.initialized = true;
+}
+
+function apply(entry: Layout, bounds?: Box): void {
+  setInteractions(entry);
+  if (phone.matches) {
+    cancelWindowAnimation(entry.root);
+    clearFloating(entry);
+    return;
+  }
+  if (suspended || !entry.root.isConnected) return;
+  bounds ??= workspace();
+  if (!entry.initialized) initializeLayout(entry, bounds);
   if (!entry.rect && !entry.maximized) {
-    detach(entry);
-    delete entry.root.dataset.windowFloating;
-    delete entry.root.dataset.windowSnap;
+    clearFloating(entry);
     return;
   }
   const rect = entry.maximized ? bounds : bounded(entry.snap ? snapBox(entry.snap, bounds) : entry.rect!, bounds);
@@ -254,35 +332,9 @@ function apply(entry: Layout, bounds = workspace()): void {
   style.setProperty('--window-height', `${rect.height}px`);
 }
 
-/** Put a window behind all others. */
-function lower(entry: Layout): void {
-  const others = [...layouts].filter(([root]) => root !== entry.root);
-  layouts.clear();
-  layouts.set(entry.root, entry);
-  for (const [root, other] of others) layouts.set(root, other);
-  let layer = 10;
-  for (const window of layouts.values()) window.root.style.setProperty('--window-layer', String(layer++));
-  // In the top layer the last popover shown is in front, whatever its z-index:
-  // show the others again, in order, so they stay in front of this one.
-  if (!entry.root.matches(':popover-open') || document.querySelector('dialog[open]')) return;
-  const focused = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
-  raising = true;
-  try {
-    for (const other of layouts.values()) {
-      if (other === entry || !other.root.hasAttribute('popover') || !other.root.matches(':popover-open')) continue;
-      other.root.hidePopover();
-      other.root.showPopover();
-    }
-  } finally { raising = false; }
-  focused?.focus({ preventScroll: true });
-}
-
-// On a phone, windows moved up only because they did not fit below would cover the page's
-// main window (the Pictures & media window over the entry text). There they tuck behind.
-const phone = matchMedia('(max-width: 760px)');
 
 function raise(entry: Layout): void {
-  if (raising) return;
+  if (phone.matches || suspended || raising) return;
   raising = true;
   try {
     // Small bounded z-indices also support browsers without popovers.
@@ -317,24 +369,19 @@ export function registerWindow(root: HTMLElement, options: { floating?: boolean 
   if (root.closest('#main-content')) root.querySelector(':scope > .window-body')?.setAttribute('data-typewriter', '');
   const entry: Layout = {
     root, host: root.closest<HTMLElement>('gwenlium-player') || root, titlebar,
-    defaultFloating: Boolean(options.floating), maximized: false,
+    initialized: false, defaultFloating: Boolean(options.floating), maximized: false,
   };
   layouts.set(root, entry);
-  titlebar.tabIndex = 0;
-  titlebar.setAttribute('role', 'group');
-  titlebar.setAttribute('aria-label', `${root.dataset.windowTitle || 'Window'} position and size`);
-  titlebar.title = 'Drag to move; double-click to maximize. Arrow keys move; Shift + arrows resize; Alt + arrows snap. Escape cancels dragging. Positions and sizes are saved on this device.';
-  titlebar.dataset.windowDrag = '';
   for (const edge of ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']) {
     const handle = document.createElement('span');
     handle.dataset.windowResize = edge;
     handle.setAttribute('aria-hidden', 'true');
     root.append(handle);
   }
-  const cascaded = restoreLayout(entry) ? (apply(entry), false) : resetWindowLayout(root, false);
+  entry.initialized = restoreLayout(entry);
+  apply(entry);
   if (editing()) captureVisitorLayout(entry);
-  if (cascaded && phone.matches) lower(entry);
-  else raise(entry);
+  raise(entry);
 }
 
 export function setWindowMaximized(root: HTMLElement, maximized: boolean): void {
@@ -353,42 +400,17 @@ export function setWindowMaximized(root: HTMLElement, maximized: boolean): void 
   apply(entry);
 }
 
-/** Returns whether the window had to be moved up into view (it did not fit where the page put it). */
-export function resetWindowLayout(root: HTMLElement, remember = true): boolean {
+export function resetWindowLayout(root: HTMLElement, remember = true): void {
   const entry = layouts.get(root);
-  if (!entry) return false;
+  if (!entry || phone.matches || suspended) return;
   cancelWindowAnimation(root);
   entry.rect = entry.snap = entry.freeRect = entry.beforeMaximum = undefined;
   entry.maximized = false;
-  apply(entry);
-  // Reset personal placement, then pin the authored responsive box. Content
-  // scrolls inside every window; an unpositioned window is not page-scrolling.
+  entry.initialized = false;
+  // Reset personal placement, then measure the authored desktop box.
   if (remember && !editing()) rememberLayout(entry);
-  const hidden = root.hidden;
-  root.hidden = false;
-  const rect = root.getBoundingClientRect();
-  root.hidden = hidden;
-  const bounds = workspace();
-  let x = rect.left;
-  let y = rect.top;
-  if (entry.defaultFloating) {
-    const authoredX = root.dataset.windowDefaultX;
-    const authoredY = root.dataset.windowDefaultY;
-    if (authoredX !== undefined && Number.isFinite(Number(authoredX))) x = bounds.x + Number(authoredX);
-    if (authoredY !== undefined && Number.isFinite(Number(authoredY))) y = bounds.y + Number(authoredY);
-  }
-  const cascaded = y < bounds.y || y > bounds.y + bounds.height - 140;
-  if (cascaded) {
-    let slot = 0;
-    for (const candidate of layouts.values()) { if (candidate === entry) break; slot++; }
-    const offset = (slot % 7) * 24;
-    x = bounds.x + offset;
-    y = bounds.y + Math.min(80, bounds.height * .12) + offset;
-  }
-  entry.rect = bounded({ x, y, width: rect.width, height: Math.min(rect.height, Math.max(140, bounds.y + bounds.height - y)) }, bounds);
-  apply(entry, bounds);
+  apply(entry);
   if (remember && editing()) rememberLayout(entry);
-  return cascaded;
 }
 
 document.addEventListener('gwenlium:editor-apply-layout', (event) => {
@@ -399,6 +421,15 @@ document.addEventListener('gwenlium:editor-apply-layout', (event) => {
     || (detail.x !== undefined && !Number.isFinite(detail.x)) || (detail.y !== undefined && !Number.isFinite(detail.y))) return;
   const entry = [...layouts.values()].find(candidate => candidate.root.dataset.windowId === detail.id);
   if (!entry) return;
+  if (phone.matches || suspended) {
+    captureVisitorLayout(entry);
+    entry.pendingEditorLayout = detail;
+    return;
+  }
+  applyEditorLayout(entry, detail);
+});
+
+function applyEditorLayout(entry: Layout, detail: EditorLayout): void {
   finishGesture(true);
   captureVisitorLayout(entry);
   if (entry.maximized) command(entry, 'restore');
@@ -410,12 +441,12 @@ document.addEventListener('gwenlium:editor-apply-layout', (event) => {
   else entry.root.dataset.windowDefaultX = String(detail.x);
   if (detail.y === undefined) delete entry.root.dataset.windowDefaultY;
   else entry.root.dataset.windowDefaultY = String(detail.y);
-  apply(entry);
+  clearFloating(entry);
   entry.root.style.width = detail.width > 0 ? `min(${detail.width}px, 100%)` : '';
   entry.root.style.height = detail.height > 0 ? `${detail.height}px` : '';
   entry.root.toggleAttribute('data-window-sized', detail.height > 0);
   resetWindowLayout(entry.root, false);
-});
+}
 
 export function unregisterWindow(root: HTMLElement): void {
   const entry = layouts.get(root);
@@ -434,6 +465,7 @@ export function unregisterWindow(root: HTMLElement): void {
 }
 
 function command(entry: Layout, action: 'maximize' | 'restore'): void {
+  if (phone.matches || suspended) return;
   document.dispatchEvent(new CustomEvent('gwenlium:window-command', { detail: { id: entry.root.dataset.windowId, action } }));
   cancelWindowAnimation(entry.root);
 }
@@ -455,6 +487,7 @@ function showPreview(snap: Snap | 'maximize' | undefined, bounds: Box): void {
 }
 
 function applySnap(entry: Layout, snap: Snap | 'maximize', bounds: Box): void {
+  if (phone.matches || suspended) return;
   if (snap === 'maximize') { command(entry, 'maximize'); return; }
   if (entry.maximized) command(entry, 'restore');
   if (!entry.snap) entry.freeRect = entry.rect;
@@ -465,6 +498,7 @@ function applySnap(entry: Layout, snap: Snap | 'maximize', bounds: Box): void {
 
 function updateGesture(): void {
   moveFrame = 0;
+  if (phone.matches || suspended) { finishGesture(true); return; }
   const current = gesture;
   if (!current) return;
   const { entry, bounds } = current;
@@ -542,6 +576,7 @@ function updateGesture(): void {
 function finishGesture(cancelled: boolean): void {
   const current = gesture;
   if (!current) return;
+  cancelled ||= phone.matches || suspended;
   cancelAnimationFrame(moveFrame);
   moveFrame = 0;
   if (!cancelled) updateGesture();
@@ -553,17 +588,28 @@ function finishGesture(cancelled: boolean): void {
   if (!current.started) return;
   if (cancelled) {
     const original = current.original;
-    if (current.entry.maximized) command(current.entry, 'restore');
-    current.entry.rect = original.rect;
-    current.entry.snap = original.snap;
-    current.entry.freeRect = original.freeRect;
-    if (original.maximized) command(current.entry, 'maximize');
-    else apply(current.entry);
+    if (phone.matches || suspended) {
+      if (current.entry.maximized !== original.maximized) current.entry.pendingMaximized = original.maximized;
+      current.entry.maximized = original.maximized;
+      current.entry.beforeMaximum = original.maximized ? { rect: original.rect, snap: original.snap, freeRect: original.freeRect } : undefined;
+      current.entry.rect = original.rect;
+      current.entry.snap = original.snap;
+      current.entry.freeRect = original.freeRect;
+      apply(current.entry);
+    } else {
+      if (current.entry.maximized) command(current.entry, 'restore');
+      current.entry.rect = original.rect;
+      current.entry.snap = original.snap;
+      current.entry.freeRect = original.freeRect;
+      if (original.maximized) command(current.entry, 'maximize');
+      else apply(current.entry);
+    }
   } else if (current.snap) applySnap(current.entry, current.snap, current.bounds);
   if (!cancelled) rememberLayout(current.entry);
 }
 
 document.addEventListener('pointerdown', (event) => {
+  if (phone.matches || suspended) return;
   if (event.button !== 0 || !event.isPrimary || !(event.target instanceof Element) || gesture) return;
   const root = event.target.closest<HTMLElement>('[data-desktop-window]');
   const entry = root && layouts.get(root);
@@ -606,6 +652,7 @@ window.addEventListener('pointercancel', (event) => { if (gesture?.pointer === e
 document.addEventListener('lostpointercapture', (event) => { if (gesture?.pointer === event.pointerId) finishGesture(true); });
 window.addEventListener('blur', () => finishGesture(true));
 document.addEventListener('dblclick', (event) => {
+  if (phone.matches || suspended) return;
   if (!(event.target instanceof Element) || event.target.closest(interactive) || !event.target.closest('[data-window-drag]')) return;
   const root = event.target.closest<HTMLElement>('[data-desktop-window]');
   const entry = root && layouts.get(root);
@@ -618,6 +665,7 @@ document.addEventListener('focusin', (event) => {
   if (entry) raise(entry);
 });
 document.addEventListener('keydown', (event) => {
+  if (phone.matches || suspended) return;
   if (event.key === 'Escape' && gesture) { event.preventDefault(); finishGesture(true); return; }
   if (!(event.target instanceof HTMLElement) || !event.target.hasAttribute('data-window-drag') || !event.key.startsWith('Arrow')) return;
   const root = event.target.closest<HTMLElement>('[data-desktop-window]');
@@ -655,19 +703,49 @@ document.addEventListener('keydown', (event) => {
   rememberLayout(entry);
 });
 
+function applyLayouts(): void {
+  if (suspended) return;
+  synchronizeEditing();
+  const bounds = phone.matches ? undefined : workspace();
+  for (const entry of layouts.values()) {
+    if (!entry.root.isConnected) continue;
+    if (!phone.matches) {
+      if (entry.pendingMaximized !== undefined) {
+        const maximized = entry.pendingMaximized;
+        entry.pendingMaximized = undefined;
+        command(entry, maximized ? 'maximize' : 'restore');
+      }
+      if (entry.pendingEditorLayout) {
+        const detail = entry.pendingEditorLayout;
+        entry.pendingEditorLayout = undefined;
+        if (editing()) applyEditorLayout(entry, detail);
+      }
+    }
+    apply(entry, bounds);
+  }
+}
+
 function reflow(): void {
   if (suspended) return;
   finishGesture(true);
+  if (phone.matches) {
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = 0;
+    applyLayouts();
+    return;
+  }
   if (resizeFrame) return;
   resizeFrame = requestAnimationFrame(() => {
     resizeFrame = 0;
-    const bounds = workspace();
-    for (const entry of layouts.values()) if (entry.root.isConnected) apply(entry, bounds);
+    applyLayouts();
   });
 }
 window.addEventListener('resize', reflow);
 window.visualViewport?.addEventListener('resize', reflow);
 document.addEventListener('gwenlium:chrome-change', reflow);
+document.addEventListener('gwenlium:mobile-window-change', reflow);
+phone.addEventListener('change', reflow);
+window.addEventListener('orientationchange', reflow);
 document.addEventListener('astro:before-swap', () => {
   finishGesture(true);
   suspended = true;
@@ -680,8 +758,7 @@ document.addEventListener('astro:before-swap', () => {
 document.addEventListener('astro:after-swap', () => {
   suspended = false;
   // Restore persistent top-layer windows before the browser captures the new page.
-  const bounds = workspace();
-  for (const entry of layouts.values()) if (entry.root.isConnected) apply(entry, bounds);
+  applyLayouts();
 });
 document.addEventListener('astro:page-load', () => { suspended = false; reflow(); });
 window.addEventListener('beforeprint', () => { suspended = true; finishGesture(true); for (const entry of layouts.values()) detach(entry); });

@@ -19,8 +19,8 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 <dialog id="start-menu" class="start-menu" aria-labelledby="start-menu-title" style={{ '--menu-tone': `var(--${definition.tone})`, '--start-preferred-width': definition.width > 0 ? `${definition.width}px` : undefined, '--start-preferred-height': definition.height > 0 ? `${definition.height}px` : undefined }}>
   <header class="start-titlebar">
     <img class="start-avatar" src="/avatar.webp" width="32" height="32" alt="" />
-    <div class="start-heading"><h2 id="start-menu-title">{definition.title}</h2><span>{site.name}</span></div>
-    <button class="start-close" type="button" data-close-start aria-label={`Close ${definition.title}`}><Icon name="close" size={16} /></button>
+    <div class="start-heading"><h2 id="start-menu-title"><span class="desktop-label">{definition.title}</span><span class="mobile-label">Menu</span></h2><span>{site.name}</span></div>
+    <button class="start-close" type="button" data-close-start aria-label={`Close ${definition.title}`}><Icon name="close" size={16} /><span class="mobile-label">Close</span></button>
   </header>
   <div class="start-content">
     <form class="start-search" role="search" aria-label="Site" data-start-search>
@@ -50,7 +50,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
         </ul>
       </nav>
       <section class="start-windows" aria-labelledby="start-windows-title">
-        <div class="start-section-heading"><h3 id="start-windows-title">Windows</h3><span class="start-window-count" data-start-window-count>0</span></div>
+        <div class="start-section-heading"><h3 id="start-windows-title"><span class="desktop-label">Windows</span><span class="mobile-label">On this page</span></h3><span class="start-window-count" data-start-window-count>0</span></div>
         <p class="start-empty" data-start-windows-empty>All windows are open.</p>
         <ul class="start-window-list" aria-label="Hidden windows" data-start-windows></ul>
         <button class="start-restore-all" type="button" data-restore-all-windows disabled>Restore all</button>
@@ -187,6 +187,24 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
     .start-sections { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
     .start-pages ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .2rem; }
     .start-windows { padding: .9rem 0 0; border-top: 1px solid var(--line); border-left: 0; }
+  }
+  @media screen and (max-width: 760px) {
+    :global(html[data-mobile-window-mode]) .start-menu { inset: calc(var(--workspace-top) + .25rem) var(--app-inset) calc(var(--workspace-bottom) + .25rem); width: auto; height: auto; max-width: 34rem; max-height: none; margin-inline: auto; }
+    :global(html[data-mobile-window-mode]) .start-content { display: flex; flex-direction: column; flex: 1; padding: .8rem; scrollbar-gutter: auto; }
+    :global(html[data-mobile-window-mode]) .start-close { display: flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; padding-inline: .55rem; }
+    :global(html[data-mobile-window-mode]) .start-sections { display: flex; flex-direction: column; order: -1; gap: 1rem; }
+    :global(html[data-mobile-window-mode]) .start-pages ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .2rem; }
+    :global(html[data-mobile-window-mode]) .start-pages a { min-height: 44px; }
+    :global(html[data-mobile-window-mode]) .start-windows { order: -1; padding: 0 0 .9rem; border-bottom: 1px solid var(--line); border-top: 0; border-left: 0; }
+    :global(html[data-mobile-window-mode]) .start-window-list :global(small) { display: none; }
+    :global(html[data-mobile-window-mode]) .start-search { margin-top: 1rem; }
+    :global(html[data-mobile-window-mode]) .start-results { order: 1; }
+    :global(html[data-mobile-window-mode]) .start-more { order: 2; }
+    :global(html[data-mobile-window-mode]) .start-restore-all,
+    :global(html[data-mobile-window-mode]) .start-shortcuts,
+    :global(html[data-mobile-window-mode]) .start-footer > span,
+    :global(html[data-mobile-window-mode]) .start-footer [data-open-shortcuts],
+    :global(html[data-mobile-window-mode]) .start-footer:not(:has([data-owner-editor]:not([hidden]))) { display: none; }
   }
   @media (max-height: 420px) {
     .start-titlebar { padding: .3rem .5rem; }

@@ -291,6 +291,7 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
 .taskbar-restore { margin-left: auto; }
 .brand-avatar { width: 100%; height: 100%; object-fit: cover; }
 .start-trigger img { flex-shrink: 0; border: 1px solid var(--line); }
+.mobile-label, .taskbar [data-mobile-back], [data-mobile-entry-tabs] { display: none; }
 
 .settings-window { position: fixed; top: calc(var(--workspace-top) + 16px); left: max(var(--app-inset), calc(50vw - 245px)); width: min(490px, calc(100vw - 2 * var(--app-inset))); height: min(620px, calc(100dvh - var(--workspace-top) - var(--workspace-bottom) - 32px)); }
 @supports (backdrop-filter: blur(1px)) {
@@ -344,6 +345,30 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
 }
 @media (max-width: 620px) {
   .taskbar-control > span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+@media screen and (max-width: 760px) {
+  html[data-mobile-window-mode] .site-shell { grid-template-rows: auto minmax(0, 1fr) auto; }
+  html[data-mobile-window-mode] .site-header { grid-row: 1; }
+  html[data-mobile-window-mode] #page-scroll { grid-area: 2 / 1; padding-inline: 0; scrollbar-gutter: auto; }
+  html[data-mobile-window-mode] .player-region { grid-area: 2 / 1; height: 0; }
+  html[data-mobile-window-mode] .taskbar { grid-area: 3 / 1; flex-wrap: wrap; }
+  html[data-mobile-window-mode] .site-footer { grid-area: 3 / 1; height: 0; min-height: 0; margin: 0; padding: 0; }
+  html[data-mobile-window-mode] .footer-navigation,
+  html[data-mobile-window-mode] .taskbar :is([data-open-settings], [data-taskbar-windows], [data-auto-arrange-windows], [data-restore-windows]),
+  html[data-mobile-window-mode] .desktop-label { display: none !important; }
+  html[data-mobile-window-mode] .mobile-label { display: inline; }
+  html[data-mobile-window-mode] .taskbar [data-mobile-back] { display: inline-flex; }
+  html[data-mobile-window-mode] .taskbar [data-open-player] { margin-left: auto; }
+  html[data-mobile-window-mode] .taskbar .button,
+  html[data-mobile-window-mode] .taskbar .button-secondary { min-height: 44px; }
+  html[data-mobile-window-mode] .taskbar [data-open-player] > .mobile-label { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip-path: none; }
+  html[data-mobile-window-mode][data-mobile-window-overlay] #page-scroll { visibility: hidden; pointer-events: none; }
+  html[data-mobile-window-mode] [data-mobile-entry-tabs]:not([hidden]) { display: flex; position: sticky; top: 0; z-index: 3; gap: .5rem; margin-bottom: 1rem; padding-block: .4rem; background: var(--page-bg); }
+  html[data-mobile-window-mode] [data-mobile-entry-tabs] button { flex: 1; min-height: 44px; }
+  html[data-mobile-window-mode] [data-mobile-entry-tabs] [aria-selected='true'] { background: var(--sage); box-shadow: inset 1px 1px var(--bevel-dark), inset -1px -1px var(--bevel-light); }
+  html[data-mobile-window-mode] [data-mobile-entry-tabs] [hidden] { display: none !important; }
+  html[data-mobile-window-mode]:not([data-mobile-active-window='post-entry']) .entry-pagination { display: none !important; }
+  html[data-mobile-window-mode] .entry-pagination { margin-top: 1rem; }
 }
 @media (max-height: 560px) {
   .site-header { padding-block: .4rem; }

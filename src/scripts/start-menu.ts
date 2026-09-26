@@ -2,6 +2,7 @@ import { navigate } from 'astro:transitions/client';
 import { handleControlKeydown } from './controls';
 import { createSearchIndex } from '../lib/search';
 import { searchKindLabels, type SearchEntry, type SearchIndex, type SearchKind } from '../lib/search-types';
+import { availableMobileWindow } from './mobile-windows';
 
 type WindowCommand = { id: string; action: 'restore' } | { action: 'restore-all' };
 type StartMenu = {
@@ -137,6 +138,10 @@ function renderSearch(): void {
 function renderWindows(): void {
   if (!menu) return;
   const { windows, windowCount, emptyWindows, restoreAll, input } = menu;
+  const mobile = document.documentElement.hasAttribute('data-mobile-window-mode');
+  const active = document.documentElement.dataset.mobileActiveWindow;
+  windows.setAttribute('aria-label', mobile ? 'Available views' : 'Hidden windows');
+  emptyWindows.textContent = mobile ? 'No additional views on this page.' : 'All windows are open.';
   const focusedId = document.activeElement instanceof HTMLButtonElement && windows.contains(document.activeElement)
     ? document.activeElement.dataset.restoreWindow : undefined;
   let nextFocus: HTMLButtonElement | undefined;
@@ -144,21 +149,22 @@ function renderWindows(): void {
   const fragment = document.createDocumentFragment();
   for (const root of document.querySelectorAll<HTMLElement>('[data-desktop-window]')) {
     const { windowId: id, windowTitle: title, windowState: state } = root.dataset;
-    if (!id || (state !== 'minimized' && state !== 'closed')) continue;
+    if (!id || (mobile ? !availableMobileWindow(root) : state !== 'minimized' && state !== 'closed')) continue;
     count += 1;
     const item = document.createElement('li');
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.restoreWindow = id;
-    button.setAttribute('aria-label', `Restore ${title || 'window'}`);
+    button.setAttribute('aria-label', `${mobile ? 'Open' : 'Restore'} ${title || 'window'}`);
+    if (mobile && id === active) button.setAttribute('aria-current', 'true');
     const label = document.createElement('span');
     const name = document.createElement('span');
     name.textContent = title || 'Window';
     const windowState = document.createElement('small');
-    windowState.textContent = state === 'minimized' ? 'Minimized' : 'Closed';
+    windowState.textContent = mobile ? (id === active ? 'Current view' : 'Available') : state === 'minimized' ? 'Minimized' : 'Closed';
     label.append(name, windowState);
     const action = document.createElement('span');
-    action.textContent = 'Restore';
+    action.textContent = mobile ? (id === active ? 'Current' : 'Open') : 'Restore';
     button.append(label, action);
     item.append(button);
     fragment.append(item);
@@ -166,9 +172,9 @@ function renderWindows(): void {
   }
   windows.replaceChildren(fragment);
   windowCount.textContent = String(count);
-  windowCount.setAttribute('aria-label', `${count} hidden ${count === 1 ? 'window' : 'windows'}`);
+  windowCount.setAttribute('aria-label', `${count} ${mobile ? 'available views' : `hidden ${count === 1 ? 'window' : 'windows'}`}`);
   emptyWindows.hidden = count > 0;
-  restoreAll.disabled = count === 0;
+  restoreAll.disabled = mobile || count === 0;
   if (focusedId && menu.dialog.open) (nextFocus ?? (count > 0 ? restoreAll : input)).focus({ preventScroll: true });
 }
 
@@ -225,10 +231,13 @@ function openMenu(trigger: HTMLElement): void {
   menu.returnTrigger = trigger;
   menu.pendingCommand = null;
   menu.dialog.returnValue = '';
+  const mobile = document.documentElement.hasAttribute('data-mobile-window-mode');
+  menu.input.autofocus = !mobile;
   renderWindows();
   menu.dialog.showModal();
   positionMenu();
-  menu.input.focus({ preventScroll: true });
+  if (mobile) menu.dialog.querySelector<HTMLButtonElement>('[data-close-start]')?.focus({ preventScroll: true });
+  else menu.input.focus({ preventScroll: true });
   loadIndex();
 }
 

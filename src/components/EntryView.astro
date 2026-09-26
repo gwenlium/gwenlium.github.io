@@ -30,9 +30,16 @@ interface Props {
 }
 
 const { section, title, date, dateLabel, tags, excerpt, sourceFile, contents, mediaItems, hasEntryMedia, shareUrl, older, newer, related, preview = false } = Astro.props;
+const mediaWindow = getWindowDefinition('post-media');
+const hasMediaContent = hasEntryMedia || hasWindowOverride('post-media');
+const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
 ---
 
 <a class="back-link" href={`/${section}/`} data-preview-back-link><span aria-hidden="true">←</span> All entries</a>
+<div class="mobile-entry-tabs" data-mobile-entry-tabs role="tablist" aria-label="Entry views">
+  <button id="mobile-tab-read" class="button-secondary" type="button" role="tab" data-mobile-window-target="post-entry" aria-controls="post-entry" aria-selected="true">Read</button>
+  <button id="mobile-tab-media" class="button-secondary" type="button" role="tab" data-mobile-window-target="post-media" aria-controls="post-media" aria-selected="false" tabindex="-1" disabled={!hasMediaWindow} hidden={!hasMediaWindow}>Media</button>
+</div>
 <div class="article-layout" data-entry-preview={preview || undefined}>
   <div class="article-main">
     <div class="article-window">
@@ -80,7 +87,7 @@ const { section, title, date, dateLabel, tags, excerpt, sourceFile, contents, me
   </nav>}
   </div>
 
-  {(hasEntryMedia || preview || getWindowDefinition('post-media')?.enabled === false) && <div class="article-media-slot" hidden={!hasEntryMedia} data-preview-media>
+  {(hasMediaContent || preview || mediaWindow?.enabled === false) && <div class="article-media-slot" hidden={!hasMediaContent} data-preview-media>
     <Window windowId="post-media" class="entry-media-window">
       <EntryMedia id="entry-media-viewer" sourceId="entry-content" items={mediaItems} />
     </Window>

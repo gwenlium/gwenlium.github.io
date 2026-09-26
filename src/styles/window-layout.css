@@ -52,6 +52,41 @@ html[data-window-interaction] iframe { pointer-events: none; }
   .taskbar-windows .taskbar-window { max-width: 95px; }
   .taskbar-window-label { max-width: 7ch; font-size: 9px; }
 }
+@media screen and (max-width: 760px) {
+  html[data-mobile-window-mode] [data-desktop-window]:not([data-mobile-window-active]),
+  html[data-mobile-window-mode] :is([data-window-resize], [data-window-placeholder], .window-controls, .player-window-controls, .window-snap-preview) { display: none !important; }
+  html[data-mobile-window-mode] [data-window-drag] { cursor: default; touch-action: auto; user-select: auto; }
+  html[data-mobile-window-mode] [data-desktop-window][data-mobile-window-active]:not([hidden]) {
+    position: fixed !important;
+    inset: calc(var(--workspace-top) + .25rem) var(--app-inset) calc(var(--workspace-bottom) + .25rem) !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    transform: none !important;
+    z-index: 20 !important;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden !important;
+  }
+  html[data-mobile-window-mode] [data-mobile-window-active] > :is(.window-titlebar, .player-titlebar) { flex-shrink: 0; }
+  html[data-mobile-window-mode] [data-mobile-window-active] > :is(.window-body, .player-body) { flex: 1; min-height: 0; min-width: 0; overflow: auto; overscroll-behavior: contain; }
+  /* Layout wrappers contribute no empty grid tracks or desktop sizing between views. */
+  html[data-mobile-window-mode] #main-content :is(div, aside, section):has([data-desktop-window]):not([data-desktop-window], [data-desktop-window] *, [hidden]) { display: contents !important; }
+  html[data-mobile-window-mode] #main-content [data-desktop-window][data-mobile-window-active]:not([hidden]) {
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    z-index: auto !important;
+    display: block;
+    overflow: visible !important;
+  }
+  html[data-mobile-window-mode] #main-content [data-mobile-window-active] > .window-body { flex: none !important; height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important; overscroll-behavior: auto; }
+}
 @media (pointer: coarse) {
   [data-window-resize='n'], [data-window-resize='s'] { height: 9px; }
   [data-window-resize='e'], [data-window-resize='w'] { width: 9px; }

@@ -209,7 +209,8 @@ const definition = getWindowDefinition('music-player')!;
         else document.dispatchEvent(new CustomEvent('gwenlium:play', { detail: { id: button.dataset.playTrack } }));
       }, { signal });
       document.addEventListener('keydown', (event) => {
-        if (event.defaultPrevented || event.key !== 'Escape' || this.visibility !== 'open' || document.querySelector('dialog[open]')) return;
+        const visible = document.documentElement.hasAttribute('data-mobile-window-mode') ? !this.panel.hidden : this.visibility === 'open';
+        if (event.defaultPrevented || event.key !== 'Escape' || !visible || document.querySelector('dialog[open]')) return;
         if (!this.queue.hidden) {
           event.preventDefault();
           this.setQueueOpen(false, true);
@@ -271,8 +272,6 @@ const definition = getWindowDefinition('music-player')!;
       this.panel = this.querySelector('#music-player')!;
       this.maximizeButton = this.querySelector('[data-player-maximize]')!;
       this.visibility = this.dataset.playerState === 'closed' ? 'closed' : 'open';
-      // On a phone the open player would cover the whole page; start it in the taskbar instead.
-      if (this.visibility === 'open' && matchMedia('(max-width: 760px)').matches) this.visibility = 'collapsed';
       try {
         const visibility = localStorage.getItem('gwenlium:player:visibility');
         if (visibility === 'open' || visibility === 'collapsed' || visibility === 'closed') this.visibility = visibility;
