@@ -34,5 +34,5 @@ Each protagonist will be able to equip three weapons which also have their own r
 
 Let's talk about her striking design! The weapon carries the element lightning which is green in this game, thus her outfit conveys this element. Inspiration was taken from 2B from NieR: Automata which I really liked back when I played it the first time; an open airy outfit that is also revealing to some degree, including some tattoos which will play a big role in the HUD later. This was intentional to make her look badass and confident with the blade and how she zippzzz through enemies! The weapon design was inspired by Xenoblade 1's Monado, mixed with the iconic design of the Master Sword from Zelda, though it has a very computerly design as well to tell the player again that they are in a computer world.
 
-Credit goes to the amazing artist [Bre - Open For Big Project | Profile | Fiverr](https://www.fiverr.com/peanutsbee_lab?source=inbox)  
+Credit goes to the amazing artist Peanutsbee\_lab  
 Thank you for your help!
