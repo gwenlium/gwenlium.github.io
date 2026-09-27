@@ -7,6 +7,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import Window from '../components/Window.astro';
 import Media from '../components/Media.astro';
 import Icon from '../components/Icon.astro';
+import EntryArchive from '../components/EntryArchive.astro';
 import { site } from '../lib/settings';
 import { getWindowDefinition, hasWindowOverride } from '../lib/windows';
 const about = site.about;
@@ -41,6 +42,7 @@ const showPortrait = Boolean(getWindowDefinition('about-portrait')?.enabled && (
       {about.links.length > 0 && <nav class="profile-links" aria-label="Profile links"><ul>{about.links.map((link, index) => <li><a href={link.url} data-site-edit-file="src/content/pages/about.json" data-site-edit-field={`/links/${index}/label`} data-site-edit-format="text" data-site-edit-label="Profile link label">{link.label}</a></li>)}</ul></nav>}
     </div>
   </div>
+  <EntryArchive section="about" />
 </SiteLayout>
 
 <style>

@@ -1,8 +1,11 @@
 import { builtinWindowPages, systemWindowIds, windowPages, windowTones } from '../../lib/window-catalogue.mjs';
+import { entrySectionFromPath, entrySectionIds, entrySectionInfo } from '../../lib/entry-sections.mjs';
 import { previewText } from '../../lib/preview-text.mjs';
+import { editablePages, editablePageForPath, type EditablePageId } from '../../lib/page-catalogue';
 import type { EditorBinding } from '../../lib/editor-types';
 import type { WindowDefinition } from '../../lib/windows';
 import { ownerStore, writerUrl } from './session';
+import { chooseEntryDestination } from './new-entry';
 import { isPostPath, type SiteEditorStore } from './store';
 import { renderMarkdownPreview } from './markdown';
 import { createRichText, type RichTextHandle } from './rich-text';
@@ -10,7 +13,7 @@ import { chooseFromLibrary, stageFiles } from './media';
 import { canCrop, cropPicture } from './crop';
 import { openPublish, resolveConflicts, resumeLiveCheck } from './publish';
 import { openAnalytics } from './analytics';
-import { openAboutDetails, openGallery, openMusic, openSiteSettings, windowContentField } from './manage';
+import { openPageEditor, openGallery, openMusic, openSiteSettings, windowContentField } from './manage';
 import { anchoredPanel, button, confirmAction, errorText, node, openDialog, toast } from './ui';
 import { navigate } from 'astro:transitions/client';
 import { hasOwnerHint } from './auth';
@@ -38,21 +41,24 @@ function annotate(element: HTMLElement, target: EditorBinding): void {
 
 function pageName(): string {
   const segments = location.pathname.split('/').filter(Boolean);
-  if (segments.length > 1 && ['devlog', 'life'].includes(segments[0])) return 'post';
+  if (segments.length > 1 && entrySectionFromPath(location.pathname)) return 'post';
   const page = segments[0] || 'home';
   return windowPages.includes(page) ? page : 'not-found';
 }
 
-/** The journal entry this page shows, if any (from the post window's own bindings). */
+function currentPage(): EditablePageId | undefined {
+  const section = location.pathname.split('/')[1];
+  if (section === 'write' || section === 'admin') return;
+  return editablePageForPath(location.pathname) ?? (root.dataset.pageTheme === 'not-found' ? 'not-found' : undefined);
+}
+
+/** The entry this page shows, if any (from the post window's own bindings). */
 function currentEntry(): string | undefined {
   const title = document.querySelector<HTMLElement>('#post-entry [data-site-edit-field="/title"]');
   const file = title?.dataset.siteEditFile;
   return file && isPostPath(file) ? file : undefined;
 }
 
-function currentSection(): 'devlog' | 'life' {
-  return location.pathname.startsWith('/life') ? 'life' : 'devlog';
-}
 
 function placeCaret(element: HTMLElement, event?: MouseEvent): void {
   const selection = getSelection();
@@ -219,27 +225,31 @@ class OwnerControls {
     panel.setAttribute('role', 'menu');
     panel.setAttribute('aria-label', 'Edit website');
     const entry = currentEntry();
+    const page = currentPage();
+    const saved = () => this.applyDraft();
     const item = (label: string, hint: string, run: () => void, primary = false) => {
       const element = button('', () => { close(); run(); }, `owner-menu__item${primary ? ' owner-menu__item--primary' : ''}`);
       element.setAttribute('role', 'menuitem');
       element.append(node('strong', label), node('small', hint));
       return element;
     };
-    const go = (href: string) => { void navigate(href); };
+    const go = (href: string) => { void Promise.resolve(this.inline?.finish(true)).then(() => navigate(href)); };
     panel.append(node('p', this.store.local ? 'Editing local files' : 'Edit website', 'owner-menu__heading'));
-    panel.append(item('New entry', `Write a new ${currentSection() === 'life' ? 'Life' : 'Devlog'} post`, () => go(writerUrl({ fresh: true, section: currentSection() })), true));
-    if (entry) panel.append(item('Edit this entry', 'Text, pictures, tags and visibility', () => go(writerUrl({ entry }))));
-    panel.append(item(this.editing ? 'Stop editing this page' : 'Edit this page', this.editing ? 'Back to browsing' : 'Click text or pictures on the page to change them', () => this.setEditing(!this.editing)));
-    panel.append(item('All entries', 'Drafts, published and scheduled posts', () => go(writerUrl())));
-    if (pageName() === 'gallery') panel.append(item('Add to gallery', 'Pictures or video from this device', () => this.pickGallery()));
-    const saved = () => this.applyDraft();
+    if (entry) panel.append(item('Edit this entry', 'Text, pictures, tags and visibility', () => go(writerUrl({ entry })), true));
+    panel.append(item('New entry', `Choose a destination: ${entrySectionIds.map(section => entrySectionInfo[section].label).join(', ')}`, () => {
+      void chooseEntryDestination(entrySectionFromPath(location.pathname)).then(section => { if (section) go(writerUrl({ fresh: true, section })); });
+    }, !entry && page !== undefined && page !== 'not-found'));
+    if (page) panel.append(item(`Edit ${editablePages[page].label}`, editablePages[page].description, () => { void Promise.resolve(this.inline?.finish(true)).then(() => openPageEditor(this.store, page, saved)); }));
+    panel.append(item('Page settings', 'Edit page copy and settings, separately from entries', () => go(writerUrl({ view: 'pages' }))));
+    panel.append(item(this.editing ? 'Stop editing in place' : 'Edit in place', this.editing ? 'Back to browsing' : 'Click text or pictures on the page to change them', () => this.setEditing(!this.editing)));
+    panel.append(item('All entries', 'Drafts, published and scheduled entries in every destination', () => go(writerUrl())));
+    if (page === 'gallery') panel.append(item('Add gallery items', 'Pictures or video from this device', () => this.pickGallery()));
     const manage = node('div', undefined, 'owner-menu__more');
     manage.append(
       node('span', 'Manage', 'owner-menu__group'),
       button('Site settings', () => { close(); void openSiteSettings(this.store, saved); }, 'owner-menu__small'),
-      button('Gallery', () => { close(); void openGallery(this.store, saved); }, 'owner-menu__small'),
-      button('Music', () => { close(); void openMusic(this.store, saved); }, 'owner-menu__small'),
-      button('About page', () => { close(); void openAboutDetails(this.store, saved); }, 'owner-menu__small'),
+      button('Gallery items', () => { close(); void openGallery(this.store, saved); }, 'owner-menu__small'),
+      button('Music tracks', () => { close(); void openMusic(this.store, saved); }, 'owner-menu__small'),
       button('Windows', () => { close(); void this.windowList(); }, 'owner-menu__small'),
       button('Unused media', () => { close(); void this.unusedMedia(); }, 'owner-menu__small'),
     );
@@ -586,7 +596,7 @@ class OwnerControls {
     const field = (label: string, input: HTMLElement) => { const wrap = node('label', undefined, 'owner-label'); wrap.append(node('span', label), input); body.append(wrap); return input; };
     const title = field('Title', Object.assign(node('input', undefined, 'owner-field'), { value: existing?.title || '' })) as HTMLInputElement;
     const page = field('Shows on', node('select', undefined, 'owner-field')) as HTMLSelectElement;
-    for (const value of windowPages) { const option = node('option', value === 'all' ? 'Every page' : value === 'not-found' ? 'Page not found' : value === 'post' ? 'Every journal entry' : value[0].toUpperCase() + value.slice(1)); option.value = value; page.append(option); }
+    for (const value of windowPages) { const option = node('option', value === 'all' ? 'Every page' : value === 'not-found' ? 'Page not found' : value === 'post' ? 'Every entry' : value[0].toUpperCase() + value.slice(1)); option.value = value; page.append(option); }
     page.value = existing?.page || pageName();
     page.disabled = Boolean(existing && Object.hasOwn(builtinWindowPages, existing.id));
     const tone = field('Colour', node('select', undefined, 'owner-field')) as HTMLSelectElement;
@@ -601,7 +611,7 @@ class OwnerControls {
       content: existing?.content ?? 'text', media: existing?.media ?? [], links: existing?.links ?? [], items: existing?.items ?? [], limit: existing?.limit ?? 0,
     }, text => { status.textContent = text; }) : undefined;
     if (content) body.append(content.element);
-    body.append(node('p', 'To place or resize it, use Edit this page and move the window where you want it.', 'owner-hint'));
+    body.append(node('p', 'To place or resize it, use Edit in place and move the window where you want it.', 'owner-hint'));
     footer.append(button('Cancel', () => dialog.close()));
     if (existing && !Object.hasOwn(builtinWindowPages, existing.id)) footer.append(button('Delete window', () => void (async () => {
       if (!await confirmAction('Delete this window?', 'It disappears from the website when you publish.', 'Delete window', true)) return;

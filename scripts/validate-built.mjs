@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { load } from 'cheerio';
 import { inlineScripts } from './apply-csp.mjs';
+import { entryUrl, resolveEntrySection } from '../src/lib/entry-sections.mjs';
 import {
   containedFile, isPublishedPost, mediaFilePattern, previewReferenceIssue, publicBranding, readMediaPreviews,
   readPosts, resolvePublicUrl, siteOrigin, srcsetUrls, validatePreviewFiles, walkFiles,
@@ -89,7 +90,7 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
   if (!htmlFiles.length) report(relativeName(root, directory), 'output', 'No HTML pages were generated.');
   const posts = readPosts(root, report);
   const unpublished = new Map(posts.filter((post) => !isPublishedPost(post.data, now) && typeof post.data.permalink === 'string' && post.data.permalink)
-    .map((post) => [`/${post.data.section ?? 'devlog'}/${post.data.permalink}/`, post.file]));
+    .map((post) => [entryUrl(resolveEntrySection(post.data.section), post.data.permalink), post.file]));
   const documents = new Map();
   const targets = new Map();
   let references = 0;
@@ -271,7 +272,7 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
       }
       if (channel.children('link').length) check(channel.children('link').first().text().trim(), name, 'channel.link', `${siteOrigin}/`, { required: true });
       const expectedPosts = new Map(posts.filter((post) => isPublishedPost(post.data, now))
-        .map((post) => [new URL(`/${post.data.section ?? 'devlog'}/${post.data.permalink}/`, siteOrigin).href, post]));
+        .map((post) => [new URL(entryUrl(resolveEntrySection(post.data.section), post.data.permalink), siteOrigin).href, post]));
       channel.children('item').each((index, element) => {
         const item = $(element);
         const field = `item[${index}]`;

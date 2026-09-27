@@ -6,6 +6,8 @@ import { build } from 'esbuild';
 import test from 'node:test';
 import { Miniflare } from 'miniflare';
 import ts from 'typescript';
+import { entrySectionIds } from '../src/lib/entry-sections.mjs';
+import { systemWindowIds } from '../src/lib/window-catalogue.mjs';
 
 const configText = await readFile(new URL('./wrangler.jsonc', import.meta.url), 'utf8');
 const configuration = ts.parseConfigFileTextToJson('wrangler.jsonc', configText).config;
@@ -375,6 +377,39 @@ test('editor preflights disallowed paths, duplicates, broken content and malform
     assert.equal(response.status, 400, JSON.stringify(body));
   }
   assert.deepEqual(fixture.writes, []); assert.equal(fixture.head, editorHead);
+});
+
+test('editor publishes rich entries in every destination and keeps omitted sections in Devlog selections', async t => {
+  const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
+  const changes = [...entrySectionIds, undefined].map(section => {
+    const permalink = section === undefined ? 'legacy' : `entry-${section}`;
+    return {
+      path: `src/content/posts/${permalink}.md`,
+      content: `---\ntitle: Rich entry\ndraft: false\npermalink: ${permalink}\ndate: 2000-01-01\n${section === undefined ? '' : `section: ${section}\n`}excerpt: A summary\ntags: [example]\ncover: ${previousPreviewPath}\ncoverAlt: Prepared image\nmedia: [{type: image, src: ${previousPreviewPath}, alt: Prepared image}]\n---\n**Rich body**\n\n![Prepared image](${previousPreviewPath})\n`,
+    };
+  });
+  const window = { page: 'all', title: 'Entries', enabled: true, tone: 'sage', floating: true, initiallyClosed: false, width: 0, height: 0, content: 'default', body: '', media: [], links: [], items: [], limit: 0 };
+  changes.push({ path: 'src/content/windows.json', content: JSON.stringify({ windows: [
+    ...systemWindowIds.map(id => ({ ...window, id, initiallyClosed: id === 'start-menu' })),
+    { ...window, id: 'custom-legacy', page: 'home', content: 'devlog', items: ['legacy'] },
+  ] }) });
+  const response = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({ changes }) });
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.equal((await response.json()).commit, publishedCommit);
+  assert.equal(fixture.head, publishedCommit);
+});
+
+test('editor rejects page-only, redirect and null entry destinations even for drafts without Git writes', async t => {
+  const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
+  for (const section of ['not-found', 'game', null]) {
+    const response = await worker.dispatchFetch('https://auth.test/editor/publish', { method: 'POST', headers: publishHeaders, body: publishBody({
+      changes: [{ path: 'src/content/posts/unsupported.md', content: `---\ntitle: Draft\ndraft: true\nsection: ${JSON.stringify(section)}\n---\nText\n` }],
+    }) });
+    assert.equal(response.status, 400, JSON.stringify(section));
+    assert.match((await response.json()).error, /section|destination/i);
+  }
+  assert.deepEqual(fixture.writes, []);
+  assert.equal(fixture.head, editorHead);
 });
 
 test('editor rejects known stale and preflight-racing publishes before creating draft blobs', async t => {

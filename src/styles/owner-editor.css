@@ -235,7 +235,7 @@ html[data-site-editing='true'] [data-site-edit-field]:has(> .owner-inline--rich)
 .writer-list { max-width: 52rem; width: 100%; margin-inline: auto; }
 .writer-list .window-body { display: grid; gap: .9rem; }
 .writer-list__actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.writer-list .writer-segmented { max-width: 22rem; }
+.writer-destination-filter { width: 100%; max-width: 22rem; margin: 0; }
 .writer-entries { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none; }
 .writer-entries__empty { color: var(--muted); }
 .writer-entry { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr) auto; align-items: center; gap: .8rem; padding: .5rem; border: 1px solid var(--line); background: var(--surface-raised); color: var(--ink); text-decoration: none; }
@@ -246,6 +246,8 @@ html[data-site-editing='true'] [data-site-edit-field]:has(> .owner-inline--rich)
 .writer-entry__text strong { overflow: hidden; font-size: .85rem; text-overflow: ellipsis; white-space: nowrap; }
 .writer-entry__text small { color: var(--muted); font-size: .68rem; }
 .writer-entry__badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .3rem; }
+.writer-entry.writer-page { grid-template-columns: minmax(0, 1fr) auto; width: 100%; font: inherit; text-align: left; cursor: pointer; }
+.writer-page:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .writer-badge { padding: .1rem .4rem; border: 1px solid var(--line); font-size: .6rem; white-space: nowrap; }
 .writer-badge--public { background: var(--sage); }
 .writer-badge--hidden { background: var(--surface); color: var(--muted); }
@@ -258,7 +260,11 @@ html[data-site-editing='true'] [data-site-edit-field]:has(> .owner-inline--rich)
   .writer-entry { grid-template-columns: 2.6rem minmax(0, 1fr); }
   .writer-entry__thumb { width: 2.6rem; }
   .writer-entry__badges { grid-column: 2; justify-content: flex-start; }
+  .writer-entry.writer-page { grid-template-columns: minmax(0, 1fr); }
+  .writer-page .writer-entry__badges { grid-column: 1; }
   .writer-status { text-align: left; }
+  .writer-destination-filter { max-width: none; }
+  .writer-destination-filter select, .writer-settings select, .owner-dialog select { min-height: 44px; }
   .owner-exact__columns { grid-template-columns: 1fr; }
   .owner-banner { width: auto; font-size: .65rem; }
 }

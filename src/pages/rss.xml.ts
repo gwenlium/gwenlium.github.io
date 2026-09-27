@@ -2,6 +2,7 @@ import rss from '@astrojs/rss';
 import type { APIContext } from 'astro';
 import { load } from 'cheerio';
 import { getPosts, postPreview, postUrl, type Post } from '../lib/content';
+import { entrySectionInfo } from '../lib/entry-sections.mjs';
 import { site } from '../lib/settings';
 
 const htmlEscapes: Record<string, string> = {
@@ -63,7 +64,7 @@ export async function GET(context: APIContext): Promise<Response> {
         pubDate: date,
         // The summary is optional; the start of the text stands in for it.
         description: postPreview(post),
-        categories: [post.data.section === 'life' ? 'Life' : 'Devlog', ...tags],
+        categories: [entrySectionInfo[post.data.section].label, ...tags],
         content: articleContent(post, base),
       };
     }),

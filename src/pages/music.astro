@@ -7,6 +7,7 @@ import Window from '../components/Window.astro';
 import Media from '../components/Media.astro';
 import Icon from '../components/Icon.astro';
 import MusicLibrary from '../components/MusicLibrary.astro';
+import EntryArchive from '../components/EntryArchive.astro';
 import { tracks } from '../lib/settings';
 import { getWindowDefinition } from '../lib/windows';
 const showLibrary = Boolean(getWindowDefinition('music-library')?.enabled);
@@ -56,6 +57,7 @@ const showCatalogue = Boolean(getWindowDefinition('music-catalogue')?.enabled);
   </Window>
     </div>
   </div>
+  <EntryArchive section="music" />
 </SiteLayout>
 
 <style>

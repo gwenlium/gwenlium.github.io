@@ -1,9 +1,11 @@
+import { entrySectionInfo, resolveEntrySection, type EntrySection } from '../../lib/entry-sections.mjs';
+import { mobileViewHistoryDepth } from '../mobile-windows';
 import { renderMarkdownPreview } from './markdown';
-import { ownerStore } from './session';
+import { ownerStore, writerUrl } from './session';
 
 type PreviewMedia = { type: 'image' | 'video' | 'audio'; src: string; alt: string; caption: string; poster: string };
 export type PreviewPayload = {
-  path?: string; section: 'devlog' | 'life'; title: string; date: string; tags: string[];
+  path?: string; section: EntrySection; title: string; date: string; tags: string[];
   excerpt: string; body: string; cover: string; coverAlt: string; media: PreviewMedia[];
   /** Where the writer was, so "Back to writing" can step back instead of adding a new page. */
   returnUrl?: string; returnIndex?: number;
@@ -119,28 +121,38 @@ function fill(): void {
     root.hidden = true;
     return;
   }
+  try { payload.section = resolveEntrySection(payload.section); }
+  catch {
+    if (note) note.textContent = 'This entry has an unknown destination. Return to the writer and choose a supported destination.';
+    root.hidden = true;
+    return;
+  }
+  const info = entrySectionInfo[payload.section];
+  root.hidden = false;
   document.documentElement.dataset.pageTheme = payload.section;
   document.title = `${payload.title.trim() || 'Untitled entry'} (preview)`;
   const back = document.querySelector<HTMLAnchorElement>('[data-preview-return]');
   if (back) {
-    back.href = payload.returnUrl ?? (payload.path ? `/write/?entry=${encodeURIComponent(payload.path)}` : '/write/');
+    back.href = payload.returnUrl ?? writerUrl({ entry: payload.path });
     const returnIndex = payload.returnIndex;
     back.onclick = event => {
-      // Straight from the writer: go back, so the browser history does not fill up with previews.
+      // Read/Media and settings views add history entries without advancing Astro's page index.
       const index = (history.state as { index?: number } | null)?.index;
       if (typeof returnIndex === 'number' && typeof index === 'number' && index === returnIndex + 1) {
         event.preventDefault();
-        history.back();
+        history.go(-(mobileViewHistoryDepth() + 1));
       }
     };
   }
   const archive = document.querySelector<HTMLAnchorElement>('[data-preview-back-link]');
-  if (archive) archive.href = `/${payload.section}/`;
+  if (archive) archive.href = info.indexUrl;
 
   const date = root.querySelector<HTMLTimeElement>('[data-preview-date]')!;
   const day = new Date(`${payload.date}T00:00:00Z`);
   date.dateTime = payload.date;
   date.textContent = Number.isFinite(day.getTime()) ? dateFormat.format(day) : '';
+  const dateRow = root.querySelector<HTMLElement>('[data-preview-date-row]');
+  if (dateRow) dateRow.hidden = !info.dated;
   root.querySelector('[data-preview-title]')!.textContent = payload.title;
 
   const tags = root.querySelector<HTMLElement>('[data-preview-tags]')!;
@@ -148,7 +160,7 @@ function fill(): void {
     const item = node('li');
     const link = node('a', tag);
     link.className = 'tag';
-    link.href = `/${payload!.section}/?tag=${encodeURIComponent(tag)}`;
+    link.href = `${info.indexUrl}?tag=${encodeURIComponent(tag)}`;
     item.append(link);
     return item;
   }));

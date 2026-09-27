@@ -1,6 +1,7 @@
 import { defineCollection } from 'astro:content';
 import { z } from 'astro/zod';
 import { glob } from 'astro/loaders';
+import { entrySectionIds } from './lib/entry-sections.mjs';
 
 const permalinkPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -25,7 +26,7 @@ const posts = defineCollection({
     publishAt: z.union([z.string(), z.date()]).optional().transform(value => (value === undefined || value === '' ? undefined : new Date(value))),
     excerpt: z.string().default(''),
     draft: z.boolean().default(true),
-    section: z.enum(['devlog', 'life']).default('devlog'),
+    section: z.enum(entrySectionIds).default('devlog'),
     tags: z.array(z.string()).default([]),
     cover: z.string().default(''),
     coverAlt: z.string().default(''),

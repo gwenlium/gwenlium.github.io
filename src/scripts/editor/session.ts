@@ -1,4 +1,5 @@
 import { devEditorPath, editorConfig } from '../../lib/editor-config';
+import { resolveEntrySection, type EntrySection } from '../../lib/entry-sections.mjs';
 import { BrowserOwnerAuth, DevOwnerAuth } from './auth';
 import { SiteEditorStore } from './store';
 
@@ -16,9 +17,10 @@ export function ownerStore(): SiteEditorStore {
   return store;
 }
 
-export const writerUrl = (options: { entry?: string; section?: 'devlog' | 'life'; fresh?: boolean } = {}) => {
+export const writerUrl = (options: { entry?: string; section?: EntrySection; fresh?: boolean; view?: 'pages' | EntrySection } = {}) => {
   const url = new URL('/write/', location.origin);
   if (options.entry) url.searchParams.set('entry', options.entry);
-  if (options.fresh) url.searchParams.set('new', options.section ?? 'devlog');
+  if (options.fresh) url.searchParams.set('new', resolveEntrySection(options.section));
+  if (options.view) url.searchParams.set('view', options.view);
   return `${url.pathname}${url.search}`;
 };

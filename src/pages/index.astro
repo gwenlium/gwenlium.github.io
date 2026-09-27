@@ -5,9 +5,11 @@ import Window from '../components/Window.astro';
 import Icon from '../components/Icon.astro';
 import Media from '../components/Media.astro';
 import PostCard from '../components/PostCard.astro';
+import EntryArchive from '../components/EntryArchive.astro';
 import { site, gallery, tracks } from '../lib/settings';
 import { getPosts, postUrl, postSourceFile, formatDate } from '../lib/content';
 import { getWindowDefinition, hasWindowOverride } from '../lib/windows';
+import { entrySectionInfo, resolveEntrySection } from '../lib/entry-sections.mjs';
 
 const posts = await getPosts();
 const homeIntro = site.intro || site.description;
@@ -68,7 +70,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
                 <h2 class="eyebrow">Recent entries</h2>
                 <ul>
                   {recentPosts.map((post) => (
-                    <li><a href={postUrl(post)}><span data-site-edit-file={postSourceFile(post)} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{post.data.title}</span><time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time><Icon name="arrow" size={14} /></a></li>
+                    <li><a href={postUrl(post)}><span data-site-edit-file={postSourceFile(post)} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{post.data.title}</span>{entrySectionInfo[resolveEntrySection(post.data.section)].dated && <time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time>}<Icon name="arrow" size={14} /></a></li>
                   ))}
                 </ul>
               </div>
@@ -121,6 +123,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
     )}
     </div>
   </div>
+  <EntryArchive section="home" />
 </SiteLayout>
 
 <style>

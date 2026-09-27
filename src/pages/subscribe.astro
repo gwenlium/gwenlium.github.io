@@ -5,6 +5,7 @@ import Window from '../components/Window.astro';
 import Icon from '../components/Icon.astro';
 import SubscribeForm from '../components/SubscribeForm.astro';
 import FollowAttribution from '../components/FollowAttribution.astro';
+import EntryArchive from '../components/EntryArchive.astro';
 import { getWindowDefinition } from '../lib/windows';
 const showRss = Boolean(getWindowDefinition('subscribe-rss')?.enabled);
 const showEmail = Boolean(getWindowDefinition('subscribe-email')?.enabled);
@@ -40,6 +41,7 @@ const feedUrl = new URL('/rss.xml', Astro.site || 'https://gwenlium.dev').href;
     </Window>
     </div>
   </div>
+  <EntryArchive section="subscribe" />
 </SiteLayout>
 
 <style>

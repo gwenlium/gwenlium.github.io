@@ -2,6 +2,7 @@ import { pages as pageSettings } from '../lib/pages';
 import { createMarkdownProcessor } from '@astrojs/markdown-remark';
 import { load } from 'cheerio';
 import { getPosts, postSearchText, postUrl, type Post } from '../lib/content';
+import { entrySectionInfo, isEntrySection, type EntrySection } from '../lib/entry-sections.mjs';
 import { gallery, site, tracks, type GalleryItem, type MusicTrack } from '../lib/settings';
 import type { SearchEntry } from '../lib/search-types';
 import { builtinWindowPages, systemWindowIds } from '../lib/window-catalogue.mjs';
@@ -9,9 +10,8 @@ import { getWindowDefinition, hasWindowOverride, windowDefinitions, type WindowD
 
 export const prerender = true;
 
-const pageRoutes: Record<Exclude<WindowPage, 'post'>, string> = {
-  home: '/', devlog: '/devlog/', life: '/life/', gallery: '/gallery/', music: '/music/',
-  about: '/about/', subscribe: '/subscribe/', 'not-found': '/404.html', all: '/',
+const pageRoutes: Record<Exclude<WindowPage, EntrySection | 'post'>, string> = {
+  'not-found': '/404.html', all: '/',
 };
 
 function text(...parts: (string | undefined)[]): string {
@@ -60,12 +60,20 @@ function hasDefaultContent(id: string): boolean {
   return Boolean(definition?.enabled && definition.content === 'default');
 }
 
+function archiveSection(id: string): EntrySection | undefined {
+  if (!Object.hasOwn(builtinWindowPages, id)) return undefined;
+  const page = builtinWindowPages[id as keyof typeof builtinWindowPages];
+  return isEntrySection(page) && (id === `${page}-search` || id === `${page}-entries`) ? page : undefined;
+}
+
 export async function GET(): Promise<Response> {
   const posts = await getPosts();
   const markdown = await createMarkdownProcessor({ remarkRehype: { allowDangerousHtml: false } });
   const markdownText = async (body: string) => body.trim() ? htmlText((await markdown.render(body)).code) : '';
   const postTexts = new Map<string, string>();
+  const postsBySection: Partial<Record<EntrySection, Post[]>> = {};
   for (const post of posts) {
+    (postsBySection[post.data.section] ??= []).push(post);
     const body = post.rendered?.html
       ? postSearchText(post)
       : text(post.data.title, post.data.excerpt, ...post.data.tags, await markdownText(post.body ?? ''));
@@ -105,6 +113,9 @@ export async function GET(): Promise<Response> {
   function windowUrl(definition: WindowDefinition): string | undefined {
     if (!definition.enabled || systemWindowIds.includes(definition.id)) return undefined;
     const builtin = Object.hasOwn(builtinWindowPages, definition.id);
+    const section = archiveSection(definition.id);
+    if (section && !entrySectionInfo[section].dated && !postsBySection[section]?.length
+      && !hasWindowOverride(`${section}-search`) && !hasWindowOverride(`${section}-entries`)) return undefined;
     if (builtin && definition.content === 'default') {
       switch (definition.id) {
         case 'home-game': if (!hasHomeGame) return undefined; break;
@@ -131,12 +142,15 @@ export async function GET(): Promise<Response> {
       ? builtinWindowPages[definition.id as keyof typeof builtinWindowPages] as WindowPage
       : definition.page;
     const destinationPost = definition.id === 'post-related' && definition.content === 'default' ? relatedPost : posts[0];
-    const route = page === 'post' ? destinationPost && postUrl(destinationPost) : pageRoutes[page];
+    const route = page === 'post' ? destinationPost && postUrl(destinationPost)
+      : isEntrySection(page) ? entrySectionInfo[page].indexUrl : pageRoutes[page];
     return route ? `${route}#${encodeURIComponent(definition.id)}` : undefined;
   }
 
   const subscribeText = site.newsletterFormAction ? text(site.newsletterHeading, site.newsletterButtonLabel) : '';
   function defaultWindowText(id: string): string {
+    const section = archiveSection(id);
+    if (section && id === `${section}-entries`) return text(...(postsBySection[section] ?? []).map(postCardText));
     switch (id) {
       case 'home-intro': return text(site.name, site.intro);
       case 'home-game': return text(game.title, game.description, game.status,
@@ -144,8 +158,6 @@ export async function GET(): Promise<Response> {
       case 'home-devlog': return text(featuredPost && postCardText(featuredPost), ...recentPosts.map((post) => post.data.title));
       case 'home-gallery': return text(...galleryPreview.map((item) => text(item.title, item.alt)));
       case 'home-music': return text(...musicPreview.map(trackText));
-      case 'devlog-entries': return text(...posts.filter((post) => post.data.section === 'devlog').map(postCardText));
-      case 'life-entries': return text(...posts.filter((post) => post.data.section === 'life').map(postCardText));
       case 'post-entry': return posts[0] ? postTexts.get(posts[0].data.permalink) ?? '' : '';
       case 'post-related': return text(...relatedPosts.map((post) => post.data.title));
       case 'game-details': return text(game.description, ...gameLinks.map((link) => link.label));
@@ -177,7 +189,7 @@ export async function GET(): Promise<Response> {
   }
   for (const post of posts) add({
     id: `post:${post.data.permalink}`, title: post.data.title, url: postUrl(post), kind: 'post',
-    text: postTexts.get(post.data.permalink) ?? '', tags: post.data.tags,
+    text: text(postTexts.get(post.data.permalink), entrySectionInfo[post.data.section].label), tags: post.data.tags,
   });
 
   const artworkDestinations = new Map<string, string>();
@@ -196,7 +208,7 @@ export async function GET(): Promise<Response> {
       case 'links': body = text(...limitItems(definition.links, definition).map((link) => link.label)); break;
       case 'devlog':
       case 'life': {
-        const selected = selectItems(posts.filter((post) => post.data.section === definition.content), (post) => post.data.permalink, definition);
+        const selected = selectItems(postsBySection[definition.content] ?? [], (post) => post.data.permalink, definition);
         body = text(...selected.map(postCardText));
         tags = [...new Set(selected.flatMap((post) => post.data.tags))];
         break;

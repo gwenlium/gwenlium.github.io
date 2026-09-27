@@ -3,12 +3,13 @@ import { load } from 'cheerio';
 import { relative, resolve, sep } from 'node:path';
 import { previewText } from './preview-text.mjs';
 import { mediaKindOf } from './embed.mjs';
+import { entryUrl, resolveEntrySection, type EntrySection } from './entry-sections.mjs';
 import manifest from '../generated/media.json';
 import registry from '../content/media-previews.json';
 
 export type Post = CollectionEntry<'posts'>;
 
-export async function getPosts(section?: 'devlog' | 'life'): Promise<Post[]> {
+export async function getPosts(section?: EntrySection): Promise<Post[]> {
   const posts = await getCollection('posts');
   const permalinks = new Map<string, string>();
   const now = Date.now();
@@ -24,14 +25,14 @@ export async function getPosts(section?: 'devlog' | 'life'): Promise<Post[]> {
   }
 
   return posts
-    .filter(({ data }) => (!section || data.section === section) && !data.draft && Number.isFinite(data.date.getTime()) && data.date.getTime() <= now
+    .filter(({ data }) => (section === undefined || resolveEntrySection(data.section) === section) && !data.draft && Number.isFinite(data.date.getTime()) && data.date.getTime() <= now
       && (data.publishAt === undefined || data.publishAt.getTime() <= now))
     .sort((a, b) => b.data.date.getTime() - a.data.date.getTime()
       || (a.data.permalink < b.data.permalink ? -1 : a.data.permalink > b.data.permalink ? 1 : 0));
 }
 
 export function postUrl(post: Post): string {
-  return `/${post.data.section}/${post.data.permalink}/`;
+  return entryUrl(resolveEntrySection(post.data.section), post.data.permalink);
 }
 
 export function postSourceFile(post: Post): string {

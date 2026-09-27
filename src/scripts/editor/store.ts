@@ -1,4 +1,5 @@
 import { parseDocument } from 'yaml';
+import { resolveEntrySection, type EntrySection } from '../../lib/entry-sections.mjs';
 import type { PreparedPreview } from './prepare-media';
 import { normalizeWatermarkCredit } from '../../lib/watermark.mjs';
 import { checkPreparedMedia } from '../../lib/media-check';
@@ -38,7 +39,8 @@ export type EntrySummary = {
   path: string;
   title: string;
   permalink: string;
-  section: 'devlog' | 'life';
+  section: EntrySection | undefined;
+  sectionError?: string;
   draft: boolean;
   date: string;
   publishAt: string;
@@ -236,11 +238,15 @@ function entryFrom(path: string, content: string, changed: boolean, isNew: boole
   let data: Record<string, unknown> = {};
   try { data = bindingDocument(content, true).value as Record<string, unknown>; } catch { /* Listed with its path so it can still be opened. */ }
   const date = data.date instanceof Date ? data.date.toISOString().slice(0, 10) : typeof data.date === 'string' ? data.date : '';
+  let section: EntrySection | undefined;
+  let sectionError: string | undefined;
+  try { section = resolveEntrySection(data.section); }
+  catch (error) { sectionError = error instanceof Error ? error.message : 'Unknown entry destination.'; }
   return {
     path, changed, isNew,
     title: typeof data.title === 'string' ? data.title : '',
     permalink: typeof data.permalink === 'string' ? data.permalink : '',
-    section: data.section === 'life' ? 'life' : 'devlog',
+    section, sectionError,
     draft: data.draft !== false,
     date,
     publishAt: data.publishAt instanceof Date ? data.publishAt.toISOString() : typeof data.publishAt === 'string' ? data.publishAt : '',
@@ -556,10 +562,10 @@ export class SiteEditorStore {
     return this.enqueue(session => this.update(session, path, content));
   }
 
-  /** Delete a journal entry. A never-published entry simply disappears from the draft. */
+  /** Delete an entry. A never-published entry simply disappears from the draft. */
   remove(path: string): Promise<void> {
     return this.enqueue(async session => {
-      if (!isPostPath(path)) throw new Error('Only journal entries can be deleted.');
+      if (!isPostPath(path)) throw new Error('Only entries can be deleted.');
       const published = session.snapshot.files.some(file => file.path === path);
       if (!published) session.files.delete(path);
       else {
@@ -623,7 +629,7 @@ export class SiteEditorStore {
     });
   }
 
-  /** Every journal entry, drafts and unpublished new ones included. */
+  /** Every entry, drafts and unpublished new ones included. */
   async entries(): Promise<EntrySummary[]> {
     const session = this.active();
     await this.writes;

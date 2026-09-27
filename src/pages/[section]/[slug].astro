@@ -1,0 +1,19 @@
+---
+import JournalPost from '../../components/JournalPost.astro';
+import { getPosts, type Post } from '../../lib/content';
+import { entrySectionIds, entrySectionInfo, resolveEntrySection, type EntrySection } from '../../lib/entry-sections.mjs';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  const bySection: Partial<Record<EntrySection, Post[]>> = {};
+  for (const post of posts) (bySection[resolveEntrySection(post.data.section)] ??= []).push(post);
+  return entrySectionIds.flatMap((section) => {
+    const entries = bySection[section] ?? [];
+    return entries.map((post, index) => ({
+      params: { section: entrySectionInfo[section].pathSegment, slug: post.data.permalink },
+      props: { post, newer: entries[index - 1], older: entries[index + 1] },
+    }));
+  });
+}
+---
+<JournalPost {...Astro.props} />

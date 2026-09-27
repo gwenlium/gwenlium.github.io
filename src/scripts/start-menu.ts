@@ -3,6 +3,7 @@ import { handleControlKeydown } from './controls';
 import { createSearchIndex } from '../lib/search';
 import { searchKindLabels, type SearchEntry, type SearchIndex, type SearchKind } from '../lib/search-types';
 import { availableMobileWindow } from './mobile-windows';
+import { entrySectionInfo, isEntrySection } from '../lib/entry-sections.mjs';
 
 type WindowCommand = { id: string; action: 'restore' } | { action: 'restore-all' };
 type StartMenu = {
@@ -141,10 +142,6 @@ const mobileViewLabels: Record<string, string> = {
   'post-related': 'Related entries',
   'music-player': 'Music player',
   'music-library': 'Music library',
-  'devlog-entries': 'Devlog entries',
-  'life-entries': 'Life entries',
-  'devlog-search': 'Search / Filter',
-  'life-search': 'Search / Filter',
 };
 
 function renderWindows(): void {
@@ -162,7 +159,9 @@ function renderWindows(): void {
   for (const root of document.querySelectorAll<HTMLElement>('[data-desktop-window]')) {
     const { windowId: id, windowTitle: title, windowState: state } = root.dataset;
     if (!id || (mobile ? !availableMobileWindow(root) : state !== 'minimized' && state !== 'closed')) continue;
-    const displayTitle = (mobile && mobileViewLabels[id]) || title || 'Window';
+    const archiveSection = mobile ? (id.endsWith('-entries') ? id.slice(0, -8) : id.endsWith('-search') ? id.slice(0, -7) : '') : '';
+    const archiveLabel = isEntrySection(archiveSection) ? (id.endsWith('-search') ? 'Search / Filter' : `${entrySectionInfo[archiveSection].label} entries`) : '';
+    const displayTitle = archiveLabel || (mobile && mobileViewLabels[id]) || title || 'Window';
     count += 1;
     const item = document.createElement('li');
     const button = document.createElement('button');

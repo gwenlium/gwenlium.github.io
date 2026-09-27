@@ -1,13 +1,11 @@
 import type { EditorConflict, EditorDraftFile } from '../../lib/editor-types';
+import { editablePages, isEditablePageId } from '../../lib/page-catalogue';
+import { entrySectionInfo, resolveEntrySection } from '../../lib/entry-sections.mjs';
 import { writerUrl } from './session';
 import { bindingDocument, isPostPath, markdownParts, type SiteEditorStore } from './store';
 import { button, errorText, node, openDialog, toast } from './ui';
 
 const liveKey = 'gwenlium:owner:live';
-const pageNames: Record<string, string> = {
-  about: 'About page', devlog: 'Devlog page', life: 'Life page', gallery: 'Gallery page', music: 'Music page',
-  subscribe: 'Subscribe page', 'not-found': 'Page not found',
-};
 
 type Change = { file: EditorDraftFile; label: string; detail: string; problems: string[]; fix?: string; summary: string };
 
@@ -25,26 +23,28 @@ function describe(file: EditorDraftFile): Change {
       body = markdownParts(file.deleted ? file.baseContent ?? '' : file.content).body;
     } catch { problems.push('This entry could not be read.'); }
     const title = typeof data.title === 'string' && data.title.trim() ? data.title.trim() : 'Untitled entry';
-    const journal = data.section === 'life' ? 'Life' : 'Devlog';
+    let destination = 'Unknown destination';
+    try { destination = entrySectionInfo[resolveEntrySection(data.section)].label; }
+    catch (error) { problems.push(errorText(error, 'Choose a supported entry destination.')); }
     let wasPublic = false;
     try { wasPublic = file.baseContent !== null && (bindingDocument(file.baseContent, true).value as Record<string, unknown>).draft === false; } catch { /* Unknown. */ }
     const isPublic = data.draft === false;
     const dateValue = data.date instanceof Date ? data.date.toISOString().slice(0, 10) : String(data.date ?? '');
     const scheduled = isPublic && (Date.parse(String(data.publishAt ?? '')) > Date.now() || dateValue > new Date().toISOString().slice(0, 10));
-    if (file.deleted) return { file, label: `Delete “${title}”`, detail: `${journal} entry${wasPublic ? ', removed from the website' : ''}`, problems: [], summary: `Delete ${journal} entry: ${title}` };
+    if (file.deleted) return { file, label: `Delete “${title}”`, detail: `${destination} entry${wasPublic ? ', removed from the website' : ''}`, problems: [], summary: `Delete ${destination} entry: ${title}` };
     const detail = [
-      `${journal}`,
+      destination,
       scheduled ? (file.baseContent === null ? 'new, scheduled' : 'scheduled') : file.baseContent === null ? (isPublic ? 'new, public' : 'new, hidden draft') : isPublic && !wasPublic ? 'now public' : !isPublic && wasPublic ? 'now hidden' : isPublic ? 'public' : 'hidden draft',
     ].join(', ');
     if (isPublic && !String(data.title ?? '').trim()) problems.push('Give it a title.');
     const missing = missingPictureDescriptions(body);
     if (missing) problems.push(missing === 1 ? 'A picture in the text needs a description.' : `${missing} pictures in the text need descriptions.`);
     if (typeof data.cover === 'string' && data.cover && !String(data.coverAlt ?? '').trim()) problems.push('The cover picture needs a description.');
-    const verb = file.baseContent === null ? `New ${journal} entry` : isPublic && !wasPublic ? `Publish ${journal} entry` : !isPublic && wasPublic ? `Hide ${journal} entry` : `Edit ${journal} entry`;
+    const verb = file.baseContent === null ? `New ${destination} entry` : isPublic && !wasPublic ? `Publish ${destination} entry` : !isPublic && wasPublic ? `Hide ${destination} entry` : `Edit ${destination} entry`;
     return { file, label: `${file.baseContent === null ? 'New entry' : 'Entry'} “${title}”`, detail, problems, fix: writerUrl({ entry: file.path }), summary: `${verb}: ${title}` };
   }
   const page = /^src\/content\/pages\/([^/]+)\.json$/.exec(file.path)?.[1];
-  const label = page ? pageNames[page] ?? `${page} page` : ({
+  const label = page ? (isEditablePageId(page) && editablePages[page].file === file.path ? editablePages[page].label : `${page} page`) : ({
     'src/content/site.json': 'Home page and site settings',
     'src/content/windows.json': 'Windows',
     'src/content/gallery.json': 'Gallery',

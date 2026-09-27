@@ -1,4 +1,5 @@
 import { cancelWindowAnimation } from './window-motion';
+import { entrySectionFromPath } from '../lib/entry-sections.mjs';
 
 const phone = matchMedia('(max-width: 760px)');
 const stateKey = 'gwenlium:mobile-window';
@@ -40,8 +41,10 @@ export function availableMobileWindow(root: HTMLElement): boolean {
 
 function primaryWindow(): HTMLElement | undefined {
   const choices = [...document.querySelectorAll<HTMLElement>('#main-content [data-desktop-window]')].filter(availableMobileWindow);
+  const section = entrySectionFromPath(location.pathname);
+  const archiveId = section ? `${section}-entries` : undefined;
   return choices.find(root => root.id === 'post-entry')
-    ?? choices.find(root => root.id === 'devlog-entries' || root.id === 'life-entries')
+    ?? choices.find(root => root.id === archiveId)
     ?? choices.find(root => root.dataset.windowInitialState !== 'closed')
     ?? choices[0];
 }
@@ -50,6 +53,11 @@ function readHistory(): MobileHistory | undefined {
   const value = history.state?.[stateKey];
   return value && value.path === path() && typeof value.id === 'string'
     && Number.isSafeInteger(value.depth) && value.depth >= 0 ? value : undefined;
+}
+
+/** Internal view entries to skip when returning from a preview to its writer. */
+export function mobileViewHistoryDepth(): number {
+  return readHistory()?.depth ?? 0;
 }
 
 function writeHistory(id: string, push: boolean): void {

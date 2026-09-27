@@ -2,6 +2,7 @@ import { parseDocument } from 'yaml';
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import type { Root, RootContent } from 'mdast';
 import { builtinWindowPages, systemWindowIds, windowContents, windowPages, windowTones } from '../../src/lib/window-catalogue.mjs';
+import { isEntrySection, resolveEntrySection, type EntrySection } from '../../src/lib/entry-sections.mjs';
 import type { EditorMediaEntry, EditorPublishRequest } from '../../src/lib/editor-types';
 import { normalizeWatermarkCredit, watermarkCreditError } from '../../src/lib/watermark.mjs';
 
@@ -94,9 +95,9 @@ export function publishPayload(value: unknown): EditorPublishRequest {
   // The commit message is shown in the repository history; one plain line.
   requireValue(request.message === undefined || (typeof request.message === 'string' && request.message.trim().length > 0 && request.message.length <= 200 && !/[\u0000-\u001f\u007f]/.test(request.message)), 'Invalid publish message.');
   const seen = new Set<string>();
-  // Journal entries and unused prepared media can be deleted; pages and windows cannot.
+  // Entries and unused prepared media can be deleted; pages and windows cannot.
   for (const path of request.deletions) {
-    requireValue(typeof path === 'string' && ((contentPath(path) && path.startsWith('src/content/posts/')) || mediaFilePattern.test(path)) && !seen.has(path), 'Only journal entries and prepared media can be deleted, each once.');
+    requireValue(typeof path === 'string' && ((contentPath(path) && path.startsWith('src/content/posts/')) || mediaFilePattern.test(path)) && !seen.has(path), 'Only entries and prepared media can be deleted, each once.');
     seen.add(path);
   }
   let textBytes = 0;
@@ -190,7 +191,7 @@ export function validateContent(files: Map<string, string>, previews: Record<str
   };
   const photos = (value: unknown): void => { if (value === '') return; for (const source of strings(value)) url(source, 'image', true); };
   const json = new Map<string, Record<string, unknown>>();
-  const posts = new Map<string, { section: string; published: boolean }>();
+  const posts = new Map<string, { section: EntrySection; published: boolean }>();
   for (const [path, content] of files) {
     try {
       if (!path.endsWith('.md')) { json.set(path, parseJson(content)); continue; }
@@ -202,14 +203,14 @@ export function validateContent(files: Map<string, string>, previews: Record<str
       keys(post, ['title', 'permalink', 'date', 'publishAt', 'excerpt', 'draft', 'section', 'tags', 'cover', 'coverAlt', 'featured', 'photos', 'media']);
       for (const field of ['title', 'permalink', 'date', 'excerpt', 'cover', 'coverAlt']) text(post[field]);
       for (const field of ['draft', 'featured']) requireValue(post[field] === undefined || typeof post[field] === 'boolean', 'Post flags must be booleans.');
-      requireValue(post.section === undefined || typeof post.section === 'string' && ['devlog', 'life'].includes(post.section), 'Invalid post section.');
+      requireValue(post.section === undefined || isEntrySection(post.section), 'Invalid entry section. Choose a supported destination.');
       let validDate = false;
       if (typeof post.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(post.date)) { const date = new Date(`${post.date}T00:00:00.000Z`); validDate = Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === post.date; }
       // Optional go-live moment in UTC; the entry is public only after it.
       requireValue(post.publishAt === undefined || (typeof post.publishAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?Z$/.test(post.publishAt) && Number.isFinite(Date.parse(post.publishAt))), 'Use a UTC time such as 2026-09-26T16:00:00Z for the go-live time.');
       const due = post.publishAt === undefined || Date.parse(String(post.publishAt)) <= Date.now();
       if (post.draft === false) { text(post.title, true); requireValue(validDate && typeof post.permalink === 'string' && slug.test(post.permalink), 'Published posts need a valid calendar date and permalink.'); }
-      if (text(post.permalink)) { requireValue(slug.test(post.permalink) && !posts.has(post.permalink), 'Invalid or duplicate post permalink.'); posts.set(post.permalink, { section: String(post.section ?? 'devlog'), published: post.draft === false && validDate && due && new Date(String(post.date)).getTime() <= Date.now() }); }
+      if (text(post.permalink)) { requireValue(slug.test(post.permalink) && !posts.has(post.permalink), 'Invalid or duplicate post permalink.'); posts.set(post.permalink, { section: resolveEntrySection(post.section), published: post.draft === false && validDate && due && new Date(String(post.date)).getTime() <= Date.now() }); }
       strings(post.tags); image(post.cover, post.coverAlt); photos(post.photos); media(post.media); markdown(match[2]);
     } catch (error) { throw new EditorError(`${path}: ${error instanceof EditorError ? error.message : 'Invalid content structure.'}`); }
   }

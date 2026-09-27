@@ -3,6 +3,7 @@ import Window from './Window.astro';
 import Icon from './Icon.astro';
 import EntryMedia from './EntryMedia.astro';
 import { getWindowDefinition, hasWindowOverride } from '../lib/windows';
+import { entrySectionInfo, type EntrySection } from '../lib/entry-sections.mjs';
 
 type MediaItem = {
   src: string; type?: 'image' | 'video' | 'audio'; alt?: string; caption?: string; poster?: string; eager?: boolean;
@@ -11,7 +12,7 @@ type MediaItem = {
 type Link = { url: string; title: string; sourceFile: string };
 
 interface Props {
-  section: 'devlog' | 'life';
+  section: EntrySection;
   title: string;
   date?: Date;
   dateLabel?: string;
@@ -30,13 +31,14 @@ interface Props {
 }
 
 const { section, title, date, dateLabel, tags, excerpt, sourceFile, contents, mediaItems, hasEntryMedia, shareUrl, older, newer, related, preview = false } = Astro.props;
+const { indexUrl, dated } = entrySectionInfo[section];
 const mediaWindow = getWindowDefinition('post-media');
 const hasMediaContent = hasEntryMedia || hasWindowOverride('post-media');
 const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
 ---
 
 <div class="entry-navigation" data-entry-navigation>
-  <a class="back-link" href={`/${section}/`} data-preview-back-link><span aria-hidden="true">←</span> All entries</a>
+  <a class="back-link" href={indexUrl} data-preview-back-link><span aria-hidden="true">←</span> All entries</a>
   <div class="mobile-entry-tabs" data-mobile-entry-tabs role="tablist" aria-label="Entry views">
     <button id="mobile-tab-read" class="button-secondary" type="button" role="tab" data-mobile-window-target="post-entry" aria-controls="post-entry" aria-selected="true">Read</button>
     <button id="mobile-tab-media" class="button-secondary" type="button" role="tab" data-mobile-window-target="post-media" aria-controls="post-media" aria-selected="false" tabindex="-1" disabled={!hasMediaWindow} hidden={!hasMediaWindow}>Media</button>
@@ -52,9 +54,9 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
     </div>
     <article class="entry" id="entry-top" tabindex="-1" aria-labelledby="entry-title">
       <header class="entry-header">
-        <p class="eyebrow"><time datetime={date?.toISOString().slice(0, 10)} data-preview-date>{dateLabel}</time></p>
+        <p class="eyebrow" hidden={!dated} data-preview-date-row><time datetime={date?.toISOString().slice(0, 10)} data-preview-date>{dateLabel}</time></p>
         <h1 id="entry-title" data-site-edit-file={sourceFile} data-site-edit-field={sourceFile && '/title'} data-site-edit-format={sourceFile && 'text'} data-site-edit-label={sourceFile && 'Post title'} data-preview-title>{title}</h1>
-        {(tags.length > 0 || preview) && <ul class="entry-tags" aria-label="Tags" hidden={!tags.length} data-preview-tags>{tags.map((tag) => <li><a class="tag" href={`/${section}/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>)}</ul>}
+        {(tags.length > 0 || preview) && <ul class="entry-tags" aria-label="Tags" hidden={!tags.length} data-preview-tags>{tags.map((tag) => <li><a class="tag" href={`${indexUrl}?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>)}</ul>}
       </header>
       {(contents.length >= 2 || preview) && <nav class="contents" aria-label="On this page" hidden={contents.length < 2} data-preview-contents>
         <h2>On this page</h2>
@@ -85,7 +87,7 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
   </Window>
     </div>
 
-  {(older || newer) && <nav class="entry-pagination" aria-label="Other journal entries">
+  {(older || newer) && <nav class="entry-pagination" aria-label="Other entries">
     {older ? <a href={older.url} rel="prev"><span class="eyebrow">← Older entry</span><span data-site-edit-file={older.sourceFile} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{older.title}</span></a> : <span />}
     {newer && <a href={newer.url} rel="next"><span class="eyebrow">Newer entry →</span><span data-site-edit-file={newer.sourceFile} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{newer.title}</span></a>}
   </nav>}
@@ -98,7 +100,7 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
   </div>}
 
   {!preview && (related.length > 0 || hasWindowOverride('post-related') || getWindowDefinition('post-related')?.enabled === false) && <div class="article-related-slot"><Window windowId="post-related">
-    <nav aria-label="Related entries"><ul class="related-list">{related.map((candidate) => <li><a href={candidate.url} data-site-edit-file={candidate.sourceFile} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{candidate.title}</a><time datetime={candidate.date.toISOString().slice(0, 10)}>{candidate.dateLabel}</time></li>)}</ul></nav>
+    <nav aria-label="Related entries"><ul class="related-list">{related.map((candidate) => <li><a href={candidate.url} data-site-edit-file={candidate.sourceFile} data-site-edit-field="/title" data-site-edit-format="text" data-site-edit-label="Post title">{candidate.title}</a>{dated && <time datetime={candidate.date.toISOString().slice(0, 10)}>{candidate.dateLabel}</time>}</li>)}</ul></nav>
   </Window></div>}
 </div>
 
@@ -148,6 +150,7 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
   .article-window:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))), .article-media-slot:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))), .article-related-slot:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))) { display: none; }
   .entry { max-width: 48rem; margin: 0 auto; padding: clamp(.25rem, 2cqi, 1.5rem); scroll-margin-top: 1.5rem; }
   .entry-header { margin-bottom: clamp(1.25rem, 4cqi, 2rem); }
+  [data-preview-date-row][hidden] { display: none; }
   .entry-header h1 { font-size: clamp(1.5rem, 1.1rem + 2.5cqi, 2.4rem); line-height: 1.4; overflow-wrap: anywhere; margin: .8rem 0 1.2rem; }
   .entry-excerpt { font-family: var(--font-reading); font-size: clamp(.95rem, .9rem + .3cqi, 1.05rem); line-height: 1.8; white-space: pre-line; }
   .entry-tags { display: flex; flex-wrap: wrap; gap: .5rem; padding: 0; margin: 1.5rem 0 0; list-style: none; }

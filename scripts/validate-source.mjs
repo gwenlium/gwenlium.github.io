@@ -7,6 +7,7 @@ import { parse as parseYaml } from 'yaml';
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import { load } from 'cheerio';
 import { builtinWindowPages, systemWindowIds, windowContents, windowPages, windowTones } from '../src/lib/window-catalogue.mjs';
+import { entrySectionIds, entryUrl, isEntrySection, resolveEntrySection } from '../src/lib/entry-sections.mjs';
 import { normalizeWatermarkCredit, watermarkCreditError } from '../src/lib/watermark.mjs';
 
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -156,6 +157,10 @@ export function readPosts(root, report) {
           engines: { yaml: (source) => parseYaml(source, { uniqueKeys: true }) },
         });
         if (!isObject(parsed.data)) throw new Error('Frontmatter must be a YAML mapping.');
+        if (parsed.data.section !== undefined && !isEntrySection(parsed.data.section)) {
+          report(name, 'section', `Choose one of: ${entrySectionIds.join(', ')}.`);
+          return [];
+        }
         return [{ file: name, data: parsed.data, body: parsed.content }];
       } catch (error) {
         report(name, 'frontmatter', `Cannot parse YAML: ${error.message}`);
@@ -373,7 +378,6 @@ export function validateSource(root = projectRoot, now = new Date()) {
       else slugs.set(key, file);
     }
     if (data.draft !== undefined && typeof data.draft !== 'boolean') report(file, 'draft', 'Use the YAML boolean true or false, not quoted text. Omitted draft defaults to true.');
-    if (data.section !== undefined && !['devlog', 'life'].includes(data.section)) report(file, 'section', 'Choose devlog or life.');
     const date = isoDate(data.date);
     const time = publishTime(data.publishAt);
     if (time === null) report(file, 'publishAt', 'Use a UTC time such as 2026-09-26T16:00:00Z, or remove it.');
@@ -384,7 +388,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
     if (data.excerpt !== undefined && typeof data.excerpt !== 'string') report(file, 'excerpt', 'Provide a text string, or leave the excerpt empty.');
     if (data.tags !== undefined && (!Array.isArray(data.tags) || data.tags.some((tag) => typeof tag !== 'string'))) report(file, 'tags', 'Use an array of text strings.');
     if (data.featured !== undefined && typeof data.featured !== 'boolean') report(file, 'featured', 'Use the YAML boolean true or false.');
-    const base = `${siteOrigin}/${data.section ?? 'devlog'}/${permalinkPattern.test(data.permalink ?? '') ? data.permalink : 'post'}/`;
+    const base = `${siteOrigin}${entryUrl(resolveEntrySection(data.section), permalinkPattern.test(data.permalink ?? '') ? data.permalink : 'post')}`;
     image(data.cover, data.coverAlt, file, 'cover', base);
     photos(data.photos, file, base);
     mediaItems(data.media, file, 'media', { base });
@@ -491,7 +495,7 @@ export function validateSource(root = projectRoot, now = new Date()) {
       const ids = new Set();
       const selections = {
         life: new Set(posts.filter((post) => post.data.section === 'life' && isPublishedPost(post.data, now)).map((post) => post.data.permalink)),
-        devlog: new Set(posts.filter((post) => (post.data.section ?? 'devlog') === 'devlog' && isPublishedPost(post.data, now)).map((post) => post.data.permalink)),
+        devlog: new Set(posts.filter((post) => resolveEntrySection(post.data.section) === 'devlog' && isPublishedPost(post.data, now)).map((post) => post.data.permalink)),
         gallery: new Set(Array.isArray(art?.value.items) ? art.value.items.filter(isObject).map((item) => item.id) : []),
         music: new Set(Array.isArray(music?.value.tracks) ? music.value.tracks.filter(isObject).map((track) => track.id) : []),
       };

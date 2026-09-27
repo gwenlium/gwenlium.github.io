@@ -4,12 +4,14 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import EntryView from './EntryView.astro';
 import { getPosts, postUrl, postSourceFile, postPreview, postPicture, formatDate, type Post } from '../lib/content';
 import { hasWindowOverride } from '../lib/windows';
+import { resolveEntrySection } from '../lib/entry-sections.mjs';
 
 interface Props { post: Post; newer?: Post; older?: Post }
 const { post, newer, older } = Astro.props;
+const section = resolveEntrySection(post.data.section);
 const { Content, headings } = await render(post);
 const contents = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
-const related = (await getPosts(post.data.section))
+const related = (await getPosts(section))
   .filter((candidate) => candidate.id !== post.id)
   .map((candidate) => ({ candidate, sharedTags: candidate.data.tags.filter((tag) => post.data.tags.includes(tag)).length }))
   .filter(({ sharedTags }) => sharedTags > 0)
@@ -29,8 +31,8 @@ const hasEntryMedia = mediaItems.length > 0 || /!\[|<(?:img|video|audio|iframe)\
 ---
 
 {/* Link previews use the cover, else the first picture; an animation as its still first frame. */}
-<SiteLayout title={post.data.title} description={postPreview(post)} image={picture && (picture.still ?? picture.src)} imageAlt={picture?.alt} article>
-  <EntryView section={post.data.section} title={post.data.title} date={post.data.date} dateLabel={formatDate(post.data.date)} tags={post.data.tags}
+<SiteLayout title={post.data.title} description={postPreview(post)} image={picture && (picture.still ?? picture.src)} imageAlt={picture?.alt} article theme={section}>
+  <EntryView section={section} title={post.data.title} date={post.data.date} dateLabel={formatDate(post.data.date)} tags={post.data.tags}
     excerpt={post.data.excerpt} sourceFile={sourceFile} contents={contents} mediaItems={mediaItems} hasEntryMedia={hasEntryMedia}
     shareUrl={shareUrl} older={link(older)} newer={link(newer)} related={related}><Content /></EntryView>
 </SiteLayout>

@@ -5,6 +5,7 @@ import { pages } from '../lib/pages';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Media from '../components/Media.astro';
 import Icon from '../components/Icon.astro';
+import EntryArchive from '../components/EntryArchive.astro';
 import { gallery } from '../lib/settings';
 const images = gallery.filter((item) => item.type === 'image').length;
 const videos = gallery.filter((item) => item.type === 'video').length;
@@ -47,9 +48,10 @@ const videos = gallery.filter((item) => item.type === 'video').length;
   ) : (
       <div class="empty-state">
         <Icon name="image" size={36} />
-        <h2>No work published yet</h2>
+        <h2>No gallery items published yet</h2>
       </div>
   )}
+  <EntryArchive section="gallery" />
 </SiteLayout>
 
 <style>

@@ -1,23 +1,26 @@
 import { Document, parseDocument } from 'yaml';
 import { navigate } from 'astro:transitions/client';
+import { editablePages, isEditablePageId } from '../../lib/page-catalogue';
+import { entrySectionIds, entrySectionInfo, entryUrl, isEntrySection, resolveEntrySection, type EntrySection } from '../../lib/entry-sections.mjs';
 import { storePreview } from './preview';
 import { ownerStore, writerUrl } from './session';
+import { chooseEntryDestination } from './new-entry';
 import { isPostPath, markdownParts, type EntrySummary, type SiteEditorStore } from './store';
 import { createRichText, type RichTextHandle } from './rich-text';
 import { chooseFromLibrary, stageFiles } from './media';
 import { canCrop, cropPicture } from './crop';
 import { openPublish, resolveConflicts } from './publish';
+import { openPageEditor } from './manage';
 import { button, confirmAction, errorText, node, openDialog, toast } from './ui';
 import '../../styles/owner-editor.css';
 
-type Section = 'devlog' | 'life';
+type ListView = 'all' | 'pages' | EntrySection;
 type MediaItem = { type: 'image' | 'video' | 'audio'; src: string; alt: string; caption: string; poster: string };
 type Model = {
-  section: Section; draft: boolean; title: string; permalink: string; date: string; publishAt: string; excerpt: string;
+  section: EntrySection; draft: boolean; title: string; permalink: string; date: string; publishAt: string; excerpt: string;
   tags: string[]; featured: boolean; cover: string; coverAlt: string; media: MediaItem[]; body: string;
 };
 
-const journals: Record<Section, string> = { devlog: 'Devlog', life: 'Life' };
 const today = () => new Date().toISOString().slice(0, 10);
 const dateFormat = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 const formatDate = (value: string) => {
@@ -47,7 +50,7 @@ function readModel(content: string): { model: Model; photos: string[] } {
   return {
     photos,
     model: {
-      section: data.section === 'life' ? 'life' : 'devlog',
+      section: resolveEntrySection(data.section),
       draft: data.draft !== false,
       title: stringValue(data.title),
       permalink: stringValue(data.permalink),
@@ -122,6 +125,7 @@ class Writer {
   private editor?: RichTextHandle;
   private saveTimer?: number;
   private saving: Promise<void> = Promise.resolve();
+  private navigating = false;
   private status = node('p', '', 'writer-status');
   private unsubscribe?: () => void;
 
@@ -129,6 +133,18 @@ class Writer {
     this.status.setAttribute('role', 'status');
     this.status.setAttribute('aria-live', 'polite');
     addEventListener('beforeunload', () => { void this.flush(); }, { signal: this.lifetime.signal });
+    // Owner-menu links and browser history also wait for pending entry edits before the page loads.
+    document.addEventListener('astro:before-preparation', event => {
+      if (!this.model) return;
+      const navigation = event as Event & { loader: () => Promise<void>; signal: AbortSignal };
+      const load = navigation.loader;
+      this.navigating = true;
+      navigation.signal.addEventListener('abort', () => { this.navigating = false; }, { once: true });
+      navigation.loader = async () => {
+        await (this.saveTimer === undefined ? this.saving : this.flush());
+        await load();
+      };
+    }, { signal: this.lifetime.signal });
     // Ctrl+S (Cmd+S on a Mac) saves right away instead of opening the browser's save dialog.
     addEventListener('keydown', event => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 's') return;
@@ -165,7 +181,7 @@ class Writer {
       // Never a silent "Opening the editor…": say what failed and offer a way on.
       const failed = node('p', `${errorText(error, 'The editor could not load.')} `, 'writer-loading');
       if ((error as { status?: number }).status === 409) failed.append(button('Update and review', () => this.chooseVersions(), 'owner-button owner-button--primary'), ' ');
-      failed.append(button('Try again', () => location.reload(), 'owner-button'));
+      failed.append(button('All entries', () => this.goto(writerUrl()), 'owner-button'), ' ', button('Try again', () => location.reload(), 'owner-button'));
       this.root.replaceChildren(failed);
       return;
     }
@@ -218,12 +234,15 @@ class Writer {
     const params = new URL(location.href).searchParams;
     const entry = params.get('entry');
     const fresh = params.get('new');
-    this.entries = await this.store.entries();
+    const view = params.get('view');
+    if (view !== null && view !== 'all' && view !== 'pages' && !isEntrySection(view)) throw new Error('Unknown entry filter. Choose All entries to see your destinations.');
+    const filter: ListView = view === 'pages' || isEntrySection(view) ? view : 'all';
+    if (filter !== 'pages' || (entry && isPostPath(entry)) || fresh !== null) this.entries = await this.store.entries();
     if (entry && isPostPath(entry)) {
       if (!this.store.exists(entry)) { toast('That entry no longer exists.'); history.replaceState(history.state, '', writerUrl()); this.renderList(); return; }
       await this.open(entry);
-    } else if (fresh) this.create(fresh === 'life' ? 'life' : 'devlog');
-    else this.renderList();
+    } else if (fresh !== null) this.create(resolveEntrySection(fresh));
+    else this.renderList(filter);
   }
 
   private frame(title: string, tone: 'sage' | 'pink' | 'lavender', className: string): HTMLElement {
@@ -240,8 +259,9 @@ class Writer {
       const all = node('a', '← All entries', 'owner-button');
       all.href = writerUrl();
       all.addEventListener('click', event => { event.preventDefault(); this.goto(writerUrl()); });
-      const create = button('+ New entry', () => this.goto(writerUrl({ fresh: true, section: this.model?.section ?? 'devlog' })), 'owner-button');
-      bar.append(all, create);
+      const pages = button('Page settings', () => this.goto(writerUrl({ view: 'pages' })), 'owner-button');
+      const create = button('+ New entry', () => this.newEntry(this.model?.section), 'owner-button');
+      bar.append(all, pages, create);
     }
     bar.append(this.status);
     return bar;
@@ -252,29 +272,63 @@ class Writer {
     void this.flush().then(() => navigate(href));
   }
 
-  // The list of entries
+  private newEntry(initial?: EntrySection): void {
+    void chooseEntryDestination(initial).then(section => { if (section) this.goto(writerUrl({ fresh: true, section })); });
+  }
 
-  private renderList(filter: 'all' | Section = 'all'): void {
+  // Page settings and entries
+
+  private renderList(filter: ListView = 'all'): void {
     this.editor?.destroy();
     this.editor = undefined;
-    const window = this.frame('Your entries', 'sage', 'writer-list');
+    const window = this.frame(filter === 'pages' ? 'Page settings' : 'Your entries', 'sage', 'writer-list');
     const body = window.querySelector('.window-body')!;
     const actions = node('div', undefined, 'writer-list__actions');
-    actions.append(
-      button('+ New Devlog entry', () => this.goto(writerUrl({ fresh: true, section: 'devlog' })), 'owner-button owner-button--primary'),
-      button('+ New Life entry', () => this.goto(writerUrl({ fresh: true, section: 'life' })), 'owner-button'),
-    );
-    const filters = node('div', undefined, 'writer-segmented');
-    filters.setAttribute('role', 'group');
-    filters.setAttribute('aria-label', 'Show');
-    for (const [value, label] of [['all', 'All'], ['devlog', 'Devlog'], ['life', 'Life']] as const) {
-      const choice = button(label, () => this.renderList(value), 'writer-segmented__option');
-      choice.setAttribute('aria-pressed', String(filter === value));
-      filters.append(choice);
+    actions.append(button('+ New entry', () => this.newEntry(isEntrySection(filter) ? filter : undefined), 'owner-button owner-button--primary'));
+    actions.append(filter === 'pages'
+      ? button('All entries', () => this.goto(writerUrl()), 'owner-button')
+      : button('Page settings', () => this.goto(writerUrl({ view: 'pages' })), 'owner-button'));
+    const filters = node('label', undefined, 'writer-field writer-destination-filter');
+    const destination = node('select', undefined, 'owner-field');
+    const all = node('option', 'All destinations');
+    all.value = 'all';
+    destination.append(all);
+    for (const section of entrySectionIds) {
+      const option = node('option', entrySectionInfo[section].label);
+      option.value = section;
+      destination.append(option);
     }
+    destination.value = filter === 'pages' ? 'all' : filter;
+    destination.addEventListener('change', () => {
+      const value = destination.value;
+      if (value === 'all') this.goto(writerUrl());
+      else if (isEntrySection(value)) this.goto(writerUrl({ view: value }));
+    });
+    filters.append(node('span', 'Filter entries by destination', 'writer-field__label'), destination);
     const list = node('ul', undefined, 'writer-entries');
-    const shown = this.entries.filter(entry => filter === 'all' || entry.section === filter);
-    if (!shown.length) list.append(node('li', 'Nothing here yet. Start a new entry above.', 'writer-entries__empty'));
+    if (filter === 'pages') {
+      for (const id of Object.keys(editablePages)) {
+        if (!isEditablePageId(id)) continue;
+        const page = editablePages[id];
+        const item = node('li');
+        const edit = button('', () => { void openPageEditor(this.store, id, () => this.refreshChrome()); }, 'writer-entry writer-page');
+        edit.setAttribute('aria-label', `Edit ${page.label}`);
+        const text = node('span', undefined, 'writer-entry__text');
+        const description = node('small', page.description);
+        description.id = `writer-page-${id}-description`;
+        edit.setAttribute('aria-describedby', description.id);
+        text.append(node('strong', page.label), description);
+        const badges = node('span', undefined, 'writer-entry__badges');
+        const draft = node('span', 'Unpublished changes', 'writer-badge writer-badge--changed');
+        badges.dataset.writerPageFile = page.file;
+        badges.append(draft);
+        edit.append(text, badges);
+        item.append(edit);
+        list.append(item);
+      }
+    }
+    const shown = filter === 'pages' ? [] : this.entries.filter(entry => filter === 'all' || entry.section === filter);
+    if (filter !== 'pages' && !shown.length) list.append(node('li', 'Nothing here yet. Start a new entry above.', 'writer-entries__empty'));
     for (const entry of shown) {
       const item = node('li');
       const link = node('a', undefined, 'writer-entry');
@@ -283,7 +337,8 @@ class Writer {
       const thumb = node('span', undefined, 'writer-entry__thumb');
       if (entry.cover) { const image = node('img'); image.src = this.store.resolveMedia(entry.cover); image.alt = ''; thumb.append(image); }
       const text = node('span', undefined, 'writer-entry__text');
-      text.append(node('strong', entry.title || 'Untitled entry'), node('small', `${journals[entry.section]} · ${entry.date ? formatDate(entry.date) : 'No date'}`));
+      const info = entry.section && entrySectionInfo[entry.section];
+      text.append(node('strong', entry.title || 'Untitled entry'), node('small', info ? `${info.label}${info.dated ? ` · ${entry.date ? formatDate(entry.date) : 'No date'}` : ''}` : entry.sectionError ?? 'Unknown entry destination'));
       const badges = node('span', undefined, 'writer-entry__badges');
       badges.append(this.badge(entry));
       if (entry.changed) badges.append(node('span', entry.isNew ? 'Not published yet' : 'Unpublished changes', 'writer-badge writer-badge--changed'));
@@ -291,7 +346,10 @@ class Writer {
       item.append(link);
       list.append(item);
     }
-    body.append(actions, filters, list);
+    body.append(actions);
+    if (filter !== 'pages') body.append(filters);
+    body.append(list);
+    if (filter === 'pages') body.prepend(node('p', 'Edit page copy and settings below. Use New entry to add full entries to any content destination.', 'owner-hint'));
     this.root.replaceChildren(this.topBar(true), window);
     this.refreshChrome();
   }
@@ -318,7 +376,7 @@ class Writer {
     return candidate;
   }
 
-  private create(section: Section): void {
+  private create(section: EntrySection): void {
     this.original = null;
     this.saved = undefined;
     this.path = undefined;
@@ -384,14 +442,16 @@ class Writer {
       try {
         if (!this.slugTouched && this.isNew) model.permalink = this.uniquePermalink(slugify(model.title));
         const nextPath = this.isNew ? this.uniquePath(model.permalink) : this.path!;
-        const content = composePost(this.isNew ? null : this.original, this.isNew ? undefined : this.saved, model, this.mediaTouched);
+        // A reopened unpublished draft still has a source document. Starting
+        // from scratch would drop untouched media/photos during an ordinary save.
+        const content = composePost(this.original, this.saved, model, this.mediaTouched);
         const previous = this.path;
         await this.store.write(nextPath, content);
         // A new entry's file follows its address until it is first published.
         if (previous && previous !== nextPath) await this.store.remove(previous);
         if (this.path !== nextPath) {
           this.path = nextPath;
-          if (!this.lifetime.signal.aborted) history.replaceState(history.state, '', writerUrl({ entry: nextPath }));
+          if (!this.lifetime.signal.aborted && !this.navigating) history.replaceState(history.state, '', writerUrl({ entry: nextPath }));
         }
         if (!this.lifetime.signal.aborted) this.status.textContent = this.store.storageWarning ?? 'Saved on this browser';
       } catch (error) {
@@ -403,6 +463,13 @@ class Writer {
 
   private refreshChrome(): void {
     if (this.lifetime.signal.aborted) return;
+    if (!this.model) {
+      const count = this.store.draftFiles.length;
+      this.status.textContent = this.store.storageWarning ?? (count ? `${count} unpublished change${count === 1 ? '' : 's'}` : '');
+    }
+    for (const badge of this.root.querySelectorAll<HTMLElement>('[data-writer-page-file]')) {
+      badge.hidden = !this.store.draftFiles.some(file => file.path === badge.dataset.writerPageFile);
+    }
     const publish = this.root.querySelector<HTMLButtonElement>('[data-writer-publish]');
     if (publish) {
       const dirty = Boolean(this.path && this.store.draftFiles.some(file => file.path === this.path));
@@ -419,7 +486,7 @@ class Writer {
     const model = this.model!;
     this.editor?.destroy();
     const layout = node('div', undefined, 'writer-layout');
-    const entry = this.frame(`${journals[model.section]} entry`, 'sage', 'writer-entry-window');
+    const entry = this.frame(`${entrySectionInfo[model.section].label} entry`, 'sage', 'writer-entry-window');
     entry.querySelector('.window-titlebar')!.append(node('span', '', 'writer-state'));
     const body = entry.querySelector('.window-body')!;
     const article = node('article', undefined, 'entry writer-article');
@@ -473,12 +540,14 @@ class Writer {
   private updateHeader(): void {
     const model = this.model;
     if (!model) return;
-    const eyebrow = this.root.querySelector('.writer-eyebrow');
-    if (eyebrow) eyebrow.textContent = formatDate(model.date);
+    const eyebrow = this.root.querySelector<HTMLElement>('.writer-eyebrow');
+    if (eyebrow) { eyebrow.textContent = formatDate(model.date); eyebrow.hidden = !entrySectionInfo[model.section].dated; }
+    const dateLabel = this.root.querySelector('.writer-date-label');
+    if (dateLabel) dateLabel.textContent = entrySectionInfo[model.section].dated ? 'Date' : 'Ordering and scheduling date';
     const state = this.root.querySelector('.writer-state');
     if (state) state.replaceChildren(this.isNew && !this.path ? node('span', 'New', 'writer-badge writer-badge--changed') : this.badge(model));
     const titlebar = this.root.querySelector('.writer-entry-window .window-titlebar__title');
-    if (titlebar) titlebar.textContent = `${journals[model.section]} entry`;
+    if (titlebar) titlebar.textContent = `${entrySectionInfo[model.section].label} entry`;
     this.refreshChrome();
   }
 
@@ -516,8 +585,24 @@ class Writer {
             ? `Scheduled: it appears on ${formatDate(model.date)}, shortly after midnight UTC.`
             : 'Shows on the website when you publish.';
     };
+    const destinationField = node('label', undefined, 'writer-field');
+    const destination = node('select', undefined, 'owner-field');
+    for (const section of entrySectionIds) {
+      const option = node('option', entrySectionInfo[section].label);
+      option.value = section;
+      destination.append(option);
+    }
+    destination.value = model.section;
+    destination.addEventListener('change', () => {
+      if (!isEntrySection(destination.value)) { destination.value = model.section; toast('Choose a supported entry destination.'); return; }
+      model.section = destination.value;
+      if (!this.path && !this.navigating) history.replaceState(history.state, '', writerUrl({ fresh: true, section: model.section }));
+      this.changed();
+      this.syncAddress();
+    });
+    destinationField.append(node('span', 'Destination', 'writer-field__label'), destination);
     body.append(
-      segmented('Journal', [['devlog', 'Devlog'], ['life', 'Life']], model.section, value => { model.section = value; this.changed(); this.syncAddress(); }),
+      destinationField,
       segmented('Visibility', [['public', 'Public'], ['hidden', 'Hidden']], model.draft ? 'hidden' : 'public', value => { model.draft = value === 'hidden'; describeVisibility(); this.changed(); }),
       visibilityHint,
     );
@@ -526,7 +611,7 @@ class Writer {
     date.value = model.date;
     date.addEventListener('change', () => { model.date = date.value || today(); date.value = model.date; describeVisibility(); this.changed(); });
     const dateField = node('label', undefined, 'writer-field');
-    dateField.append(node('span', 'Date', 'writer-field__label'), date);
+    dateField.append(node('span', 'Date', 'writer-field__label writer-date-label'), date);
     // A go-live time, entered in local time and stored in UTC; the shown date follows it.
     const localValue = (iso: string) => { const time = new Date(iso); const offset = time.getTimezoneOffset() * 60000; return new Date(time.getTime() - offset).toISOString().slice(0, 16); };
     const timed = node('label', undefined, 'owner-check');
@@ -575,7 +660,7 @@ class Writer {
   private tagsField(): HTMLElement {
     const model = this.model!;
     const field = node('div', undefined, 'writer-field');
-    field.append(node('span', model.section === 'devlog' ? 'Projects and topics' : 'Topics', 'writer-field__label'));
+    field.append(node('span', 'Tags', 'writer-field__label'));
     const chips = node('div', undefined, 'writer-tags');
     const input = node('input', undefined, 'writer-tags__input');
     input.placeholder = 'Add a tag, then Enter';
@@ -761,8 +846,8 @@ class Writer {
       model.permalink = value;
       const taken = this.entries.some(entry => entry.path !== this.path && entry.permalink === value);
       slug.setCustomValidity(!value ? 'Use letters or numbers.' : taken ? 'Another entry already uses this address.' : '');
-      addressHint.textContent = slug.validationMessage || (this.wasPublished ? 'Changing a published address breaks links people already shared.' : '');
       this.changed();
+      this.syncAddress();
     });
     slug.addEventListener('blur', () => { slug.value = model.permalink; });
     const summary = node('label', undefined, 'writer-field');
@@ -772,17 +857,21 @@ class Writer {
     excerpt.addEventListener('input', () => { model.excerpt = excerpt.value; this.changed(); });
     summary.append(node('span', 'Summary (optional)', 'writer-field__label'), excerpt, node('p', 'Shown above your text and in entry lists. Leave it empty to use the start of your text.', 'owner-hint'));
     const actions = node('div', undefined, 'writer-more__actions');
-    if (this.wasPublished && model.permalink) {
+    let published: Model | undefined;
+    if (this.wasPublished) {
       const view = node('a', 'View on the website', 'owner-button');
-      view.href = `/${model.section}/${this.saved?.permalink || model.permalink}/`;
+      const base = this.store.draftFiles.find(file => file.path === this.path)?.baseContent ?? this.original;
+      published = readModel(base!).model;
+      view.href = entryUrl(published.section, published.permalink);
       actions.append(view);
     }
     if (this.path && !this.isNew) actions.append(button('Earlier versions', () => void this.history(), 'owner-button'));
     actions.append(button('Delete entry', () => void this.delete(), 'owner-button owner-button--danger'));
     body.append(address, summary, actions);
     this.syncAddress = () => {
-      prefix.textContent = `gwenlium.dev/${model.section}/`;
+      prefix.textContent = `gwenlium.dev/${entrySectionInfo[model.section].pathSegment}/`;
       if (!this.slugTouched && this.isNew) { model.permalink = this.uniquePermalink(slugify(model.title)); slug.value = model.permalink; }
+      addressHint.textContent = slug.validationMessage || (published && (model.section !== published.section || model.permalink !== published.permalink) ? 'Changing a published destination or address breaks links people already shared.' : '');
     };
     this.syncAddress();
     return window;

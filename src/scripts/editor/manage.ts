@@ -1,4 +1,5 @@
 import type { EditorBinding } from '../../lib/editor-types';
+import { editablePages, type EditablePageId } from '../../lib/page-catalogue';
 import type { SiteEditorStore } from './store';
 import { checkField, linksEditor, listEditor, mediaField, pickFiles, section, selectField, textField, topicsField, type Field, type Link } from './forms';
 import { button, errorText, node, openDialog, toast } from './ui';
@@ -6,7 +7,7 @@ import { createRichText } from './rich-text';
 import { chooseFromLibrary, stageFiles } from './media';
 import { canCrop, cropPicture } from './crop';
 
-/** Owner dialogs for everything that is not text on a page: settings, collections, lists. */
+/** Owner dialogs for page text, settings, collections and lists. */
 
 const siteFile = 'src/content/site.json';
 const galleryFile = 'src/content/gallery.json';
@@ -14,6 +15,7 @@ const musicFile = 'src/content/music.json';
 const aboutFile = 'src/content/pages/about.json';
 const whole = (file: string, label: string): EditorBinding => ({ file, field: '', label, format: 'text' });
 const today = () => new Date().toISOString().slice(0, 10);
+const draftHint = 'Saving keeps a draft in this browser. Publish separately to update the public site.';
 
 type MediaItem = { type: 'image' | 'video' | 'audio'; src: string; alt: string; caption: string; poster: string };
 type GalleryItem = { id: string; title: string; type: 'image' | 'video'; src: string; alt: string; caption: string; poster: string; topics: string[] };
@@ -82,6 +84,49 @@ export function mediaListField(store: SiteEditorStore, label: string, items: Med
   });
 }
 
+export async function openPageEditor(store: SiteEditorStore, id: EditablePageId, onSaved: () => Promise<void> | void): Promise<void> {
+  if (id === 'home') return openSiteSettings(store, onSaved);
+  if (id === 'about') return openAboutDetails(store, onSaved);
+
+  const page = editablePages[id];
+  const { dialog, body, footer, status } = openDialog(page.label);
+  const data = await load<Record<string, unknown>>(store, page.file).catch(error => { status.textContent = errorText(error); return undefined; });
+  if (!data) return;
+  const text = (key: string) => typeof data[key] === 'string' ? data[key] as string : '';
+  const eyebrow = textField('Small heading', text('eyebrow'), { hint: 'Optional, shown above the title.' });
+  const title = textField('Title', text('title'), { hint: 'Required.' });
+  const intro = textField('Introduction', text('intro'), { multiline: true, hint: 'Optional, shown under the title.' });
+  const optionalFields: [string, Field<string>][] = [['eyebrow', eyebrow], ['intro', intro]];
+  body.append(node('p', draftHint, 'owner-hint'), eyebrow.element, title.element, intro.element);
+  if (id === 'subscribe') {
+    const rssDescription = textField('RSS description', text('rssDescription'), { multiline: true, hint: 'Shown beside the RSS feed address.' });
+    optionalFields.push(['rssDescription', rssDescription]);
+    body.append(rssDescription.element);
+  }
+  if (id === 'music' || id === 'gallery' || id === 'subscribe') {
+    const manage = id === 'music' ? openMusic : id === 'gallery' ? openGallery : openSiteSettings;
+    const label = id === 'music' ? 'Manage music tracks' : id === 'gallery' ? 'Manage gallery pictures and videos' : 'Edit email subscription settings';
+    body.append(section('Related content',
+      node('p', 'Opens a separate dialog. Your unsaved page text stays here; each dialog saves its own draft.', 'owner-hint'),
+      button(label, () => void manage(store, onSaved).catch(error => { status.textContent = errorText(error); })),
+    ));
+  }
+  footer.append(button('Cancel', () => dialog.close()), saveButton('Save draft', async () => {
+    const next: Record<string, unknown> = { ...data, title: title.get().trim() };
+    if (!next.title) throw new Error('Give the page a title.');
+    for (const [key, field] of optionalFields) {
+      const value = field.get().trim();
+      // Keep absent optional fields absent unless the owner changes them.
+      if (value !== text(key)) next[key] = value;
+    }
+    if (unchanged(data, next)) { dialog.close(); toast('Nothing changed.'); return; }
+    await store.set(whole(page.file, page.label), next);
+    await onSaved();
+    dialog.close();
+    toast(`${page.label} saved as a draft. Publish when ready.`);
+  }, status));
+}
+
 export async function openSiteSettings(store: SiteEditorStore, onSaved: () => Promise<void> | void): Promise<void> {
   const { dialog, body, footer, status } = openDialog('Site settings', { wide: true });
   const site = await load<Record<string, unknown>>(store, siteFile).catch(error => { status.textContent = errorText(error); return undefined; });
@@ -114,13 +159,14 @@ export async function openSiteSettings(store: SiteEditorStore, onSaved: () => Pr
   const maintenanceMessage = textField('Maintenance message', text('maintenanceMessage'), { multiline: true });
 
   body.append(
+    node('p', draftHint, 'owner-hint'),
     section('General', name.element, description.element, statusLine.element, github.element, watermark.element),
     section('Home page', intro.element, featured.element),
     section('Newsletter', newsletterHeading.element, newsletterButton.element, newsletterUrl.element, newsletterAction.element),
     section('Game in the Devlog', gameTitle.element, gameStatus.element, gameDescription.element, gameCover.element, gameTrailer.element, gameLinks.element),
     section('Maintenance', maintenance.element, maintenanceHeading.element, maintenanceMessage.element),
   );
-  footer.append(button('Cancel', () => dialog.close()), saveButton('Save', async () => {
+  footer.append(button('Cancel', () => dialog.close()), saveButton('Save draft', async () => {
     if (!name.get().trim()) throw new Error('Your display name cannot be empty.');
     const cover = gameCover.get();
     if (cover.src && !cover.alt) throw new Error('Describe the game cover.');
@@ -251,8 +297,8 @@ export async function openAboutDetails(store: SiteEditorStore, onSaved: () => Pr
   const links = linksEditor('Profile links', Array.isArray(about.links) ? about.links as Link[] : []);
   const photos = Array.isArray(about.photos) ? (about.photos as string[]).map(src => ({ type: 'image' as const, src, alt: '', caption: '', poster: '' })) : [];
   const media = mediaListField(store, 'Pictures, video and audio', [...photos, ...(Array.isArray(about.media) ? about.media as MediaItem[] : [])], onStatus);
-  body.append(eyebrow.element, title.element, intro.element, bioField, portrait.element, links.element, media.element);
-  footer.append(button('Cancel', () => dialog.close()), saveButton('Save', async () => {
+  body.append(node('p', draftHint, 'owner-hint'), eyebrow.element, title.element, intro.element, bioField, portrait.element, links.element, media.element);
+  footer.append(button('Cancel', () => dialog.close()), saveButton('Save draft', async () => {
     const picture = portrait.get();
     if (!title.get().trim()) throw new Error('Give the page a title.');
     if (bio.missingDescriptions()) { bio.focusMissingDescription(); throw new Error('Describe every picture in your bio.'); }

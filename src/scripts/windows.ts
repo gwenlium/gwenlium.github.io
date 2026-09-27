@@ -261,7 +261,8 @@ function discoverWindows(animate = true) {
   if (controlsTemplate) document.querySelectorAll<HTMLElement>('.window:not([data-desktop-window])').forEach((root, index) => {
     const titlebar = root.querySelector<HTMLElement>(':scope > .window-titlebar');
     const body = root.querySelector<HTMLElement>(':scope > .window-body, :scope > .gallery-item-body');
-    if (!titlebar || !body || root.closest('dialog, template')) return;
+    // Owner dialogs and writing-desk panels manage their own layout.
+    if (!titlebar || !body || root.closest('dialog, template, [data-writer]')) return;
     root.dataset.desktopWindow = '';
     root.id ||= `desktop-${document.documentElement.dataset.pageTheme || 'page'}-${index + 1}`;
     root.dataset.windowTitle ||= root.getAttribute('aria-label') || titlebar.textContent?.trim() || 'Window';
