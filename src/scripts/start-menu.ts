@@ -135,6 +135,18 @@ function renderSearch(): void {
   more.hidden = count <= resultLimit;
 }
 
+const mobileViewLabels: Record<string, string> = {
+  'post-entry': 'Read entry',
+  'post-media': 'Entry media',
+  'post-related': 'Related entries',
+  'music-player': 'Music player',
+  'music-library': 'Music library',
+  'devlog-entries': 'Devlog entries',
+  'life-entries': 'Life entries',
+  'devlog-search': 'Search / Filter',
+  'life-search': 'Search / Filter',
+};
+
 function renderWindows(): void {
   if (!menu) return;
   const { windows, windowCount, emptyWindows, restoreAll, input } = menu;
@@ -150,16 +162,17 @@ function renderWindows(): void {
   for (const root of document.querySelectorAll<HTMLElement>('[data-desktop-window]')) {
     const { windowId: id, windowTitle: title, windowState: state } = root.dataset;
     if (!id || (mobile ? !availableMobileWindow(root) : state !== 'minimized' && state !== 'closed')) continue;
+    const displayTitle = (mobile && mobileViewLabels[id]) || title || 'Window';
     count += 1;
     const item = document.createElement('li');
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.restoreWindow = id;
-    button.setAttribute('aria-label', `${mobile ? 'Open' : 'Restore'} ${title || 'window'}`);
+    button.setAttribute('aria-label', `${mobile ? 'Open' : 'Restore'} ${displayTitle}`);
     if (mobile && id === active) button.setAttribute('aria-current', 'true');
     const label = document.createElement('span');
     const name = document.createElement('span');
-    name.textContent = title || 'Window';
+    name.textContent = displayTitle;
     const windowState = document.createElement('small');
     windowState.textContent = mobile ? (id === active ? 'Current view' : 'Available') : state === 'minimized' ? 'Minimized' : 'Closed';
     label.append(name, windowState);

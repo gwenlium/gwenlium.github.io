@@ -35,10 +35,13 @@ const hasMediaContent = hasEntryMedia || hasWindowOverride('post-media');
 const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
 ---
 
-<a class="back-link" href={`/${section}/`} data-preview-back-link><span aria-hidden="true">←</span> All entries</a>
-<div class="mobile-entry-tabs" data-mobile-entry-tabs role="tablist" aria-label="Entry views">
-  <button id="mobile-tab-read" class="button-secondary" type="button" role="tab" data-mobile-window-target="post-entry" aria-controls="post-entry" aria-selected="true">Read</button>
-  <button id="mobile-tab-media" class="button-secondary" type="button" role="tab" data-mobile-window-target="post-media" aria-controls="post-media" aria-selected="false" tabindex="-1" disabled={!hasMediaWindow} hidden={!hasMediaWindow}>Media</button>
+<div class="entry-navigation" data-entry-navigation>
+  <a class="back-link" href={`/${section}/`} data-preview-back-link><span aria-hidden="true">←</span> All entries</a>
+  <div class="mobile-entry-tabs" data-mobile-entry-tabs role="tablist" aria-label="Entry views">
+    <button id="mobile-tab-read" class="button-secondary" type="button" role="tab" data-mobile-window-target="post-entry" aria-controls="post-entry" aria-selected="true">Read</button>
+    <button id="mobile-tab-media" class="button-secondary" type="button" role="tab" data-mobile-window-target="post-media" aria-controls="post-media" aria-selected="false" tabindex="-1" disabled={!hasMediaWindow} hidden={!hasMediaWindow}>Media</button>
+  </div>
+  <div class="entry-reading-progress" data-entry-reading-progress role="progressbar" aria-label="Entry reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span></span></div>
 </div>
 <div class="article-layout" data-entry-preview={preview || undefined}>
   <div class="article-main">
@@ -47,10 +50,10 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
     <div slot="titlebar-actions" class="dialogue-option" data-dialogue-option hidden>
       <button class="button button-secondary" type="button" data-dialogue-enter aria-controls="entry-content" title="Read one block at a time">Dialogue mode</button>
     </div>
-    <article class="entry">
+    <article class="entry" id="entry-top" tabindex="-1" aria-labelledby="entry-title">
       <header class="entry-header">
         <p class="eyebrow"><time datetime={date?.toISOString().slice(0, 10)} data-preview-date>{dateLabel}</time></p>
-        <h1 data-site-edit-file={sourceFile} data-site-edit-field={sourceFile && '/title'} data-site-edit-format={sourceFile && 'text'} data-site-edit-label={sourceFile && 'Post title'} data-preview-title>{title}</h1>
+        <h1 id="entry-title" data-site-edit-file={sourceFile} data-site-edit-field={sourceFile && '/title'} data-site-edit-format={sourceFile && 'text'} data-site-edit-label={sourceFile && 'Post title'} data-preview-title>{title}</h1>
         {(tags.length > 0 || preview) && <ul class="entry-tags" aria-label="Tags" hidden={!tags.length} data-preview-tags>{tags.map((tag) => <li><a class="tag" href={`/${section}/?tag=${encodeURIComponent(tag)}`}>{tag}</a></li>)}</ul>}
       </header>
       {(contents.length >= 2 || preview) && <nav class="contents" aria-label="On this page" hidden={contents.length < 2} data-preview-contents>
@@ -76,6 +79,7 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
         <button class="button button-secondary" type="button" data-copy-link={shareUrl}><Icon name="external" size={15} /> Copy link</button>
         <span class="copy-feedback" role="status" aria-live="polite" data-copy-feedback></span>
         <label class="copy-fallback" hidden data-copy-fallback>Entry link<input type="text" readonly value={shareUrl} aria-label="Entry link to copy" /></label>
+        <a class="entry-back-to-top" href="#entry-top"><span aria-hidden="true">↑</span> Back to top</a>
       </footer>
     </article>
   </Window>
@@ -100,6 +104,7 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
 
 <script>
   import '../scripts/dialogue-reader';
+  import '../scripts/entry-reading';
 
   let shareController: AbortController | undefined;
   function initializeSharing() {
@@ -134,12 +139,14 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
 
 <style>
   .back-link { display: inline-flex; align-items: center; gap: .65rem; font-size: .75rem; margin: 0 0 1.5rem; text-underline-offset: .25em; }
+  .entry-reading-progress { display: none; }
+  .entry-back-to-top { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; margin-left: auto; font-size: .7rem; text-underline-offset: .25em; }
   .article-layout { display: grid; align-items: start; gap: 1.5rem; max-width: 60rem; margin-inline: auto; }
   .article-main { display: grid; gap: 1.5rem; min-width: 0; }
   .article-window, .article-media-slot, .article-related-slot { min-width: 0; }
   .article-media-slot[data-entry-media-none] { display: none; }
   .article-window:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))), .article-media-slot:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))), .article-related-slot:not(:has(:global(:is([data-desktop-window], [data-window-placeholder])))) { display: none; }
-  .entry { max-width: 48rem; margin: 0 auto; padding: clamp(.25rem, 2cqi, 1.5rem); }
+  .entry { max-width: 48rem; margin: 0 auto; padding: clamp(.25rem, 2cqi, 1.5rem); scroll-margin-top: 1.5rem; }
   .entry-header { margin-bottom: clamp(1.25rem, 4cqi, 2rem); }
   .entry-header h1 { font-size: clamp(1.5rem, 1.1rem + 2.5cqi, 2.4rem); line-height: 1.4; overflow-wrap: anywhere; margin: .8rem 0 1.2rem; }
   .entry-excerpt { font-family: var(--font-reading); font-size: clamp(.95rem, .9rem + .3cqi, 1.05rem); line-height: 1.8; white-space: pre-line; }
@@ -177,10 +184,32 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
     :global(.entry-text-window > .window-body), :global(.entry-media-window > .window-body) { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
     .entry { padding: .4rem; }
   }
+  @media screen and (max-width: 760px) {
+    :global(html[data-mobile-window-mode]) .entry-navigation { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .6rem; padding: .25rem .55rem .35rem; border-bottom: 1px solid var(--line); background: var(--page-bg); box-shadow: 0 1px 0 var(--bevel-light); }
+    :global(html[data-mobile-window-mode]) .entry-navigation .back-link { min-height: 44px; margin: 0; gap: .4rem; font-size: .65rem; }
+    :global(html[data-mobile-window-mode]) .entry-navigation .mobile-entry-tabs:not([hidden]) { position: static; z-index: auto; flex-shrink: 0; gap: .35rem; margin: 0; padding: 0; background: none; }
+    :global(html[data-mobile-window-mode]) .mobile-entry-tabs button { padding-inline: .65rem; }
+    :global(html[data-mobile-window-mode][data-mobile-active-window='post-entry']) .entry-reading-progress:not([hidden]) { display: block; position: absolute; inset-inline: 0; bottom: -1px; height: 2px; background: var(--line); }
+    .entry-reading-progress > span { display: block; width: 100%; height: 100%; background: var(--accent-ink); transform: scaleX(var(--entry-reading-progress, 0)); transform-origin: left; }
+    :global(html[data-mobile-window-mode] .entry-text-window > .window-titlebar) { min-height: 26px; padding-block: .2rem; }
+    :global(html[data-mobile-window-mode] .entry-text-window > .window-body) { padding: .7rem .85rem; }
+    :global(html[data-mobile-window-mode]) .entry { padding: 0; }
+    :global(html[data-mobile-window-mode]) .entry,
+    :global(html[data-mobile-window-mode]) .entry-body :global([id]) { scroll-margin-top: calc(var(--entry-navigation-height, 3.5rem) + .5rem); }
+    :global(html[data-mobile-window-mode]) .entry-header { margin-bottom: .9rem; }
+    :global(html[data-mobile-window-mode]) .entry-header .eyebrow { margin-bottom: 0; }
+    :global(html[data-mobile-window-mode]) .entry-header h1 { font-size: clamp(1.3rem, 1.05rem + 1.4cqi, 1.6rem); line-height: 1.45; margin: .4rem 0 .65rem; }
+    :global(html[data-mobile-window-mode]) .entry-tags { gap: .4rem; margin-top: .65rem; }
+    :global(html[data-mobile-window-mode]) .contents { padding: .65rem .8rem; margin-block: .85rem; }
+    :global(html[data-mobile-window-mode]) .contents h2 { margin-bottom: .4rem; }
+    :global(html[data-mobile-window-mode]) .contents ol { line-height: 1.65; }
+    :global(html[data-mobile-window-mode]) .dialogue-heading { top: var(--entry-navigation-height, 3.5rem); }
+  }
   @media print {
     :global(#post-entry) { display: block !important; position: static !important; width: auto !important; height: auto !important; max-height: none !important; overflow: visible !important; transform: none !important; break-inside: auto; }
     :global(#post-entry > .window-body) { display: block !important; height: auto !important; max-height: none !important; overflow: visible !important; }
     .dialogue-option, .dialogue-heading, .dialogue-controls { display: none !important; }
+    .entry-reading-progress, .entry-back-to-top { display: none !important; }
     .dialogue-reader[data-dialogue-active] { border: 0; box-shadow: none; background: none; }
     .dialogue-reader[data-dialogue-active] [data-dialogue-content] { padding: 0; min-height: 0; }
     .dialogue-reader :global([data-dialogue-hidden]) { display: revert !important; }

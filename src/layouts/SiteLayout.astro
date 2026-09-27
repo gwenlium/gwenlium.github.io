@@ -170,7 +170,7 @@ const windowPage: WindowPage = article ? 'post' : pageTheme as WindowPage;
           <Icon name="settings" size={17} /><span>{preferencesWindow.title}</span>
         </button>
         <button type="button" class="button-secondary taskbar-control" data-open-player aria-controls="music-player" aria-expanded={!playerWindow.initiallyClosed} aria-label={`${playerWindow.title} player`}>
-          <Icon name="music" size={17} /><span class="desktop-label">{playerWindow.title}</span><span class="mobile-label">Music</span>
+          <Icon name="music" size={17} /><span class="desktop-label">{playerWindow.title}</span><span class="mobile-label">Player</span>
         </button>
         <button type="button" class="button-secondary taskbar-control owner-taskbar" data-owner-menu data-owner-editor aria-haspopup="menu" hidden><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m4 20 4-1 11-11-3-3L5 16l-1 4ZM14 7l3 3" /></svg><span>Edit</span></button>
         <button type="button" class="button owner-taskbar owner-taskbar--publish" data-owner-publish hidden>Publish</button>

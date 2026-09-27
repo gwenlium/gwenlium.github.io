@@ -194,11 +194,11 @@ function synchronize(): void {
     release();
     pageBody = document.body;
     renderedPath = path();
-    routeIndex = history.state?.index;
     activeId = '';
   }
   const previous = activeId;
   const historyView = readHistory();
+  routeIndex = history.state?.index;
   const requested = rootFor(historyView?.id || activeId);
   const selected = requested && availableMobileWindow(requested) ? requested : primaryWindow();
   activeId = selected?.id ?? '';
@@ -230,10 +230,42 @@ document.addEventListener('gwenlium:window-command', event => {
   else if (detail.id === activeId && (detail.action === 'close' || detail.action === 'minimize')) goBack();
 }, { ...options, capture: true });
 
+// Filter submission changes the query and the visible results pane together.
+// A single history entry keeps Back aligned with the previous applied filters.
+document.addEventListener('gwenlium:archive-results', event => {
+  if (!mobile() || swapping) return;
+  const detail = (event as CustomEvent<{ id?: string; url?: string }>).detail;
+  if (!detail?.id || typeof detail.url !== 'string') return;
+  const root = rootFor(detail.id);
+  if (!root || !root.closest('[data-archive-url]') || !availableMobileWindow(root)) return;
+  let destination: URL;
+  try { destination = new URL(detail.url, location.href); } catch { return; }
+  if (destination.origin !== location.origin || destination.pathname !== location.pathname) return;
+  rememberPosition();
+  if (destination.href !== location.href || activeId !== root.id) {
+    const next: MobileHistory = { path: destination.pathname + destination.search, id: root.id, depth: (readHistory()?.depth ?? 0) + 1 };
+    history.pushState({ ...(history.state ?? {}), [stateKey]: next }, '', destination.href);
+  }
+  renderedPath = destination.pathname + destination.search;
+  routeIndex = history.state?.index;
+  activeId = root.id;
+  positions().delete(root.id);
+  applySelection();
+  restorePosition(root, true);
+}, options);
+
 document.addEventListener('click', event => {
   if (!mobile() || !(event.target instanceof Element)) return;
   const target = event.target.closest<HTMLElement>('[data-mobile-window-target]');
-  if (target) { event.preventDefault(); selectWindow(target.dataset.mobileWindowTarget || '', true, false); }
+  if (target) {
+    event.preventDefault();
+    const id = target.dataset.mobileWindowTarget || '';
+    const focusId = target.dataset.mobileWindowFocus;
+    if (focusId) positions().delete(id);
+    selectWindow(id, true, false);
+    const focus = focusId ? document.getElementById(focusId) : null;
+    if (focus && rootFor(activeId)?.contains(focus)) focus.focus({ preventScroll: true });
+  }
   else if (event.target.closest('[data-mobile-back]')) { event.preventDefault(); goBack(); }
 }, options);
 
@@ -258,8 +290,7 @@ window.addEventListener('popstate', event => {
   if (!mobile()) return;
   if (renderedPath !== path()) { rememberPosition(); swapping = true; return; }
   if (swapping) return;
-  const destination = readHistory();
-  if (!destination || history.state?.index !== routeIndex) return;
+  if (history.state?.index !== routeIndex) return;
   // A view switch is not an Astro page navigation: retain the article DOM,
   // dialogue state, media selection and playing audio when traversing views.
   event.stopImmediatePropagation();
@@ -293,6 +324,9 @@ document.addEventListener('astro:after-swap', () => { swapping = false; navigati
 document.addEventListener('astro:page-load', synchronize, options);
 window.addEventListener('pagehide', rememberPosition, options);
 window.addEventListener('pageshow', () => { swapping = false; synchronize(); }, options);
+// Native article anchors can create history entries without mobile metadata.
+// Adopt them before opening another view so Back returns to the reading pane.
+window.addEventListener('hashchange', queueSynchronization, options);
 window.addEventListener('beforeprint', () => { rememberPosition(); printing = true; release(); }, options);
 window.addEventListener('afterprint', () => { printing = false; synchronize(); }, options);
 
