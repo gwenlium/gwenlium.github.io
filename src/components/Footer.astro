@@ -15,7 +15,7 @@ const navigation = [
 ];
 ---
 
-<footer class="site-footer">
+<footer class="site-footer" transition:name="site-navigation" transition:animate="none">
   <nav class="footer-navigation" aria-label="Site navigation">
     {navigation.map((item) => (
       <a class:list={['footer-link', { 'phone-primary': item.phonePrimary }]} href={item.href} aria-current={(item.href === '/' ? path === '/' : path.startsWith(item.href)) ? 'page' : undefined}>

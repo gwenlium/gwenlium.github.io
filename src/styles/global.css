@@ -322,13 +322,13 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
   .window-body { padding: 1.1rem; }
 }
 @media (max-width: 760px), (pointer: coarse) and (max-width: 1000px) and (max-height: 500px) {
-  .site-shell { grid-template-rows: auto minmax(0, 1fr) auto; padding: env(safe-area-inset-top) max(.5rem, env(safe-area-inset-right)) 0 max(.5rem, env(safe-area-inset-left)); }
-  .site-header { gap: .75rem; padding-block: .45rem; }
+  .site-shell { grid-template-rows: auto minmax(0, 1fr) auto; padding: env(safe-area-inset-top) 0 0; }
+  .site-header { gap: .75rem; padding-block: .45rem; padding-inline: max(.5rem, env(safe-area-inset-left)) max(.5rem, env(safe-area-inset-right)); }
   .site-brand { font-size: 24px; gap: .65rem; }
   .brand-icon { width: 36px; height: 36px; }
   .site-status, .taskbar { display: none; }
-  #page-scroll { padding: .35rem .15rem 1rem; scrollbar-gutter: auto; }
-  .site-footer { margin: 0; padding: .25rem 0 max(.25rem, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+  #page-scroll { padding: .35rem calc(max(.5rem, env(safe-area-inset-right)) + .15rem) 1rem calc(max(.5rem, env(safe-area-inset-left)) + .15rem); scrollbar-gutter: auto; }
+  .site-footer { margin: 0; padding: .25rem max(.5rem, env(safe-area-inset-right)) max(.25rem, env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-left)); border-top: 1px solid var(--line); background: var(--surface); }
   .footer-navigation { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch; gap: .15rem; }
   .footer-navigation > .footer-link:not(.phone-primary) { display: none; }
   .footer-navigation .phone-primary, .phone-menu-slot .start-trigger { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 100%; min-width: 0; min-height: 54px; padding: .3rem .1rem; border: 1px solid transparent; border-radius: 2px; background: transparent; color: var(--muted); box-shadow: none; font-size: 10px; line-height: 1.2; letter-spacing: 0; text-decoration: none; }
@@ -358,7 +358,7 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
   .site-footer .footer-navigation .phone-primary, .phone-menu-slot .start-trigger { min-height: 48px; }
 }
 @media (min-width: 761px) and (max-height: 560px) {
-  .site-footer { padding-block: .2rem; }
+  .site-footer { padding-block: .2rem max(.2rem, env(safe-area-inset-bottom)); }
   .footer-link { min-height: 27px; }
 }
 
