@@ -1,4 +1,5 @@
 import 'astro:transitions/client';
+import { phoneViewport } from './window-layout';
 
 type Position = { left: number; top: number };
 type ScrollEntry = Position & { id: string };
@@ -149,14 +150,37 @@ function syncControls(): void {
   const music = document.getElementById('music-player');
   const musicControl = document.querySelector<HTMLElement>('[data-open-player]');
   if (musicControl) {
-    musicControl.setAttribute('aria-expanded', String(document.documentElement.hasAttribute('data-mobile-window-mode')
-      ? document.documentElement.dataset.mobileActiveWindow === 'music-player'
-      : player?.dataset.playerState === 'open' && Boolean(music && !music.hidden)));
+    musicControl.setAttribute('aria-expanded', String(player?.dataset.playerState === 'open' && Boolean(music && !music.hidden)));
     musicControl.dataset.windowState = music?.dataset.windowState || 'normal';
   }
   document.querySelector('[data-open-start]')?.setAttribute('aria-expanded', String(Boolean(document.querySelector<HTMLDialogElement>('#start-menu')?.open)));
   const settings = document.getElementById('site-settings');
   document.querySelector('[data-open-settings]')?.setAttribute('aria-expanded', String(Boolean(settings && !settings.hidden)));
+}
+
+function syncPhoneShell(): void {
+  const shell = document.querySelector<HTMLElement>('.site-shell');
+  const player = document.querySelector<HTMLElement>('.player-region');
+  const start = document.querySelector<HTMLElement>('[data-open-start]');
+  const settings = document.querySelector<HTMLElement>('[data-open-settings]');
+  const publish = document.querySelector<HTMLElement>('[data-owner-publish]');
+  const menuSlot = document.querySelector<HTMLElement>('[data-phone-menu-slot]');
+  const settingsSlot = document.querySelector<HTMLElement>('[data-phone-settings-slot]');
+  if (!shell || !viewport || !footer || !taskbar || !player || !start || !settings || !menuSlot || !settingsSlot) return;
+  if (phoneViewport.matches) {
+    if (player.parentElement !== viewport) viewport.append(player);
+    if (start.parentElement !== menuSlot) menuSlot.append(start);
+    if (settings.parentElement !== settingsSlot) settingsSlot.append(settings);
+    if (publish && publish.parentElement !== settingsSlot) settingsSlot.append(publish);
+    const current = footer.querySelector<HTMLElement>('.footer-link:not(.phone-primary)[aria-current="page"]');
+    start.setAttribute('aria-label', current ? `Menu, current section: ${current.textContent?.trim()}` : 'Menu');
+  } else {
+    if (player.parentElement !== shell) shell.insertBefore(player, footer);
+    if (start.parentElement !== taskbar) taskbar.prepend(start, settings);
+    if (publish && publish.parentElement !== taskbar) taskbar.querySelector('[data-owner-menu]')?.after(publish);
+    start.removeAttribute('aria-label');
+  }
+  queueGeometry();
 }
 
 function detachPage(): void {
@@ -178,6 +202,7 @@ function bindPage(): void {
   renderedPathname = location.pathname;
   pageController = new AbortController();
   viewport?.addEventListener('scroll', onViewportScroll, { passive: true, signal: pageController.signal });
+  syncPhoneShell();
   for (const element of document.querySelectorAll<HTMLElement>('.site-shell, .site-header, #page-scroll, .player-region, .site-footer, .taskbar')) geometryObserver.observe(element);
   dialogObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
   measureGeometry();
@@ -298,15 +323,12 @@ window.addEventListener('popstate', (event) => {
     finishRestoration();
   });
 }, { ...listenerOptions, capture: true });
-document.addEventListener('gwenlium:mobile-history-traverse', event => {
-  adoptTraversal((event as CustomEvent<unknown>).detail);
-  finishRestoration();
-}, listenerOptions);
 window.addEventListener('hashchange', prepareFragment, listenerOptions);
 window.addEventListener('pagehide', persistScroll, listenerOptions);
 window.addEventListener('pageshow', queueGeometry, listenerOptions);
 window.addEventListener('resize', queueGeometry, listenerOptions);
 window.visualViewport?.addEventListener('resize', queueGeometry, listenerOptions);
+phoneViewport.addEventListener('change', syncPhoneShell, listenerOptions);
 
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;

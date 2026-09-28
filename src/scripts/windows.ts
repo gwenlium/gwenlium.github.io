@@ -1,4 +1,4 @@
-import { registerWindow, resetWindowLayout, setWindowMaximized, unregisterWindow } from './window-layout';
+import { phoneViewport, registerWindow, resetWindowLayout, setWindowMaximized, unregisterWindow } from './window-layout';
 import { animateWindow, cancelWindowAnimation } from './window-motion';
 
 type DesktopWindowState = 'normal' | 'minimized' | 'maximized' | 'closed';
@@ -15,6 +15,7 @@ type DesktopWindow = {
   lastFocus: HTMLElement | null;
   request: number;
   pending?: 'minimize' | 'close';
+  desktopState?: DesktopWindowState;
 };
 
 const desktopWindows = new Map<string, DesktopWindow>();
@@ -57,6 +58,11 @@ function usableControl(element: HTMLElement, root: HTMLElement) {
 }
 
 function focusWindow(entry: DesktopWindow) {
+  if (phoneViewport.matches && entry.root.hasAttribute('data-window-feed')) {
+    entry.root.scrollIntoView({ block: 'start' });
+    entry.root.focus({ preventScroll: true });
+    return;
+  }
   if (entry.lastFocus && usableControl(entry.lastFocus, entry.root)) {
     entry.lastFocus.focus();
     return;
@@ -188,11 +194,36 @@ function createNotice() {
   notice = { root, message, reopen };
 }
 
+function syncPhoneWindow(entry: DesktopWindow) {
+  if (!entry.root.hasAttribute('data-window-feed')) return;
+  if (phoneViewport.matches) {
+    entry.desktopState ??= entry.pending === 'close' ? 'closed' : entry.pending === 'minimize' ? 'minimized' : entry.root.dataset.windowState as DesktopWindowState;
+    entry.request++;
+    entry.pending = undefined;
+    cancelWindowAnimation(entry.root);
+    setState(entry, 'normal');
+    entry.controls.hidden = true;
+  } else if (entry.desktopState) {
+    const state = entry.desktopState;
+    entry.desktopState = undefined;
+    setState(entry, state);
+    if (state === 'maximized') maximizedWindow = entry;
+    entry.controls.hidden = false;
+  }
+}
+
+phoneViewport.addEventListener('change', () => {
+  hideNotice();
+  for (const entry of desktopWindows.values()) syncPhoneWindow(entry);
+  windowsChanged();
+});
+
 function commandWindow(id: string | undefined, action: string | undefined) {
   if (action === 'restore-all') {
     let focusTarget: DesktopWindow | undefined;
     const previousMaximized = maximizedWindow;
     for (const entry of desktopWindows.values()) {
+      if (phoneViewport.matches && entry.root.hasAttribute('data-window-feed')) continue;
       if (entry.root.hidden || entry.pending) focusTarget ??= entry;
       restoreWindow(entry, false);
       resetWindowLayout(entry.root);
@@ -211,6 +242,10 @@ function commandWindow(id: string | undefined, action: string | undefined) {
     restoreWindow(maximizedWindow, false);
   }
   if (!entry) return;
+  if (phoneViewport.matches && entry.root.hasAttribute('data-window-feed')) {
+    if (action === 'restore') focusWindow(entry);
+    return;
+  }
   switch (action) {
     case 'restore':
       restoreWindow(entry);
@@ -266,6 +301,7 @@ function discoverWindows(animate = true) {
     root.dataset.desktopWindow = '';
     root.id ||= `desktop-${document.documentElement.dataset.pageTheme || 'page'}-${index + 1}`;
     root.dataset.windowTitle ||= root.getAttribute('aria-label') || titlebar.textContent?.trim() || 'Window';
+    if (!root.hasAttribute('tabindex')) root.tabIndex = -1;
     body.classList.add('window-body');
     const controls = controlsTemplate.cloneNode(true) as HTMLElement;
     for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-window-action]')) {
@@ -324,7 +360,8 @@ function discoverWindows(animate = true) {
     registerWindow(root, { floating: root.hasAttribute('data-window-default-floating') });
     setState(entry, root.dataset.windowInitialState === 'closed' ? 'closed' : 'normal');
     entry.controls.hidden = false;
-    if (animate && !root.hidden) void animateWindow(root, 'open');
+    syncPhoneWindow(entry);
+    if (animate && !root.hidden && !phoneViewport.matches) void animateWindow(root, 'open');
   });
 }
 

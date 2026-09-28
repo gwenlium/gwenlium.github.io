@@ -1,5 +1,4 @@
 import { entrySectionInfo, resolveEntrySection, type EntrySection } from '../../lib/entry-sections.mjs';
-import { mobileViewHistoryDepth } from '../mobile-windows';
 import { renderMarkdownPreview } from './markdown';
 import { ownerStore, writerUrl } from './session';
 
@@ -136,11 +135,12 @@ function fill(): void {
     back.href = payload.returnUrl ?? writerUrl({ entry: payload.path });
     const returnIndex = payload.returnIndex;
     back.onclick = event => {
-      // Read/Media and settings views add history entries without advancing Astro's page index.
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      // Return to the actual writer page when the preview is its next history entry.
       const index = (history.state as { index?: number } | null)?.index;
       if (typeof returnIndex === 'number' && typeof index === 'number' && index === returnIndex + 1) {
         event.preventDefault();
-        history.go(-(mobileViewHistoryDepth() + 1));
+        history.back();
       }
     };
   }

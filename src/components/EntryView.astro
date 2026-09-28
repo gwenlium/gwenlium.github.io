@@ -34,15 +34,10 @@ const { section, title, date, dateLabel, tags, excerpt, sourceFile, contents, me
 const { indexUrl, dated } = entrySectionInfo[section];
 const mediaWindow = getWindowDefinition('post-media');
 const hasMediaContent = hasEntryMedia || hasWindowOverride('post-media');
-const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
 ---
 
 <div class="entry-navigation" data-entry-navigation>
   <a class="back-link" href={indexUrl} data-preview-back-link><span aria-hidden="true">←</span> All entries</a>
-  <div class="mobile-entry-tabs" data-mobile-entry-tabs role="tablist" aria-label="Entry views">
-    <button id="mobile-tab-read" class="button-secondary" type="button" role="tab" data-mobile-window-target="post-entry" aria-controls="post-entry" aria-selected="true">Read</button>
-    <button id="mobile-tab-media" class="button-secondary" type="button" role="tab" data-mobile-window-target="post-media" aria-controls="post-media" aria-selected="false" tabindex="-1" disabled={!hasMediaWindow} hidden={!hasMediaWindow}>Media</button>
-  </div>
   <div class="entry-reading-progress" data-entry-reading-progress role="progressbar" aria-label="Entry reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span></span></div>
 </div>
 <div class="article-layout" data-entry-preview={preview || undefined}>
@@ -171,14 +166,14 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
   .dialogue-controls { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: .75rem; border-top: 1px solid var(--line); background: var(--surface-raised); }
   .dialogue-progress { flex: 1; text-align: center; font-family: var(--font-reading); font-size: .9rem; color: var(--muted); }
   .dialogue-controls button:disabled { cursor: default; opacity: .5; }
-  @media (pointer: coarse) { .dialogue-option button { min-height: 28px; } }
+  @media (pointer: coarse) { .dialogue-option button, .dialogue-heading button, .dialogue-controls button { min-height: 44px; } }
   @container window-content (max-width: 360px) {
     .dialogue-heading, .dialogue-controls { padding: .5rem; }
     .dialogue-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .dialogue-controls button { min-width: 0; padding-inline: .5rem; }
     .dialogue-progress { grid-column: 1 / -1; grid-row: 1; }
   }
-  @media screen and (min-width: 1000px) {
+  @media screen and (min-width: 1000px) and (not ((pointer: coarse) and (max-width: 1000px) and (max-height: 500px))) {
     .article-layout { max-width: 54rem; }
     .article-layout:has(> .article-media-slot :global(:is([data-desktop-window], [data-window-placeholder]))) { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1.5rem; max-width: 74rem; }
     .article-related-slot { grid-column: 1 / -1; width: min(100%, 54rem); margin-inline: auto; }
@@ -187,26 +182,24 @@ const hasMediaWindow = Boolean(mediaWindow?.enabled && hasMediaContent);
     :global(.entry-text-window > .window-body), :global(.entry-media-window > .window-body) { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
     .entry { padding: .4rem; }
   }
-  @media screen and (max-width: 760px) {
-    :global(html[data-mobile-window-mode]) .entry-navigation { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .6rem; padding: .25rem .55rem .35rem; border-bottom: 1px solid var(--line); background: var(--page-bg); box-shadow: 0 1px 0 var(--bevel-light); }
-    :global(html[data-mobile-window-mode]) .entry-navigation .back-link { min-height: 44px; margin: 0; gap: .4rem; font-size: .65rem; }
-    :global(html[data-mobile-window-mode]) .entry-navigation .mobile-entry-tabs:not([hidden]) { position: static; z-index: auto; flex-shrink: 0; gap: .35rem; margin: 0; padding: 0; background: none; }
-    :global(html[data-mobile-window-mode]) .mobile-entry-tabs button { padding-inline: .65rem; }
-    :global(html[data-mobile-window-mode][data-mobile-active-window='post-entry']) .entry-reading-progress:not([hidden]) { display: block; position: absolute; inset-inline: 0; bottom: -1px; height: 2px; background: var(--line); }
+  @media screen and (max-width: 760px), screen and (pointer: coarse) and (max-width: 1000px) and (max-height: 500px) {
+    .entry-navigation { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .6rem; padding: .25rem .55rem .35rem; border-bottom: 1px solid var(--line); background: var(--page-bg); box-shadow: 0 1px 0 var(--bevel-light); }
+    .entry-navigation .back-link { min-height: 44px; margin: 0; gap: .4rem; font-size: .65rem; }
+    .entry-reading-progress:not([hidden]) { display: block; position: absolute; inset-inline: 0; bottom: -1px; height: 2px; background: var(--line); }
     .entry-reading-progress > span { display: block; width: 100%; height: 100%; background: var(--accent-ink); transform: scaleX(var(--entry-reading-progress, 0)); transform-origin: left; }
-    :global(html[data-mobile-window-mode] .entry-text-window > .window-titlebar) { min-height: 26px; padding-block: .2rem; }
-    :global(html[data-mobile-window-mode] .entry-text-window > .window-body) { padding: .7rem .85rem; }
-    :global(html[data-mobile-window-mode]) .entry { padding: 0; }
-    :global(html[data-mobile-window-mode]) .entry,
-    :global(html[data-mobile-window-mode]) .entry-body :global([id]) { scroll-margin-top: calc(var(--entry-navigation-height, 3.5rem) + .5rem); }
-    :global(html[data-mobile-window-mode]) .entry-header { margin-bottom: .9rem; }
-    :global(html[data-mobile-window-mode]) .entry-header .eyebrow { margin-bottom: 0; }
-    :global(html[data-mobile-window-mode]) .entry-header h1 { font-size: clamp(1.3rem, 1.05rem + 1.4cqi, 1.6rem); line-height: 1.45; margin: .4rem 0 .65rem; }
-    :global(html[data-mobile-window-mode]) .entry-tags { gap: .4rem; margin-top: .65rem; }
-    :global(html[data-mobile-window-mode]) .contents { padding: .65rem .8rem; margin-block: .85rem; }
-    :global(html[data-mobile-window-mode]) .contents h2 { margin-bottom: .4rem; }
-    :global(html[data-mobile-window-mode]) .contents ol { line-height: 1.65; }
-    :global(html[data-mobile-window-mode]) .dialogue-heading { top: var(--entry-navigation-height, 3.5rem); }
+    :global(.entry-text-window > .window-titlebar) { min-height: 26px; padding-block: .2rem; }
+    :global(.entry-text-window > .window-body) { padding: .7rem .85rem; }
+    .entry { padding: 0; }
+    .entry,
+    .entry-body :global([id]) { scroll-margin-top: calc(var(--entry-navigation-height, 3.5rem) + .5rem); }
+    .entry-header { margin-bottom: .9rem; }
+    .entry-header .eyebrow { margin-bottom: 0; }
+    .entry-header h1 { font-size: clamp(1.3rem, 1.05rem + 1.4cqi, 1.6rem); line-height: 1.45; margin: .4rem 0 .65rem; }
+    .entry-tags { gap: .4rem; margin-top: .65rem; }
+    .contents { padding: .65rem .8rem; margin-block: .85rem; }
+    .contents h2 { margin-bottom: .4rem; }
+    .contents ol { line-height: 1.65; }
+    .dialogue-heading { top: var(--entry-navigation-height, 3.5rem); }
   }
   @media print {
     :global(#post-entry) { display: block !important; position: static !important; width: auto !important; height: auto !important; max-height: none !important; overflow: visible !important; transform: none !important; break-inside: auto; }

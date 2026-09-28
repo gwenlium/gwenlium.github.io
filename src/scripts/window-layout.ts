@@ -51,9 +51,9 @@ type Gesture = {
 };
 
 const layouts = new Map<HTMLElement, Layout>();
+export const phoneViewport = window.matchMedia('(max-width: 760px), (pointer: coarse) and (max-width: 1000px) and (max-height: 500px)');
 const interactive = 'button, a, input, select, textarea, [contenteditable="true"]';
 const storagePrefix = 'gwenlium:window-layout:';
-const phone = matchMedia('(max-width: 760px)');
 let gesture: Gesture | undefined;
 let moveFrame = 0;
 let resizeFrame = 0;
@@ -80,7 +80,7 @@ function synchronizeEditing(): void {
   finishGesture(true);
   for (const entry of layouts.values()) {
     if (editing()) captureVisitorLayout(entry);
-    else if (phone.matches) entry.pendingEditorLayout = undefined;
+    else if (phoneViewport.matches) entry.pendingEditorLayout = undefined;
     else if (entry.visitor) {
       if (entry.maximized) command(entry, 'restore');
       const visitor = entry.visitor;
@@ -150,7 +150,7 @@ function restoreLayout(entry: Layout): boolean {
 }
 
 function rememberLayout(entry: Layout): void {
-  if (phone.matches || suspended) return;
+  if (phoneViewport.matches || suspended) return;
   const id = entry.root.dataset.windowId;
   if (!id) return;
   if (editing()) {
@@ -171,7 +171,7 @@ function rememberLayout(entry: Layout): void {
 }
 
 function arrangeWindows(): void {
-  if (phone.matches || suspended) return;
+  if (phoneViewport.matches || suspended) return;
   finishGesture(true);
   const open = [...layouts.values()].filter(entry => entry.root.isConnected && !entry.root.hidden && !entry.root.inert
     && entry.root.getClientRects().length && getComputedStyle(entry.root).visibility !== 'hidden');
@@ -217,7 +217,7 @@ function detach(entry: Layout): void {
 }
 
 function place(entry: Layout): void {
-  if (phone.matches || suspended || !entry.root.isConnected) return;
+  if ((phoneViewport.matches && entry.root.hasAttribute('data-window-feed')) || suspended || !entry.root.isConnected) return;
   if (!entry.placement && entry.host.parentElement !== document.body) {
     const parent = entry.host.parentElement as MovingElement;
     const marker = document.createElement('div');
@@ -255,7 +255,7 @@ function clearFloating(entry: Layout): void {
 }
 
 function setInteractions(entry: Layout): void {
-  const mobile = phone.matches;
+  const mobile = phoneViewport.matches;
   if (entry.mobile === mobile) return;
   entry.mobile = mobile;
   const titlebar = entry.titlebar;
@@ -307,7 +307,7 @@ function initializeLayout(entry: Layout, bounds: Box): void {
 
 function apply(entry: Layout, bounds?: Box): void {
   setInteractions(entry);
-  if (phone.matches) {
+  if (phoneViewport.matches && entry.root.hasAttribute('data-window-feed')) {
     cancelWindowAnimation(entry.root);
     clearFloating(entry);
     return;
@@ -334,7 +334,7 @@ function apply(entry: Layout, bounds?: Box): void {
 
 
 function raise(entry: Layout): void {
-  if (phone.matches || suspended || raising) return;
+  if (phoneViewport.matches || suspended || raising) return;
   raising = true;
   try {
     // Small bounded z-indices also support browsers without popovers.
@@ -361,6 +361,7 @@ export function registerWindow(root: HTMLElement, options: { floating?: boolean 
   // Top-layer windows need their own snapshots. Page windows never share one
   // across navigations, even when both routes contain the same window id.
   const persistent = root.hasAttribute('data-persistent-window');
+  root.toggleAttribute('data-window-feed', persistent || Boolean(root.closest('#main-content')));
   root.style.setProperty('view-transition-name', persistent
     ? CSS.escape(`persistent-window-${root.dataset.windowId || root.id}`)
     : `page-window-${++nextTransitionId}`);
@@ -402,7 +403,7 @@ export function setWindowMaximized(root: HTMLElement, maximized: boolean): void 
 
 export function resetWindowLayout(root: HTMLElement, remember = true): void {
   const entry = layouts.get(root);
-  if (!entry || phone.matches || suspended) return;
+  if (!entry || phoneViewport.matches || suspended) return;
   cancelWindowAnimation(root);
   entry.rect = entry.snap = entry.freeRect = entry.beforeMaximum = undefined;
   entry.maximized = false;
@@ -421,7 +422,7 @@ document.addEventListener('gwenlium:editor-apply-layout', (event) => {
     || (detail.x !== undefined && !Number.isFinite(detail.x)) || (detail.y !== undefined && !Number.isFinite(detail.y))) return;
   const entry = [...layouts.values()].find(candidate => candidate.root.dataset.windowId === detail.id);
   if (!entry) return;
-  if (phone.matches || suspended) {
+  if (phoneViewport.matches || suspended) {
     captureVisitorLayout(entry);
     entry.pendingEditorLayout = detail;
     return;
@@ -458,6 +459,7 @@ export function unregisterWindow(root: HTMLElement): void {
   delete root.dataset.windowSnap;
   delete entry.titlebar.dataset.windowDrag;
   entry.titlebar.removeAttribute('tabindex');
+  for (const attribute of ['role', 'aria-label', 'title']) entry.titlebar.removeAttribute(attribute);
   for (const handle of root.querySelectorAll(':scope > [data-window-resize]')) handle.remove();
   for (const key of ['x', 'y', 'width', 'height', 'layer']) root.style.removeProperty(`--window-${key}`);
   root.style.removeProperty('view-transition-name');
@@ -465,7 +467,7 @@ export function unregisterWindow(root: HTMLElement): void {
 }
 
 function command(entry: Layout, action: 'maximize' | 'restore'): void {
-  if (phone.matches || suspended) return;
+  if (phoneViewport.matches || suspended) return;
   document.dispatchEvent(new CustomEvent('gwenlium:window-command', { detail: { id: entry.root.dataset.windowId, action } }));
   cancelWindowAnimation(entry.root);
 }
@@ -487,7 +489,7 @@ function showPreview(snap: Snap | 'maximize' | undefined, bounds: Box): void {
 }
 
 function applySnap(entry: Layout, snap: Snap | 'maximize', bounds: Box): void {
-  if (phone.matches || suspended) return;
+  if (phoneViewport.matches || suspended) return;
   if (snap === 'maximize') { command(entry, 'maximize'); return; }
   if (entry.maximized) command(entry, 'restore');
   if (!entry.snap) entry.freeRect = entry.rect;
@@ -498,7 +500,7 @@ function applySnap(entry: Layout, snap: Snap | 'maximize', bounds: Box): void {
 
 function updateGesture(): void {
   moveFrame = 0;
-  if (phone.matches || suspended) { finishGesture(true); return; }
+  if (phoneViewport.matches || suspended) { finishGesture(true); return; }
   const current = gesture;
   if (!current) return;
   const { entry, bounds } = current;
@@ -576,7 +578,7 @@ function updateGesture(): void {
 function finishGesture(cancelled: boolean): void {
   const current = gesture;
   if (!current) return;
-  cancelled ||= phone.matches || suspended;
+  cancelled ||= phoneViewport.matches || suspended;
   cancelAnimationFrame(moveFrame);
   moveFrame = 0;
   if (!cancelled) updateGesture();
@@ -588,7 +590,7 @@ function finishGesture(cancelled: boolean): void {
   if (!current.started) return;
   if (cancelled) {
     const original = current.original;
-    if (phone.matches || suspended) {
+    if (phoneViewport.matches || suspended) {
       if (current.entry.maximized !== original.maximized) current.entry.pendingMaximized = original.maximized;
       current.entry.maximized = original.maximized;
       current.entry.beforeMaximum = original.maximized ? { rect: original.rect, snap: original.snap, freeRect: original.freeRect } : undefined;
@@ -609,7 +611,7 @@ function finishGesture(cancelled: boolean): void {
 }
 
 document.addEventListener('pointerdown', (event) => {
-  if (phone.matches || suspended) return;
+  if (phoneViewport.matches || suspended) return;
   if (event.button !== 0 || !event.isPrimary || !(event.target instanceof Element) || gesture) return;
   const root = event.target.closest<HTMLElement>('[data-desktop-window]');
   const entry = root && layouts.get(root);
@@ -652,7 +654,7 @@ window.addEventListener('pointercancel', (event) => { if (gesture?.pointer === e
 document.addEventListener('lostpointercapture', (event) => { if (gesture?.pointer === event.pointerId) finishGesture(true); });
 window.addEventListener('blur', () => finishGesture(true));
 document.addEventListener('dblclick', (event) => {
-  if (phone.matches || suspended) return;
+  if (phoneViewport.matches || suspended) return;
   if (!(event.target instanceof Element) || event.target.closest(interactive) || !event.target.closest('[data-window-drag]')) return;
   const root = event.target.closest<HTMLElement>('[data-desktop-window]');
   const entry = root && layouts.get(root);
@@ -665,7 +667,7 @@ document.addEventListener('focusin', (event) => {
   if (entry) raise(entry);
 });
 document.addEventListener('keydown', (event) => {
-  if (phone.matches || suspended) return;
+  if (phoneViewport.matches || suspended) return;
   if (event.key === 'Escape' && gesture) { event.preventDefault(); finishGesture(true); return; }
   if (!(event.target instanceof HTMLElement) || !event.target.hasAttribute('data-window-drag') || !event.key.startsWith('Arrow')) return;
   const root = event.target.closest<HTMLElement>('[data-desktop-window]');
@@ -706,10 +708,10 @@ document.addEventListener('keydown', (event) => {
 function applyLayouts(): void {
   if (suspended) return;
   synchronizeEditing();
-  const bounds = phone.matches ? undefined : workspace();
+  const bounds = phoneViewport.matches ? undefined : workspace();
   for (const entry of layouts.values()) {
     if (!entry.root.isConnected) continue;
-    if (!phone.matches) {
+    if (!phoneViewport.matches) {
       if (entry.pendingMaximized !== undefined) {
         const maximized = entry.pendingMaximized;
         entry.pendingMaximized = undefined;
@@ -728,7 +730,7 @@ function applyLayouts(): void {
 function reflow(): void {
   if (suspended) return;
   finishGesture(true);
-  if (phone.matches) {
+  if (phoneViewport.matches) {
     cancelAnimationFrame(resizeFrame);
     resizeFrame = 0;
     applyLayouts();
@@ -741,10 +743,9 @@ function reflow(): void {
   });
 }
 window.addEventListener('resize', reflow);
+phoneViewport.addEventListener('change', reflow);
 window.visualViewport?.addEventListener('resize', reflow);
 document.addEventListener('gwenlium:chrome-change', reflow);
-document.addEventListener('gwenlium:mobile-window-change', reflow);
-phone.addEventListener('change', reflow);
 window.addEventListener('orientationchange', reflow);
 document.addEventListener('astro:before-swap', () => {
   finishGesture(true);

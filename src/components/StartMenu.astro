@@ -4,30 +4,26 @@ import { site } from '../lib/settings';
 import { getWindowDefinition } from '../lib/windows';
 const definition = getWindowDefinition('start-menu')!;
 
-const navigation = [
-  { title: 'Home', href: '/', icon: 'home' },
-  { title: 'Devlog', href: '/devlog/', icon: 'book' },
-  { title: 'Life', href: '/life/', icon: 'user' },
-  { title: 'Gallery', href: '/gallery/', icon: 'image' },
-  { title: 'Music', href: '/music/', icon: 'music' },
-  { title: 'About', href: '/about/', icon: 'user' },
-  { title: 'Updates', href: '/subscribe/', icon: 'rss' },
-];
+interface Props {
+  navigation: { href: string; label: string; icon: string }[];
+}
+const { navigation } = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 ---
 
 <dialog id="start-menu" class="start-menu" aria-labelledby="start-menu-title" style={{ '--menu-tone': `var(--${definition.tone})`, '--start-preferred-width': definition.width > 0 ? `${definition.width}px` : undefined, '--start-preferred-height': definition.height > 0 ? `${definition.height}px` : undefined }}>
   <header class="start-titlebar">
     <img class="start-avatar" src="/avatar.webp" width="32" height="32" alt="" />
-    <div class="start-heading"><h2 id="start-menu-title"><span class="desktop-label">{definition.title}</span><span class="mobile-label">Menu</span></h2><span>{site.name}</span></div>
-    <button class="start-close" type="button" data-close-start aria-label={`Close ${definition.title}`}><Icon name="close" size={16} /><span class="mobile-label">Close</span></button>
+    <div class="start-heading"><h2 id="start-menu-title"><span class="start-label-desktop">{definition.title}</span><span class="start-label-phone">Menu</span></h2><span>{site.name}</span></div>
+    <button class="start-close" type="button" data-close-start aria-label="Close menu"><Icon name="close" size={16} /><span class="start-label-phone">Close</span></button>
   </header>
   <div class="start-content">
+    <div class="start-phone-utilities" data-phone-settings-slot></div>
     <form class="start-search" role="search" aria-label="Site" data-start-search>
       <label for="start-query">Search this site</label>
       <div class="start-search-field">
         <Icon name="search" size={18} />
-        <input id="start-query" name="q" type="search" placeholder="Search everything" maxlength="2048" autocomplete="off" spellcheck="false" aria-controls="start-search-results" aria-describedby="start-search-help start-search-status" autofocus />
+        <input id="start-query" name="q" type="search" placeholder="Search everything" maxlength="2048" autocomplete="off" spellcheck="false" aria-controls="start-search-results" aria-describedby="start-search-help start-search-status" />
       </div>
       <div class="start-search-tools">
         <label for="start-kind">Content type<select id="start-kind" data-start-kind><option value="all">Everything</option><option value="page">Pages</option><option value="post">Posts</option><option value="window">Windows</option><option value="artwork">Artwork</option><option value="track">Tracks</option></select></label>
@@ -43,19 +39,23 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
         <h3 id="start-pages-title">Pages</h3>
         <ul>
           {navigation.map((item) => (
-            <li><a href={item.href} aria-current={path === (item.href.replace(/\/$/, '') || '/') || (['/devlog/', '/life/'].includes(item.href) && path.startsWith(item.href)) ? 'page' : undefined}>
-              <Icon name={item.icon} size={17} /><span class:list={{ 'desktop-label': item.href === '/music/' }}>{item.title}</span>{item.href === '/music/' && <span class="mobile-label">Music library</span>}<Icon name="chevron" size={12} />
+            <li><a href={item.href} aria-current={(item.href === '/' ? path === '/' : `${path}/`.startsWith(item.href)) ? 'page' : undefined}>
+              <Icon name={item.icon} size={17} /><span>{item.label}</span><Icon name="chevron" size={12} />
             </a></li>
           ))}
         </ul>
       </nav>
       <section class="start-windows" aria-labelledby="start-windows-title">
-        <div class="start-section-heading"><h3 id="start-windows-title"><span class="desktop-label">Windows</span><span class="mobile-label">On this page</span></h3><span class="start-window-count" data-start-window-count>0</span></div>
+        <div class="start-section-heading"><h3 id="start-windows-title">Windows</h3><span class="start-window-count" data-start-window-count>0</span></div>
         <p class="start-empty" data-start-windows-empty>All windows are open.</p>
         <ul class="start-window-list" aria-label="Hidden windows" data-start-windows></ul>
         <button class="start-restore-all" type="button" data-restore-all-windows disabled>Restore all</button>
       </section>
     </div>
+    <nav class="start-external" aria-label="Elsewhere">
+      <a href={site.githubUrl}>GitHub<Icon name="external" size={14} /></a>
+      {site.about.links.map((link) => <a href={link.url}>{link.label}<Icon name="external" size={14} /></a>)}
+    </nav>
     <details class="start-shortcuts" id="start-keyboard-shortcuts" data-start-shortcuts>
       <summary>Keyboard &amp; gamepad controls</summary>
       <dl>
@@ -182,29 +182,33 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
   .start-footer kbd { font: inherit; color: var(--ink); }
   .start-footer button { min-height: 32px; margin: -.4rem -.3rem; padding: .4rem .3rem; border: 0; border-radius: 2px; background: transparent; color: var(--ink); font: inherit; }
   .start-footer button:hover { background: var(--sage); }
+  .start-phone-utilities, .start-external { display: none; }
+  @media (max-width: 760px), (pointer: coarse) and (max-width: 1000px) and (max-height: 500px) {
+    .start-menu { width: min(var(--start-preferred-width, 36rem), var(--start-available-width, 100%), calc(100% - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right)))); max-height: min(var(--start-preferred-height, 100dvh), calc(var(--start-max-height, 100dvh) - env(safe-area-inset-top))); border-radius: 3px; }
+    .start-menu::backdrop { background: rgb(16 39 28 / .3); }
+    .start-titlebar { gap: .5rem; padding: .3rem .5rem; }
+    .start-close { display: flex; align-items: center; justify-content: center; gap: .4rem; min-width: 44px; min-height: 44px; padding-inline: .55rem; }
+    .start-content { display: flex; flex-direction: column; padding: .8rem; scrollbar-gutter: auto; }
+    .start-phone-utilities { display: grid; gap: .5rem; margin-block: 1rem; }
+    .start-phone-utilities :global(button) { justify-content: flex-start; min-height: 44px; padding: .65rem; }
+    .start-search-tools select, .start-search-tools button, .start-more { min-height: 44px; }
+    .start-search-tools select { font-size: 16px; }
+    .start-sections { grid-template-columns: minmax(0, 1fr); order: -1; margin-top: 0; }
+    .start-pages ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; }
+    .start-pages a { min-height: 44px; padding: .5rem; gap: .4rem; }
+    .start-windows { display: none; }
+    .start-external { display: flex; flex-wrap: wrap; gap: .25rem .75rem; margin-top: 1rem; padding-top: .5rem; border-top: 1px solid var(--line); }
+    .start-external a { display: inline-flex; align-items: center; gap: .4rem; min-width: 0; min-height: 44px; font-size: .75rem; overflow-wrap: anywhere; }
+    .start-shortcuts:not([open]) { display: none; }
+    .start-footer { gap: .25rem; padding: .2rem .75rem; }
+    .start-footer > span, .start-footer [data-open-shortcuts], .start-footer:not(:has([data-owner-editor]:not([hidden]))) { display: none; }
+    .start-footer button { min-height: 44px; margin: 0; }
+  }
   @media (max-width: 420px) {
     .start-content { padding: .8rem; }
     .start-sections { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
     .start-pages ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .2rem; }
     .start-windows { padding: .9rem 0 0; border-top: 1px solid var(--line); border-left: 0; }
-  }
-  @media screen and (max-width: 760px) {
-    :global(html[data-mobile-window-mode]) .start-menu { inset: calc(var(--workspace-top) + .25rem) var(--app-inset) calc(var(--workspace-bottom) + .25rem); width: auto; height: auto; max-width: 34rem; max-height: none; margin-inline: auto; }
-    :global(html[data-mobile-window-mode]) .start-content { display: flex; flex-direction: column; flex: 1; padding: .8rem; scrollbar-gutter: auto; }
-    :global(html[data-mobile-window-mode]) .start-close { display: flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; padding-inline: .55rem; }
-    :global(html[data-mobile-window-mode]) .start-sections { display: flex; flex-direction: column; order: -1; gap: 1rem; }
-    :global(html[data-mobile-window-mode]) .start-pages ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .2rem; }
-    :global(html[data-mobile-window-mode]) .start-pages a { min-height: 44px; }
-    :global(html[data-mobile-window-mode]) .start-windows { order: -1; padding: 0 0 .9rem; border-bottom: 1px solid var(--line); border-top: 0; border-left: 0; }
-    :global(html[data-mobile-window-mode]) .start-window-list :global(small) { display: none; }
-    :global(html[data-mobile-window-mode]) .start-search { margin-top: 1rem; }
-    :global(html[data-mobile-window-mode]) .start-results { order: 1; }
-    :global(html[data-mobile-window-mode]) .start-more { order: 2; }
-    :global(html[data-mobile-window-mode]) .start-restore-all,
-    :global(html[data-mobile-window-mode]) .start-shortcuts,
-    :global(html[data-mobile-window-mode]) .start-footer > span,
-    :global(html[data-mobile-window-mode]) .start-footer [data-open-shortcuts],
-    :global(html[data-mobile-window-mode]) .start-footer:not(:has([data-owner-editor]:not([hidden]))) { display: none; }
   }
   @media (max-height: 420px) {
     .start-titlebar { padding: .3rem .5rem; }

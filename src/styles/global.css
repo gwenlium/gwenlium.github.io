@@ -291,7 +291,7 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
 .taskbar-restore { margin-left: auto; }
 .brand-avatar { width: 100%; height: 100%; object-fit: cover; }
 .start-trigger img { flex-shrink: 0; border: 1px solid var(--line); }
-.mobile-label, .taskbar [data-mobile-back], [data-mobile-entry-tabs] { display: none; }
+.phone-nav-icon, .phone-menu-slot, .start-label-phone, .start-icon-phone { display: none; }
 
 .settings-window { position: fixed; top: calc(var(--workspace-top) + 16px); left: max(var(--app-inset), calc(50vw - 245px)); width: min(490px, calc(100vw - 2 * var(--app-inset))); height: min(620px, calc(100dvh - var(--workspace-top) - var(--workspace-bottom) - 32px)); }
 @supports (backdrop-filter: blur(1px)) {
@@ -321,13 +321,22 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
   .site-status { max-width: 19rem; }
   .window-body { padding: 1.1rem; }
 }
-@media (max-width: 760px) {
-  .site-header { gap: 1rem; }
+@media (max-width: 760px), (pointer: coarse) and (max-width: 1000px) and (max-height: 500px) {
+  .site-shell { grid-template-rows: auto minmax(0, 1fr) auto; padding: env(safe-area-inset-top) max(.5rem, env(safe-area-inset-right)) 0 max(.5rem, env(safe-area-inset-left)); }
+  .site-header { gap: .75rem; padding-block: .45rem; }
   .site-brand { font-size: 24px; gap: .65rem; }
   .brand-icon { width: 36px; height: 36px; }
-  .site-status { max-width: 15rem; font-size: 10px; }
-  .footer-navigation { gap: .1rem .25rem; }
-  .footer-link { min-height: 30px; font-size: 10px; }
+  .site-status, .taskbar { display: none; }
+  #page-scroll { padding: .35rem .15rem 1rem; scrollbar-gutter: auto; }
+  .site-footer { margin: 0; padding: .25rem 0 max(.25rem, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+  .footer-navigation { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch; gap: .15rem; }
+  .footer-navigation > .footer-link:not(.phone-primary) { display: none; }
+  .footer-navigation .phone-primary, .phone-menu-slot .start-trigger { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 100%; min-width: 0; min-height: 54px; padding: .3rem .1rem; border: 1px solid transparent; border-radius: 2px; background: transparent; color: var(--muted); box-shadow: none; font-size: 10px; line-height: 1.2; letter-spacing: 0; text-decoration: none; }
+  .footer-navigation .phone-primary[aria-current='page'], .phone-menu-slot .start-trigger[aria-expanded='true'], .footer-navigation:has(> .footer-link:not(.phone-primary)[aria-current='page']) .start-trigger { border-color: var(--line); background: var(--sage); color: var(--ink); box-shadow: inset 0 2px var(--accent-ink); }
+  .footer-navigation .phone-primary:focus-visible, .phone-menu-slot .start-trigger:focus-visible { outline-offset: -3px; }
+  .footer-navigation .nav-cursor, .phone-menu-slot .start-trigger img, .start-label-desktop { display: none; }
+  .phone-nav-icon, .phone-menu-slot, .start-label-phone, .start-icon-phone { display: block; }
+  .preference-options label { min-height: 44px; }
   .page-heading { margin-bottom: 1.25rem; }
 }
 @media (max-width: 440px) {
@@ -335,45 +344,20 @@ h1.page-heading, .page-heading h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); lette
   .site-brand { font-size: 21px; }
   .brand-icon { width: 32px; height: 32px; }
   .window-body { padding: 1rem; }
-  .taskbar { gap: .35rem; }
-  .taskbar .button, .taskbar .button-secondary { padding-inline: .55rem; }
   .preference-options { gap: .35rem; }
   .preference-options label { gap: .3rem; font-size: 10px; }
   .preference-options label svg { width: 14px; }
   .settings-bottom { align-items: flex-end; gap: .7rem; }
   .settings-bottom .button { padding-inline: .7rem; }
 }
-@media (max-width: 620px) {
-  .taskbar-control > span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-}
-@media screen and (max-width: 760px) {
-  html[data-mobile-window-mode] .site-shell { grid-template-rows: auto minmax(0, 1fr) auto; }
-  html[data-mobile-window-mode] .site-header { grid-row: 1; }
-  html[data-mobile-window-mode] #page-scroll { grid-area: 2 / 1; padding-inline: 0; scrollbar-gutter: auto; }
-  html[data-mobile-window-mode] .player-region { grid-area: 2 / 1; height: 0; }
-  html[data-mobile-window-mode] .taskbar { grid-area: 3 / 1; flex-wrap: wrap; }
-  html[data-mobile-window-mode] .site-footer { grid-area: 3 / 1; height: 0; min-height: 0; margin: 0; padding: 0; }
-  html[data-mobile-window-mode] .footer-navigation,
-  html[data-mobile-window-mode] .taskbar :is([data-open-settings], [data-taskbar-windows], [data-auto-arrange-windows], [data-restore-windows]),
-  html[data-mobile-window-mode] .desktop-label { display: none !important; }
-  html[data-mobile-window-mode] .mobile-label { display: inline; }
-  html[data-mobile-window-mode] .taskbar [data-mobile-back] { display: inline-flex; }
-  html[data-mobile-window-mode] .taskbar [data-open-player] { margin-left: auto; }
-  html[data-mobile-window-mode] .taskbar .button,
-  html[data-mobile-window-mode] .taskbar .button-secondary { min-height: 44px; }
-  html[data-mobile-window-mode] .taskbar [data-open-player] > .mobile-label { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip-path: none; }
-  html[data-mobile-window-mode][data-mobile-window-overlay] #page-scroll { visibility: hidden; pointer-events: none; }
-  html[data-mobile-window-mode] [data-mobile-entry-tabs]:not([hidden]) { display: flex; position: sticky; top: 0; z-index: 3; gap: .5rem; margin-bottom: 1rem; padding-block: .4rem; background: var(--page-bg); }
-  html[data-mobile-window-mode] [data-mobile-entry-tabs] button { flex: 1; min-height: 44px; }
-  html[data-mobile-window-mode] [data-mobile-entry-tabs] [aria-selected='true'] { background: var(--sage); box-shadow: inset 1px 1px var(--bevel-dark), inset -1px -1px var(--bevel-light); }
-  html[data-mobile-window-mode] [data-mobile-entry-tabs] [hidden] { display: none !important; }
-  html[data-mobile-window-mode]:not([data-mobile-active-window='post-entry']) .entry-pagination { display: none !important; }
-  html[data-mobile-window-mode] .entry-pagination { margin-top: 1rem; }
-}
 @media (max-height: 560px) {
   .site-header { padding-block: .4rem; }
   .site-brand { font-size: 20px; }
   .brand-icon { width: 28px; height: 28px; }
+  .site-footer { padding-top: .2rem; }
+  .site-footer .footer-navigation .phone-primary, .phone-menu-slot .start-trigger { min-height: 48px; }
+}
+@media (min-width: 761px) and (max-height: 560px) {
   .site-footer { padding-block: .2rem; }
   .footer-link { min-height: 27px; }
 }

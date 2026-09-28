@@ -1,6 +1,7 @@
+import { phoneViewport } from './window-layout';
+
 const lifetime = new AbortController();
 const listenerOptions = { signal: lifetime.signal };
-const phone = window.matchMedia('(max-width: 760px)');
 let disposeReading: (() => void) | undefined;
 
 function disposeEntryReading(): void {
@@ -18,7 +19,6 @@ function initializeEntryReading(): void {
   disposeEntryReading();
   if (!page || !article || !content || !navigation || !progress || !reader) return;
 
-  const root = document.documentElement;
   const controller = new AbortController();
   const options = { passive: true, signal: controller.signal };
   let frame = 0;
@@ -29,8 +29,7 @@ function initializeEntryReading(): void {
 
   function update(): void {
     frame = 0;
-    if (printing || !phone.matches || !root.hasAttribute('data-mobile-window-mode')
-      || root.dataset.mobileActiveWindow !== 'post-entry' || root.hasAttribute('data-mobile-window-overlay')) {
+    if (printing || !phoneViewport.matches) {
       progress!.hidden = true;
       return;
     }
@@ -79,13 +78,11 @@ function initializeEntryReading(): void {
   const resizeObserver = new ResizeObserver(queueUpdate);
   for (const element of [page, article, content, navigation]) resizeObserver.observe(element);
   const stateObserver = new MutationObserver(queueUpdate);
-  stateObserver.observe(root, { attributes: true, attributeFilter: ['data-mobile-window-mode', 'data-mobile-active-window', 'data-mobile-window-overlay'] });
   stateObserver.observe(reader, { attributes: true, attributeFilter: ['data-dialogue-active'] });
   page.addEventListener('scroll', queueUpdate, options);
   window.addEventListener('resize', queueUpdate, options);
   window.visualViewport?.addEventListener('resize', queueUpdate, options);
-  phone.addEventListener('change', queueUpdate, options);
-  document.addEventListener('gwenlium:mobile-window-change', queueUpdate, options);
+  phoneViewport.addEventListener('change', queueUpdate, options);
   document.addEventListener('gwenlium:chrome-change', queueUpdate, options);
   window.addEventListener('beforeprint', () => { printing = true; progress.hidden = true; }, options);
   window.addEventListener('afterprint', () => { printing = false; queueUpdate(); }, options);

@@ -5,28 +5,30 @@ import { site } from '../lib/settings';
 
 const path = Astro.url.pathname;
 const navigation = [
-  { href: '/', label: 'Home' },
-  { href: '/devlog/', label: 'Devlog' },
-  { href: '/life/', label: 'Life' },
-  { href: '/gallery/', label: 'Gallery' },
-  { href: '/music/', label: 'Music' },
-  { href: '/about/', label: 'About' },
-  { href: '/subscribe/', label: 'Subscribe' },
+  { href: '/', label: 'Home', icon: 'home', phonePrimary: true },
+  { href: '/devlog/', label: 'Devlog', icon: 'book', phonePrimary: true },
+  { href: '/life/', label: 'Life', icon: 'user', phonePrimary: true },
+  { href: '/gallery/', label: 'Gallery', icon: 'image', phonePrimary: true },
+  { href: '/music/', label: 'Music', icon: 'music', phonePrimary: false },
+  { href: '/about/', label: 'About', icon: 'user', phonePrimary: false },
+  { href: '/subscribe/', label: 'Subscribe', icon: 'rss', phonePrimary: false },
 ];
 ---
 
 <footer class="site-footer">
   <nav class="footer-navigation" aria-label="Site navigation">
     {navigation.map((item) => (
-      <a class="footer-link" href={item.href} aria-current={(item.href === '/' ? path === '/' : path.startsWith(item.href)) ? 'page' : undefined}>
+      <a class:list={['footer-link', { 'phone-primary': item.phonePrimary }]} href={item.href} aria-current={(item.href === '/' ? path === '/' : path.startsWith(item.href)) ? 'page' : undefined}>
         <span class="nav-cursor pixel-caret" aria-hidden="true"></span>
-        {item.label}
+        <span class="phone-nav-icon" aria-hidden="true"><Icon name={item.icon} size={20} /></span>
+        <span>{item.label}</span>
       </a>
     ))}
     <a class="footer-link" href={site.githubUrl}>GitHub<Icon name="external" size={12} /></a>
     {site.about.links.map((link) => (
       <a class="footer-link" href={link.url}>{link.label}<Icon name="external" size={12} /></a>
     ))}
+    <span class="phone-menu-slot" data-phone-menu-slot></span>
   </nav>
-  <StartMenu />
+  <StartMenu navigation={navigation} />
 </footer>

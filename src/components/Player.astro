@@ -128,7 +128,7 @@ const definition = getWindowDefinition('music-player')!;
 
 <script>
   import { animateWindow, cancelWindowAnimation } from '../scripts/window-motion';
-  import { registerWindow, resetWindowLayout, setWindowMaximized } from '../scripts/window-layout';
+  import { phoneViewport, registerWindow, resetWindowLayout, setWindowMaximized } from '../scripts/window-layout';
   import { playInterfaceSound } from '../scripts/interface-audio';
   import '../scripts/music-library';
 
@@ -174,6 +174,11 @@ const definition = getWindowDefinition('music-player')!;
       this.pageEvents?.abort();
       this.pageEvents = new AbortController();
       const { signal } = this.pageEvents;
+      phoneViewport.addEventListener('change', () => {
+        this.viewRequest++;
+        cancelWindowAnimation(this.panel);
+        this.applyView();
+      }, { signal });
       document.addEventListener('gwenlium:play', ((event: CustomEvent<{ id: string }>) => {
         const index = this.tracks.findIndex((track) => track.id === event.detail?.id);
         if (index < 0) return;
@@ -190,7 +195,7 @@ const definition = getWindowDefinition('music-player')!;
         if (!order.length) return;
         this.setPlaybackOrder(order);
         const requested = this.tracks.findIndex((track) => track.id === event.detail.startId);
-        if (this.visibility !== 'open') this.sendWindowCommand('restore');
+        if (this.panel.hidden) this.sendWindowCommand('restore');
         void this.playTrack(order.includes(requested) ? requested : order[0]);
       }) as EventListener, { signal });
       document.addEventListener('gwenlium:window-command', ((event: CustomEvent<WindowCommand>) => {
@@ -204,17 +209,16 @@ const definition = getWindowDefinition('music-player')!;
         }
         const button = event.target.closest<HTMLButtonElement>('[data-play-track]');
         if (!button?.dataset.playTrack || button.disabled) return;
-        if (this.visibility !== 'open') this.sendWindowCommand('restore');
+        if (this.panel.hidden) this.sendWindowCommand('restore');
         if (button.dataset.playTrack === this.tracks[this.index]?.id && !this.audio.paused) this.pause();
         else document.dispatchEvent(new CustomEvent('gwenlium:play', { detail: { id: button.dataset.playTrack } }));
       }, { signal });
       document.addEventListener('keydown', (event) => {
-        const visible = document.documentElement.hasAttribute('data-mobile-window-mode') ? !this.panel.hidden : this.visibility === 'open';
-        if (event.defaultPrevented || event.key !== 'Escape' || !visible || document.querySelector('dialog[open]')) return;
+        if (event.defaultPrevented || event.key !== 'Escape' || this.panel.hidden || document.querySelector('dialog[open]')) return;
         if (!this.queue.hidden) {
           event.preventDefault();
           this.setQueueOpen(false, true);
-        } else if (this.maximized) {
+        } else if (this.maximized && !phoneViewport.matches) {
           event.preventDefault();
           this.sendWindowCommand('restore');
         }
@@ -296,7 +300,7 @@ const definition = getWindowDefinition('music-player')!;
       this.querySelector('[data-player-queue-close]')!.addEventListener('click', () => this.setQueueOpen(false, true));
       this.toggle.addEventListener('click', () => {
         // The global P shortcut invokes this same button even when the panel is hidden.
-        if (this.visibility !== 'open') this.sendWindowCommand('restore');
+        if (this.panel.hidden) this.sendWindowCommand('restore');
         if (this.audio.paused) void this.playTrack(this.index);
         else this.pause();
       });
@@ -369,6 +373,13 @@ const definition = getWindowDefinition('music-player')!;
     }
 
     private handleWindowCommand({ id, action }: WindowCommand) {
+      if (phoneViewport.matches) {
+        if (id === 'music-player' && action === 'restore') {
+          this.panel.scrollIntoView({ block: 'start' });
+          this.panel.focus({ preventScroll: true });
+        }
+        return;
+      }
       if (action === 'restore-all') {
         this.viewRequest++;
         cancelWindowAnimation(this.panel);
@@ -430,20 +441,23 @@ const definition = getWindowDefinition('music-player')!;
 
     private applyView() {
       if (this.visibility !== 'open') this.maximized = false;
-      this.dataset.playerState = this.visibility;
-      this.dataset.playerMaximized = String(this.maximized && this.visibility === 'open');
-      this.panel.hidden = this.visibility !== 'open';
-      this.panel.dataset.windowState = this.visibility === 'closed' ? 'closed' : this.visibility === 'collapsed' ? 'minimized' : this.maximized ? 'maximized' : 'normal';
-      setWindowMaximized(this.panel, this.maximized);
-      const label = `${this.maximized ? 'Restore' : 'Maximize'} ${this.panel.dataset.windowTitle}`;
+      const visibility = phoneViewport.matches ? 'open' : this.visibility;
+      const maximized = !phoneViewport.matches && this.maximized && visibility === 'open';
+      this.dataset.playerState = visibility;
+      this.dataset.playerMaximized = String(maximized);
+      this.panel.hidden = visibility !== 'open';
+      this.panel.dataset.windowState = visibility === 'closed' ? 'closed' : visibility === 'collapsed' ? 'minimized' : maximized ? 'maximized' : 'normal';
+      setWindowMaximized(this.panel, maximized);
+      const label = `${maximized ? 'Restore' : 'Maximize'} ${this.panel.dataset.windowTitle}`;
       this.maximizeButton.setAttribute('aria-label', label);
       this.maximizeButton.title = label;
-      this.maximizeButton.setAttribute('aria-pressed', String(this.maximized));
-      this.querySelector('[data-player-maximize-icon]')!.setAttribute('d', this.maximized ? 'M5 5V2h9v9h-3M2 5h9v9H2zM2 7.5h9' : 'M3 3h10v10H3zM3 5.5h10');
+      this.maximizeButton.setAttribute('aria-pressed', String(maximized));
+      this.querySelector('[data-player-maximize-icon]')!.setAttribute('d', maximized ? 'M5 5V2h9v9h-3M2 5h9v9H2zM2 7.5h9' : 'M3 3h10v10H3zM3 5.5h10');
       this.publishState(true);
     }
 
     private saveView() {
+      if (phoneViewport.matches) return;
       try {
         localStorage.setItem('gwenlium:player:visibility', this.visibility);
       } catch { /* Visibility still applies for this visit. */ }
@@ -733,6 +747,15 @@ const definition = getWindowDefinition('music-player')!;
     .player-tools .player-volume { flex-basis: 5rem; }
     .player-queue { width: calc(100% - 1rem); }
     .player-queue-track { flex-wrap: wrap; }
+  }
+  @media (max-width: 760px), (pointer: coarse) and (max-width: 1000px) and (max-height: 500px) {
+    .player-window { position: relative; inset: auto; width: 100% !important; height: auto !important; }
+    .player-window-controls { display: none; }
+    .player-body { flex: none; overflow: visible; container-type: inline-size; }
+    .player-content, .player-track { height: auto; }
+    .player-artwork { container-type: inline-size; }
+    .player-cover { width: min(100%, 18rem); }
+    .player-button, .player-actions .player-button { min-height: 44px; min-width: 44px; }
   }
   @media (pointer: coarse) { .player-window-control { min-height: 32px; min-width: 30px; } }
   @media (forced-colors: active) {
