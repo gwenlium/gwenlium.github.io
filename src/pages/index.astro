@@ -35,7 +35,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
           {homeIntro && <DialogueReader id="home-reading"><div data-dialogue-blocks data-site-edit-file="src/content/site.json" data-site-edit-field={site.intro ? '/intro' : '/description'} data-site-edit-format="text" data-site-edit-label="Home introduction">{homeIntro.split(/\n\s*\n/).map(paragraph => <p class="hero-intro">{paragraph}</p>)}</div></DialogueReader>}
         </div>
       </div>
-      <div class="hero-statusbar"><span><img src="/avatar.webp" alt="" width="16" height="16" />gwenlium.dev</span><span aria-hidden="true">◆ &nbsp; ◇ &nbsp; ◇</span></div>
+      <div class="hero-statusbar"><span><img src="/avatar.webp" alt="" width="16" height="16" />gwenlium.dev</span></div>
     </Window>
     </div>
 
@@ -141,7 +141,6 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
   .hero-intro { max-width: 43ch; margin-bottom: 1.7rem; font-family: var(--font-reading); font-size: 1rem; line-height: 1.75; white-space: pre-line; }
   .hero-statusbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; min-height: 26px; padding: .3rem .7rem; border-top: 1px solid var(--line); box-shadow: inset 0 1px var(--bevel-light); color: var(--muted); font-size: 9px; }
   .hero-statusbar > span:first-child { display: inline-flex; align-items: center; gap: .45rem; }
-  .hero-statusbar > span:last-child { letter-spacing: .13em; }
   .game-preview { display: grid; gap: 1.75rem; }
   .game-preview__copy { min-width: 0; }
   .game-preview h2 { font-size: clamp(1.1rem, 3cqi, 2rem); margin-bottom: .75rem; }
