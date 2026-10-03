@@ -2,6 +2,7 @@ import classWorkerURL from '@ffmpeg/ffmpeg/worker?worker&url';
 import coreURL from '@ffmpeg/core?url';
 import wasmURL from '@ffmpeg/core/wasm?url';
 import { FFmpeg, FFFSType } from '@ffmpeg/ffmpeg';
+import { Input, MP4, BlobSource, Output, Mp4OutputFormat, BufferTarget, Conversion, Quality, canEncodeVideo } from 'mediabunny';
 import { normalizeWatermarkCredit, watermarkCreditError, watermarkLayout } from '../../lib/watermark.mjs';
 
 type PreviewMetadata =
@@ -523,7 +524,7 @@ async function withTranscoder<T>(options: Settings, convert: (ffmpeg: FFmpeg) =>
 
 async function execute(ffmpeg: FFmpeg, args: string[]) {
   // Native/worker log messages can contain embedded source metadata; never forward them.
-  if (await ffmpeg.exec(['-hide_banner', '-loglevel', 'error', ...args], 600_000) !== 0) fail(conversionError);
+  if (await ffmpeg.exec(['-hide_banner', '-loglevel', 'error', ...args]) !== 0) fail(conversionError);
 }
 
 function input(filename: string, demuxers = mediaDemuxers) {
@@ -638,7 +639,98 @@ async function audio(file: File, options: Settings): Promise<Generated> {
   }, file);
 }
 
+/** Use browser codecs for MP4s instead of decoding 4K phone video inside the WASM heap. */
+async function nativeVideo(file: File, options: Settings): Promise<Generated | undefined> {
+  if (typeof VideoEncoder === 'undefined' || typeof VideoDecoder === 'undefined') return;
+  const source = new Input({ formats: [MP4], source: new BlobSource(file) });
+  let conversion: Conversion | undefined;
+  let surface: CanvasSurface | undefined;
+  let mark: HTMLCanvasElement | undefined;
+  const stop = () => { void conversion?.cancel().catch(() => undefined); source.dispose(); };
+  options.signal?.addEventListener('abort', stop, { once: true });
+  try {
+    checkAbort(options.signal);
+    if (!await source.canRead()) return;
+    const videoTrack = await source.getPrimaryVideoTrack();
+    const audioTrack = await source.getPrimaryAudioTrack();
+    if (!videoTrack || !await videoTrack.canDecode()) return;
+    const tracks = audioTrack ? [videoTrack, audioTrack] : [videoTrack];
+    const sourceDuration = await source.computeDuration(tracks);
+    const duration = mediaDuration(sourceDuration, options);
+    const original = dimensions(await videoTrack.getDisplayWidth(), await videoTrack.getDisplayHeight());
+    if (original.width < 2 || original.height < 2) fail('Video frames must be at least 2 by 2 pixels.');
+    const audioRate = audioTrack ? 128_000 : 0;
+    const sourceRate = await videoTrack.getAverageBitrate() ?? await videoTrack.getBitrate() ?? file.size * 8 / sourceDuration;
+    const detailRate = Number.isFinite(sourceRate) && sourceRate > 0 ? Math.max(100_000, Math.round(sourceRate * 1.5)) : 6_000_000;
+    const bitrate = Math.min(6_000_000, detailRate, Math.floor(outputBytes * 0.9 * 8 / duration) - audioRate);
+    if (bitrate < 100_000) fail('This recording is too long to fit within 32 MiB with clear video and audio. Choose a shorter excerpt. Nothing was shortened or uploaded.');
+    // Keep portrait and landscape copies within a comparable pixel budget. When a
+    // longer recording has fewer bits per frame, resize rather than smearing a large frame.
+    const scale = Math.min(1, 1280 / original.width, 1920 / original.height, Math.sqrt(bitrate / (original.width * original.height * 30 * 0.05)));
+    const size = { width: Math.max(2, Math.floor(original.width * scale / 2) * 2), height: Math.max(2, Math.floor(original.height * scale / 2) * 2) };
+    const quality = new Quality({ bitrate, bitrateMode: 'constant' });
+    if (!await canEncodeVideo('avc', { ...size, frameRate: 30, quality })) return;
+    surface = canvas(size);
+    mark = await watermark(options.creator, size);
+    const target = new BufferTarget();
+    // Write progressively so the limit also bounds memory, rather than buffering
+    // every encoded packet until the end of a long recording.
+    target.on('write', ({ end }) => { if (end > outputBytes) fail('The compressed copy exceeded 32 MiB. Choose a shorter excerpt. Nothing was shortened or uploaded.'); });
+    const output = new Output({ format: new Mp4OutputFormat({ fastStart: false }), target });
+    conversion = await Conversion.init({
+      input: source, output, tracks: 'primary', copy: false, tags: {}, showWarnings: false,
+      trim: { start: options.start, end: options.start + duration },
+      video: {
+        ...size, fit: 'fill', codec: 'avc', quality, frameRate: 30, keyFrameInterval: 2,
+        allowTransformationMetadata: false,
+        process(sample) {
+          checkAbort(options.signal);
+          sample.draw(surface!.context, 0, 0, size.width, size.height);
+          surface!.context.drawImage(mark!, size.width - mark!.width, size.height - mark!.height);
+          return surface!.element;
+        },
+      },
+      audio: { discard: true },
+    });
+    if (!conversion.isValid || !conversion.utilizedTracks.includes(videoTrack)) return;
+    conversion.onProgress = value => progress(options, value * 0.9);
+    checkAbort(options.signal);
+    await conversion.execute();
+    checkAbort(options.signal);
+    if (!target.buffer?.byteLength || target.buffer.byteLength > outputBytes) fail('The browser did not produce a complete MP4 within 32 MiB.');
+    const encoded = target.buffer;
+    // Copy the native video without another lossy encode. Encode only the audio
+    // in FFmpeg, so native video acceleration does not require browser AAC support.
+    return await withTranscoder(options, async ffmpeg => {
+      await ffmpeg.writeFile('native.mp4', new Uint8Array(encoded));
+      await execute(ffmpeg, [...input('native.mp4'), '-ss', String(options.start), ...input('/original/source'),
+        '-map', '0:v:0', ...(audioTrack ? ['-map', '1:a:0', '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2'] : ['-an']),
+        '-c:v', 'copy', '-t', String(duration), '-sn', '-dn', ...stripMetadata,
+        '-metadata:s:v:0', 'rotate=0', '-movflags', '+faststart', 'preview.mp4']);
+      await ffmpeg.deleteFile('native.mp4');
+      const bytes = await binary(ffmpeg, 'preview.mp4');
+      if (!bytes.length || bytes.length > outputBytes) fail('The prepared MP4 exceeds 32 MiB. Choose a shorter excerpt.');
+      const result = await probe(ffmpeg, 'preview.mp4');
+      if (audioTrack && !result.streams?.some(track => track.codec_type === 'audio')) fail('The converted MP4 lost its audio. Nothing was prepared.');
+      const blob = new Blob([bytes], { type: 'video/mp4' });
+      const visible = await viewableMedia(blob, options.signal);
+      verifyMediaDuration(visible.duration, duration, true);
+      if (visible.width !== size.width || visible.height !== size.height) fail('The converted MP4 has unexpected dimensions. Nothing was prepared.');
+      const poster = await videoStill(ffmpeg, visible.duration, size, options);
+      return { blob, extension: 'mp4', entry: { kind: 'video', ...size, duration: visible.duration }, poster };
+    }, file);
+  } finally {
+    options.signal?.removeEventListener('abort', stop);
+    await conversion?.cancel();
+    source.dispose();
+    if (surface) surface.element.width = surface.element.height = 1;
+    if (mark) mark.width = mark.height = 1;
+  }
+}
+
 async function video(file: File, options: Settings): Promise<Generated> {
+  const accelerated = await nativeVideo(file, options);
+  if (accelerated) return accelerated;
   return withTranscoder(options, async (ffmpeg) => {
     const source = await probe(ffmpeg, '/original/source');
     const stream = source.streams?.find((item) => item.codec_type === 'video' && !item.disposition?.attached_pic);

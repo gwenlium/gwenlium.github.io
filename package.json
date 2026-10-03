@@ -39,6 +39,7 @@
     "astro": "7.3.3",
     "dompurify": "3.4.15",
     "marked": "18.0.14",
+    "mediabunny": "1.61.1",
     "minisearch": "7.2.0",
     "sharp": "0.35.4"
   },
