@@ -6,6 +6,7 @@ import { build } from 'esbuild';
 import test from 'node:test';
 import { Miniflare } from 'miniflare';
 import ts from 'typescript';
+import sharp from 'sharp';
 import { entrySectionIds } from '../src/lib/entry-sections.mjs';
 import { systemWindowIds } from '../src/lib/window-catalogue.mjs';
 
@@ -545,6 +546,18 @@ test('prepared media checks accept generated stills and reject fakes and mismatc
   await assert.rejects(checkPreparedMedia(`/media/fake-preview-${sha256.slice(0, 32)}.webp`, { sha256, kind: 'image', width: 1, height: 1 }, new Uint8Array(fake)));
   await assert.rejects(checkPreparedMedia(`/media/pixel-preview-${'0'.repeat(32)}.webp`, previousPreviewEntry, new Uint8Array(preparedBytes)), /filename/);
   await assert.rejects(checkPreparedMedia(`/media/pixel-preview-${preparedDigest.slice(0, 32)}.webp`, previousPreviewEntry, new Uint8Array([...preparedBytes.subarray(0, -1), 1])), /digest/);
+});
+
+test('prepared portrait posters publish at their actual dimensions without weakening integrity checks', async () => {
+  const bytes = new Uint8Array(await sharp({ create: { width: 1080, height: 1920, channels: 3, background: '#b8c8a4' } }).webp().toBuffer());
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  const path = `/media/portrait-still-preview-${sha256.slice(0, 32)}.webp`;
+  const entry = { sha256, kind: 'image', width: 1080, height: 1920 };
+  await checkPreparedMedia(path, entry, bytes);
+  await assert.rejects(checkPreparedMedia(path, { ...entry, height: 1600 }, bytes), /dimensions/);
+  const privateBytes = new Uint8Array(await sharp(bytes).withExif({ IFD0: { Artist: 'Private camera owner' } }).webp().toBuffer());
+  const privateDigest = createHash('sha256').update(privateBytes).digest('hex');
+  await assert.rejects(checkPreparedMedia(`/media/portrait-still-preview-${privateDigest.slice(0, 32)}.webp`, { ...entry, sha256: privateDigest }, privateBytes), /metadata/);
 });
 
 function renewalUpstream(options = {}) {

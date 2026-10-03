@@ -57,14 +57,13 @@ type Probe = {
 };
 
 const MiB = 1024 * 1024;
-// Pictures are shrunk to 1600 px while decoding, so memory is bounded by the pixel limit, not the file size.
-const imageBytes = 256 * MiB;
+const animationBytes = 256 * MiB;
 const videoBytes = 128 * MiB;
 const outputBytes = 32 * MiB;
 const maxEdge = 8192;
 const maxPixels = 40_000_000;
 const maxFrames = 1800;
-// Source pixels decoded across all frames; decoding is one frame at a time, so this bounds time, not memory.
+// Source pixels across all frames bound decoding work; browser decoder memory use can vary.
 const maxAnimationPixels = 2_000_000_000;
 // GIF is heavy: animations are published at up to 800 px, at most 25 frames per second.
 const animationEdges = [800, 560, 400];
@@ -128,11 +127,9 @@ function bytes(blob: Blob, signal?: AbortSignal): Promise<ArrayBuffer> {
   return promise;
 }
 
-function dimensions(width: number, height: number, stillPhoto = false): Dimensions {
+function dimensions(width: number, height: number, stillImage = false): Dimensions {
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) fail('The media has no valid dimensions.');
-  const edgeLimit = stillPhoto ? 16384 : maxEdge;
-  const pixelLimit = stillPhoto ? 80_000_000 : maxPixels;
-  if (width > edgeLimit || height > edgeLimit || width * height > pixelLimit) fail(stillPhoto ? 'Pictures can be up to 16384 pixels on a side and 80 megapixels. Export a smaller copy first.' : 'Source frames must be at most 8192 pixels per edge and 40 megapixels. Resize the original locally first.');
+  if (!stillImage && (width > maxEdge || height > maxEdge || width * height > maxPixels)) fail('Source frames must be at most 8192 pixels per edge and 40 megapixels. Resize the original locally first.');
   return { width, height };
 }
 
@@ -187,7 +184,7 @@ function inspectRaster(data: Uint8Array): Raster {
   if (mime === 'image/png') {
     need(0, 33);
     if (text(data, 12, 4) !== 'IHDR' || view.getUint32(8) !== 13) fail('The PNG header is corrupt.');
-    // PNG here is always a still picture (APNG is refused below), so it gets the photo limits.
+    // PNG here is always a still picture; APNG is refused below.
     const size = dimensions(view.getUint32(16), view.getUint32(20), true);
     let position = 8;
     let ended = false;
@@ -205,7 +202,7 @@ function inspectRaster(data: Uint8Array): Raster {
   }
   if (mime === 'image/gif') {
     need(0, 13);
-    const size = dimensions(view.getUint16(6, true), view.getUint16(8, true));
+    const size = dimensions(view.getUint16(6, true), view.getUint16(8, true), true);
     let position = 13 + ((data[10]! & 0x80) ? 3 * 2 ** ((data[10]! & 7) + 1) : 0);
     let delay = 100;
     let ended = false;
@@ -244,6 +241,10 @@ function inspectRaster(data: Uint8Array): Raster {
         position++;
         subblocks();
         delays.push(delay);
+        if (delays.length === 2) {
+          dimensions(size.width, size.height);
+          if (data.byteLength > animationBytes) fail('Animation originals can be up to 256 MiB. Export a smaller copy first.');
+        }
         delay = 100;
         if (delays.length > maxFrames) fail('Animations may contain at most 1800 frames. Export a shorter animation locally first.');
       } else fail('The GIF contains an unsupported or corrupt block.');
@@ -269,15 +270,15 @@ function inspectRaster(data: Uint8Array): Raster {
       if (body + length > end) fail('The WebP chunk data is corrupt.');
       if (tag === 'VP8X') {
         if (length !== 10) fail('The WebP header is corrupt.');
-        size = dimensions(u24(body + 4) + 1, u24(body + 7) + 1);
+        size = dimensions(u24(body + 4) + 1, u24(body + 7) + 1, true);
         animation = Boolean(data[body]! & 2);
       } else if (tag === 'VP8 ' && !size) {
         if (length < 10 || text(data, body + 3, 3) !== '\x9d\x01\x2a') fail('The WebP frame header is corrupt.');
-        size = dimensions(view.getUint16(body + 6, true) & 0x3fff, view.getUint16(body + 8, true) & 0x3fff);
+        size = dimensions(view.getUint16(body + 6, true) & 0x3fff, view.getUint16(body + 8, true) & 0x3fff, true);
       } else if (tag === 'VP8L' && !size) {
         if (length < 5 || data[body] !== 0x2f) fail('The WebP frame header is corrupt.');
         const packed = view.getUint32(body + 1, true);
-        size = dimensions((packed & 0x3fff) + 1, ((packed >>> 14) & 0x3fff) + 1);
+        size = dimensions((packed & 0x3fff) + 1, ((packed >>> 14) & 0x3fff) + 1, true);
       } else if (tag === 'ANMF') {
         if (length < 16 || !size || u24(body) * 2 + u24(body + 6) + 1 > size.width || u24(body + 3) * 2 + u24(body + 9) + 1 > size.height) fail('The animated WebP frame header is corrupt.');
         delays.push(Math.max(10, u24(body + 12) || 100));
@@ -286,6 +287,10 @@ function inspectRaster(data: Uint8Array): Raster {
       position = body + length + (length % 2);
     }
     if (!size || position !== end || animation !== (delays.length > 0)) fail('The WebP image structure is incomplete or inconsistent.');
+    if (animation) {
+      dimensions(size.width, size.height);
+      if (data.byteLength > animationBytes) fail('Animation originals can be up to 256 MiB. Export a smaller copy first.');
+    }
     // Browser ImageDecoder implementations disagree on animated EXIF orientation.
     if (animation && orientationMetadata) fail('Animated WebP with EXIF metadata needs an orientation-normalized local export first. No frames were flattened.');
     return { mime, ...size, ...(animation ? { delays } : {}) };
@@ -300,7 +305,6 @@ export async function previewInputKind(file: File, signal?: AbortSignal): Promis
   const mime = rasterMime(new Uint8Array(await bytes(file.slice(0, 64), signal)));
   if (!mime && file.size > videoBytes) fail('Video and audio originals can be up to 128 MiB. Trim or export a smaller copy first.');
   if (mime) {
-    if (file.size > imageBytes) fail('Pictures can be up to 256 MiB. Export a smaller copy first.');
     if (mime === 'image/gif' || mime === 'image/webp') {
       let raster = imageMetadata.get(file);
       if (!raster) {
@@ -410,9 +414,9 @@ async function decodeBitmap(blob: Blob, signal?: AbortSignal, resizeWidth?: numb
 }
 
 /**
- * The width to decode at so the long edge lands on `edge` without upscaling. createImageBitmap
- * resizes after applying EXIF orientation, so this uses the displayed shape, which an image
- * element reports without decoding pixels. Without it, fall back to the shorter stored side.
+ * The requested bitmap width so the long edge lands on `edge` without upscaling. createImageBitmap
+ * resizes after applying EXIF orientation, so this uses the displayed shape from an image element.
+ * Either browser decode path may need full-resolution memory. Without the shape, use the shorter stored side.
  */
 async function decodeWidth(blob: Blob, source: Dimensions, edge: number, signal?: AbortSignal): Promise<number> {
   const url = URL.createObjectURL(blob);
@@ -436,7 +440,7 @@ async function still(blob: Blob, options: Settings, source: Dimensions): Promise
   const turn = options.rotate ?? 0;
   const crop = options.crop ?? { x: 0, y: 0, width: 1, height: 1 };
   const edited = turn !== 0 || crop.x > 0 || crop.y > 0 || crop.width < 1 || crop.height < 1;
-  // Without editing, decode straight at 1600 px; a crop keeps up to 4096 px so the kept part stays sharp.
+  // Request a bitmap up to 1600 px; a crop keeps up to 4096 px so the kept part stays sharp.
   const bitmap = await decodeBitmap(blob, options.signal, await decodeWidth(blob, source, edited ? 4096 : 1600, options.signal));
   let surface: CanvasSurface | undefined;
   let turned: CanvasSurface | undefined;
@@ -823,7 +827,6 @@ async function prepare(file: File, options: Settings, hasTiming: boolean): Promi
   const mime = rasterMime(header);
   let generated: Generated;
   if (mime) {
-    if (file.size > imageBytes) fail('Pictures can be up to 256 MiB. Export a smaller copy first.');
     let data: ArrayBuffer | undefined;
     let raster = imageMetadata.get(file);
     if (!raster) { data = await bytes(file, options.signal); raster = inspectRaster(new Uint8Array(data)); }
@@ -868,7 +871,6 @@ export async function preparePreview(file: File, options: PreviewOptions): Promi
   checkAbort(options.signal);
   if (!globalThis.isSecureContext || !globalThis.crypto?.subtle || typeof document === 'undefined' || typeof FileReader === 'undefined' || typeof Promise.withResolvers !== 'function') fail('Safe preview preparation needs a current HTTPS browser with Canvas, FileReader, Web Crypto and Promise.withResolvers support.');
   if (typeof File === 'undefined' || !(file instanceof File) || !file.size) fail('Choose a nonempty local media file in a supported browser.');
-  if (file.size > Math.max(imageBytes, videoBytes)) fail('Pictures can be up to 256 MiB, and video and audio up to 128 MiB. Export a smaller copy first.');
   let creator: string;
   try { creator = normalizeWatermarkCredit(options.creator); }
   catch { fail(watermarkCreditError); }

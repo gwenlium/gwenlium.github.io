@@ -162,7 +162,8 @@ function container(bytes: Uint8Array, extension: string, entry: EditorMediaEntry
     boxes(0, bytes.length, 'root', 0);
     requireValue(moov && mdat && video && videoCodec && duration !== undefined && entry.duration !== undefined && Math.abs(duration - entry.duration) <= 0.2, 'Incomplete MP4 or inconsistent duration metadata.');
   }
-  if (entry.kind === 'image') requireValue(width && height && width === entry.width && height === entry.height && Math.max(width, height) <= 1600, 'Prepared image dimensions do not match its bytes.');
+  // Portrait video posters can exceed the still-photo converter's 1600px target.
+  if (entry.kind === 'image') requireValue(width && height && width === entry.width && height === entry.height, 'Prepared image dimensions do not match its bytes.');
 }
 /** Check a prepared file against its registry entry: digest, filename, container and metadata. */
 export async function checkPreparedMedia(path: string, entry: EditorMediaEntry, bytes: Uint8Array<ArrayBuffer>): Promise<void> {

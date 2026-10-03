@@ -23,10 +23,42 @@ assert(frame > 0);
 large.writeUInt16BE(5464, frame + 5);
 large.writeUInt16BE(8192, frame + 7);
 assert.equal(sandbox.exports.inspectRaster(new Uint8Array(large)).width, 8192);
-large.writeUInt16BE(16384, frame + 5);
-large.writeUInt16BE(16384, frame + 7);
+// Header checks must not impose still-image limits; the browser remains responsible for decoding.
+large.writeUInt16BE(32768, frame + 5);
+large.writeUInt16BE(32768, frame + 7);
+assert.equal(sandbox.exports.inspectRaster(new Uint8Array(large)).width, 32768);
+assert.equal(sandbox.exports.inspectRaster(new Uint8Array(large)).height, 32768);
+large.writeUInt16BE(0, frame + 7);
 assert.throws(() => sandbox.exports.inspectRaster(new Uint8Array(large)));
-console.log('Camera MPF JPEGs accepted through 80 MP; oversized and truncated inputs still rejected.');
+const png = await sharp(jpeg).png().toBuffer();
+png.writeUInt32BE(32768, 16);
+png.writeUInt32BE(32768, 20);
+assert.equal(sandbox.exports.inspectRaster(new Uint8Array(png)).width, 32768);
+assert.equal(sandbox.exports.inspectRaster(new Uint8Array(png)).height, 32768);
+assert.throws(() => sandbox.exports.inspectRaster(new Uint8Array(png.subarray(0, -1))));
+png.writeUInt32BE(0, 20);
+assert.throws(() => sandbox.exports.inspectRaster(new Uint8Array(png)));
+// A one-frame GIF may use a large still canvas; a second frame activates animation bounds.
+const gif = Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex');
+gif.writeUInt16LE(32768, 6);
+gif.writeUInt16LE(32768, 8);
+assert.equal(sandbox.exports.inspectRaster(new Uint8Array(gif)).width, 32768);
+assert.throws(() => sandbox.exports.inspectRaster(new Uint8Array(gif.subarray(0, -1))));
+const animatedGif = Buffer.concat([gif.subarray(0, -1), gif.subarray(19)]);
+assert.throws(() => sandbox.exports.inspectRaster(new Uint8Array(animatedGif)));
+animatedGif.writeUInt16LE(1, 6);
+animatedGif.writeUInt16LE(1, 8);
+assert.equal(sandbox.exports.inspectRaster(new Uint8Array(animatedGif)).delays.length, 2);
+gif.writeUInt16LE(0, 6);
+assert.throws(() => sandbox.exports.inspectRaster(new Uint8Array(gif)));
+const webp = await sharp(jpeg).webp({ lossless: true }).toBuffer();
+const lossless = webp.indexOf(Buffer.from('VP8L'));
+assert(lossless > 0);
+webp.writeUInt32LE(0x0fffffff, lossless + 9);
+assert.equal(sandbox.exports.inspectRaster(new Uint8Array(webp)).width, 16384);
+assert.equal(sandbox.exports.inspectRaster(new Uint8Array(webp)).height, 16384);
+assert.throws(() => sandbox.exports.inspectRaster(new Uint8Array(webp.subarray(0, -1))));
+console.log('Large still-image headers accepted; invalid dimensions, truncation and oversized animations rejected.');
 // Chromium Canvas can add an sRGB ICC profile. Prepared files must remain
 // decodable, pixel-identical and metadata-free before owner publication.
 const profiled = await sharp({ create: { width: 64, height: 48, channels: 3, background: '#b8c8a4' } }).withIccProfile('srgb').webp().toBuffer();
