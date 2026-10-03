@@ -37,10 +37,10 @@ export function createPreviewPicker(settings: PreviewPickerSettings) {
       <fieldset data-length hidden><legend>Prepared copy length</legend>
         <label class="media-library-choice"><input type="radio" name="${titleId}-length" value="preview" data-short checked>Short preview</label>
         <label class="media-library-choice"><input type="radio" name="${titleId}-length" value="full" data-full>Full length</label>
-        <p class="media-library-warning" data-full-warning hidden>Publishing will make the complete recording or animation public. Until then the processed copy stays in your unpublished changes. The original is never uploaded. Copies must fit within 32 MiB.</p>
+        <p class="media-library-warning" data-full-warning hidden>Publishing will make the complete recording or animation public. Until then the processed copy stays in your unpublished changes. The original is never uploaded. Audio and video are automatically compressed to fit within 32 MiB when good quality is possible; otherwise choose a shorter excerpt. Nothing is shortened automatically.</p>
       </fieldset>
       <fieldset data-timing hidden><legend>Preview excerpt</legend><label>Start (seconds)<input data-start type="number" min="0" step="0.01" value="0" required></label><label>Duration (seconds, maximum 60)<input data-duration type="number" min="0.01" max="60" step="0.01" value="30" required></label></fieldset>
-      <p class="media-library-help">JPEG, PNG, WebP and GIF stills are automatically optimized to previews up to 1600 pixels, without upscaling. Still originals have no fixed size limit; browser decoding and memory limits apply. GIF/WebP animation is preserved and needs ImageDecoder (current Chrome); animation originals are limited to 256 MiB, 8192 pixels per edge, 40 megapixels per frame and 1800 frames, with total processing limits. Animations, audio and video need WebAssembly; audio and video originals can be up to 128 MiB. Large files may take time; canceling processing uploads nothing.</p>
+      <p class="media-library-help">JPEG, PNG, WebP and GIF stills are automatically optimized to previews up to 1600 pixels, without upscaling. Audio and video originals over 128 MiB are read in chunks and compressed on this device, with detail-first video encoding and high-quality audio. Copies that need more compression get a size-targeted video pass; very long recordings may need a shorter excerpt to preserve quality. Browser decoding and memory limits still apply. GIF/WebP animations need ImageDecoder (current Chrome), with limits of 256 MiB, 8192 pixels per edge, 40 megapixels per frame and 1800 frames. Animations, audio and video need WebAssembly. Canceling uploads nothing.</p>
       <div class="media-library-actions"><button type="submit" data-convert disabled>Prepare preview</button><button type="button" data-cancel hidden>Cancel processing</button></div>
     </form>
     <p data-status role="status" aria-live="polite"></p><progress data-progress max="1" hidden></progress>
@@ -254,8 +254,9 @@ export function createPreviewPicker(settings: PreviewPickerSettings) {
       const { creator } = await settings.load();
       if (abort.signal.aborted || request !== opening) return;
       for (const [index, candidate] of files.entries()) {
-        status.textContent = `Preparing ${index + 1} of ${files.length}: ${candidate.name}`;
         const kind = await previewInputKind(candidate, abort.signal);
+        const action = (kind === 'video' || kind === 'audio') && candidate.size > 128 * 1024 * 1024 ? 'Compressing' : 'Preparing';
+        status.textContent = `${action} ${index + 1} of ${files.length}: ${candidate.name}. Keeping the selected length.`;
         const result = await preparePreview(candidate, {
           creator, name: name.value.trim() && files.length > 1 ? `${name.value.trim()}-${index + 1}` : name.value.trim(), signal: abort.signal,
           ...(kind === 'image' ? {} : full.checked ? { fullLength: true } : { start: Number(start.value), duration: Number(duration.value) }),
@@ -276,7 +277,9 @@ export function createPreviewPicker(settings: PreviewPickerSettings) {
         else media.alt = 'Prepared, watermarked image or animation';
         previewMedia.append(media);
       }
-      previewDetails.textContent = `${prepared.length} prepared copy/copies. Review each copy before adding it.`;
+      const originalSize = files.reduce((total, file) => total + file.size, 0);
+      const preparedSize = prepared.reduce((total, copy) => total + copy.file.size + (copy.poster?.file.size ?? 0), 0);
+      previewDetails.textContent = `${prepared.length} prepared copy/copies: ${(originalSize / 1024 / 1024).toFixed(1)} MiB original → ${(preparedSize / 1024 / 1024).toFixed(1)} MiB prepared. Review playback and detail before adding.`;
       publish.textContent = prepared.length > 1 ? `Use ${prepared.length} pictures` : `Use copy`;
       preview.hidden = false;
       status.textContent = 'Check the prepared copy. Nothing is public until you publish, and the original stays on this device.';

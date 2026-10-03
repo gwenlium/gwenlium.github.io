@@ -1,7 +1,7 @@
 import classWorkerURL from '@ffmpeg/ffmpeg/worker?worker&url';
 import coreURL from '@ffmpeg/core?url';
 import wasmURL from '@ffmpeg/core/wasm?url';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { FFmpeg, FFFSType } from '@ffmpeg/ffmpeg';
 import { normalizeWatermarkCredit, watermarkCreditError, watermarkLayout } from '../../lib/watermark.mjs';
 
 type PreviewMetadata =
@@ -58,7 +58,6 @@ type Probe = {
 
 const MiB = 1024 * 1024;
 const animationBytes = 256 * MiB;
-const videoBytes = 128 * MiB;
 const outputBytes = 32 * MiB;
 const maxEdge = 8192;
 const maxPixels = 40_000_000;
@@ -303,7 +302,6 @@ export async function previewInputKind(file: File, signal?: AbortSignal): Promis
   checkAbort(signal);
   if (!(file instanceof File) || !file.size) fail('Choose a nonempty local media file.');
   const mime = rasterMime(new Uint8Array(await bytes(file.slice(0, 64), signal)));
-  if (!mime && file.size > videoBytes) fail('Video and audio originals can be up to 128 MiB. Trim or export a smaller copy first.');
   if (mime) {
     if (mime === 'image/gif' || mime === 'image/webp') {
       let raster = imageMetadata.get(file);
@@ -485,14 +483,14 @@ async function still(blob: Blob, options: Settings, source: Dimensions): Promise
   }
 }
 
-async function withTranscoder<T>(options: Settings, convert: (ffmpeg: FFmpeg) => Promise<T>): Promise<T> {
+async function withTranscoder<T>(options: Settings, convert: (ffmpeg: FFmpeg) => Promise<T>, original?: File): Promise<T> {
   if (typeof Worker === 'undefined' || typeof WebAssembly === 'undefined') fail('This browser needs Web Workers and WebAssembly for audio, animated images and video.');
   checkAbort(options.signal);
   const ffmpeg = new FFmpeg();
   const stop = () => ffmpeg.terminate();
   options.signal?.addEventListener('abort', stop, { once: true });
-  // A terminated worker also destroys its in-memory filesystem, including all originals.
-  // Use a fresh instance for each job instead of keeping private media in a shared heap.
+  // Each job owns its worker. Originals are mounted read-only and read in chunks,
+  // not copied into the WASM filesystem; terminating also releases the mount.
   try {
     const urls = [classWorkerURL, coreURL, wasmURL].map((url) => new URL(url, location.href));
     if (urls.some((url) => url.origin !== location.origin)) fail('The preview converter must be served from this site, not a remote CDN.');
@@ -510,6 +508,12 @@ async function withTranscoder<T>(options: Settings, convert: (ffmpeg: FFmpeg) =>
       ]);
     } finally { clearTimeout(timer); }
     checkAbort(options.signal);
+    if (original) {
+      await ffmpeg.createDir('/original');
+      if (!await ffmpeg.mount(FFFSType.WORKERFS, { blobs: [{ name: 'source', data: original }] }, '/original')) {
+        fail('This browser could not open the local recording for compression. The original was not uploaded.');
+      }
+    }
     return await convert(ffmpeg);
   } finally {
     options.signal?.removeEventListener('abort', stop);
@@ -596,7 +600,7 @@ function mediaDuration(sourceDuration: number, options: Settings): number {
     return sourceDuration;
   }
   if (Number.isFinite(sourceDuration) && sourceDuration > 0 && options.start >= sourceDuration) fail('The excerpt must start before the end of the media.');
-  return Math.min(options.duration, 59.9);
+  return Math.min(options.duration, 59.9, Number.isFinite(sourceDuration) && sourceDuration > 0 ? sourceDuration - options.start : Infinity);
 }
 
 function verifyMediaDuration(actual: number, expected: number, fullLength = false): void {
@@ -609,33 +613,34 @@ function verifyMediaDuration(actual: number, expected: number, fullLength = fals
 
 async function audio(file: File, options: Settings): Promise<Generated> {
   return withTranscoder(options, async ffmpeg => {
-    await ffmpeg.writeFile('source', new Uint8Array(await bytes(file, options.signal)));
-    const source = await probe(ffmpeg, 'source');
+    const source = await probe(ffmpeg, '/original/source');
     const stream = source.streams?.find(item => item.codec_type === 'audio');
     if (!stream || source.streams?.some(item => item.codec_type === 'video' && !item.disposition?.attached_pic)) fail('Choose an audio file, not a video or a file without an audio stream.');
     const duration = mediaDuration(Number(source.format?.duration), options);
+    // Reserve room for encoder padding; never fit a long recording by cutting its end.
+    const budget = Math.floor(outputBytes * 0.94 * 8 / (duration * 1000));
+    const bitrate = [192, 160, 128].find(value => value <= budget);
+    if (!bitrate) fail('The full audio cannot fit within 32 MiB at good quality. Choose a shorter excerpt in the media library. Nothing was shortened or uploaded.');
     const update = ({ time }: { time: number }) => progress(options, Math.min(0.9, Math.max(0, time / (duration * 1_000_000)) * 0.9));
     ffmpeg.on('progress', update);
     try {
-      await execute(ffmpeg, ['-ss', String(options.start), ...input('source'),
+      await execute(ffmpeg, ['-ss', String(options.start), ...input('/original/source'),
         '-map', `0:${stream.index}`, ...(options.fullLength ? [] : ['-t', String(duration)]),
-        '-vn', '-sn', '-dn', '-c:a', 'libmp3lame', '-b:a', options.fullLength ? '192k' : '96k', '-ar', '44100', '-ac', '2',
+        '-vn', '-sn', '-dn', '-c:a', 'libmp3lame', '-b:a', `${bitrate}k`, '-ar', '44100', '-ac', '2',
         ...stripMetadata, '-id3v2_version', '0', '-write_id3v1', '0', '-fs', String(outputBytes + 1), 'preview.mp3']);
     } finally { ffmpeg.off('progress', update); }
-    await ffmpeg.deleteFile('source');
     const output = await binary(ffmpeg, 'preview.mp3');
-    if (!output.length || output.length > outputBytes) fail('The prepared audio exceeds the 32 MiB limit or is empty. Choose a shorter excerpt.');
+    if (!output.length || output.length > outputBytes) fail('The prepared audio cannot fit within 32 MiB. Choose a shorter excerpt. Nothing was shortened or uploaded.');
     const blob = new Blob([output], { type: 'audio/mpeg' });
     const playable = await viewableMedia(blob, options.signal);
-    verifyMediaDuration(playable.duration, duration, options.fullLength);
+    verifyMediaDuration(playable.duration, duration, Number.isFinite(Number(source.format?.duration)));
     return { blob, extension: 'mp3', entry: { kind: 'audio', duration: playable.duration } };
-  });
+  }, file);
 }
 
 async function video(file: File, options: Settings): Promise<Generated> {
   return withTranscoder(options, async (ffmpeg) => {
-    await ffmpeg.writeFile('source', new Uint8Array(await bytes(file, options.signal)));
-    const source = await probe(ffmpeg, 'source');
+    const source = await probe(ffmpeg, '/original/source');
     const stream = source.streams?.find((item) => item.codec_type === 'video' && !item.disposition?.attached_pic);
     if (!stream || !Number.isSafeInteger(stream.index)) fail('Select a file with a moving-video stream. Audio-only files and cover artwork are not video previews.');
     const rawSize = dimensions(stream.width ?? 0, stream.height ?? 0);
@@ -644,7 +649,7 @@ async function video(file: File, options: Settings): Promise<Generated> {
     const seek = ['-ss', String(options.start)];
     const displayWidth = 'iw*if(gt(sar,0),sar,1)';
     const scale = `scale=w='max(2,trunc(min(1280,${displayWidth})/2)*2)':h='max(2,trunc(ih*min(1,1280/(${displayWidth}))/2)*2)',setsar=1`;
-    await execute(ffmpeg, [...seek, ...input('source'), '-map', `0:${stream.index}`, '-vf', scale,
+    await execute(ffmpeg, [...seek, ...input('/original/source'), '-map', `0:${stream.index}`, '-vf', scale,
       '-frames:v', '1', '-an', '-sn', '-dn', ...stripMetadata, 'frame.png']);
     const frame = await binary(ffmpeg, 'frame.png');
     const size = inspectRaster(frame);
@@ -654,28 +659,50 @@ async function video(file: File, options: Settings): Promise<Generated> {
     finally { mark.width = mark.height = 1; }
     await ffmpeg.deleteFile('frame.png');
     const filter = `[0:${stream.index}]${scale},fps=30[base];[base][1:v]overlay=x=main_w-overlay_w:y=main_h-overlay_h:format=auto,format=yuv420p[preview]`;
-    const update = ({ time }: { time: number }) => progress(options, Math.min(0.9, Math.max(0, time / (duration * 1_000_000)) * 0.9));
-    ffmpeg.on('progress', update);
-    try {
-      await execute(ffmpeg, [...seek, ...input('source'), ...input('watermark.png', 'png_pipe'),
-        '-filter_complex', filter, '-map', '[preview]', '-map', '0:a:0?', '-c:a', 'aac', '-b:a', '96k', '-ac', '2',
-        ...(options.fullLength ? [] : ['-t', String(duration)]), '-sn', '-dn', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p',
-        ...stripMetadata, '-metadata:s:v:0', 'rotate=0', '-fs', String(outputBytes + 1), '-movflags', '+faststart', 'preview.mp4']);
-    } finally { ffmpeg.off('progress', update); }
-    await ffmpeg.deleteFile('source');
-    const output = await binary(ffmpeg, 'preview.mp4');
-    if (!output.length || output.length > outputBytes) fail('The generated preview exceeds the 32 MiB limit or is empty. Choose a shorter excerpt.');
-    const result = await probe(ffmpeg, 'preview.mp4');
+    const hasAudio = source.streams?.some(item => item.codec_type === 'audio');
+    const audioRate = hasAudio ? 128 : 0;
+    const encode = async (pass: number, bitrate?: number) => {
+      const update = ({ time }: { time: number }) => progress(options, Math.min(0.9, Math.max(0, time / (duration * 1_000_000)) * 0.9));
+      ffmpeg.on('progress', update);
+      try {
+        await execute(ffmpeg, [...seek, ...input('/original/source'), ...input('watermark.png', 'png_pipe'),
+          '-filter_complex', filter, '-map', '[preview]',
+          ...(pass === 1 ? ['-an'] : ['-map', '0:a:0?', '-c:a', 'aac', '-b:a', `${audioRate || 128}k`, '-ac', '2']),
+          ...(options.fullLength ? [] : ['-t', String(duration)]), '-sn', '-dn', '-c:v', 'libx264', '-preset', 'fast',
+          ...(bitrate ? ['-b:v', `${bitrate}k`, '-pass', String(pass), '-passlogfile', 'compression'] : ['-crf', '23']),
+          '-pix_fmt', 'yuv420p', ...stripMetadata, '-metadata:s:v:0', 'rotate=0',
+          ...(pass === 1 ? ['-f', 'null', '-'] : ['-fs', String(outputBytes + 1), '-movflags', '+faststart', 'preview.mp4'])]);
+      } finally { ffmpeg.off('progress', update); }
+    };
+    // Keep detail with CRF first. Only a copy near the size ceiling needs two-pass
+    // allocation, which gives difficult scenes more bits without truncating the recording.
+    await encode(0);
+    let output = await binary(ffmpeg, 'preview.mp4');
+    let result = await probe(ffmpeg, 'preview.mp4');
+    const expectedDuration = Number.isFinite(Number(source.format?.duration));
+    if (output.length > outputBytes * 0.98 || (expectedDuration && Math.abs(Number(result.format?.duration) - duration) > 0.25)) {
+      const bitrate = Math.floor(outputBytes * 0.94 * 8 / (duration * 1000)) - audioRate;
+      // Do not turn a long, detailed recording into a tiny-bitrate blur just to fit.
+      const minimum = Math.max(100, Math.ceil(size.width * size.height * 30 * 0.05 / 1000));
+      if (bitrate < minimum) fail('The full video cannot fit within 32 MiB without losing too much detail. Choose a shorter excerpt in the media library. Nothing was shortened or uploaded.');
+      output = new Uint8Array(0);
+      await ffmpeg.deleteFile('preview.mp4');
+      await encode(1, bitrate);
+      await encode(2, bitrate);
+      output = await binary(ffmpeg, 'preview.mp4');
+      result = await probe(ffmpeg, 'preview.mp4');
+    }
+    if (!output.length || output.length > outputBytes) fail('The compressed video cannot fit within 32 MiB at this quality. Choose a shorter excerpt. Nothing was shortened or uploaded.');
     const resultStream = result.streams?.find((item) => item.codec_type === 'video');
     const blob = new Blob([output], { type: 'video/mp4' });
     const visible = await viewableMedia(blob, options.signal);
-    verifyMediaDuration(visible.duration, duration, options.fullLength);
+    verifyMediaDuration(visible.duration, duration, expectedDuration);
     if (resultStream?.width !== size.width || resultStream.height !== size.height || visible.width !== size.width || visible.height !== size.height) {
       fail('The generated video failed its dimension bounds. Nothing was prepared.');
     }
     const poster = await videoStill(ffmpeg, visible.duration, size, options);
     return { blob, extension: 'mp4', entry: { kind: 'video', width: size.width, height: size.height, duration: visible.duration }, poster };
-  });
+  }, file);
 }
 
 /**
@@ -841,7 +868,6 @@ async function prepare(file: File, options: Settings, hasTiming: boolean): Promi
     }
   } else {
     const extension = file.name.split('.').at(-1)?.toLowerCase() || '';
-    if (file.size > videoBytes) fail('Video and audio originals can be up to 128 MiB. Trim or export a smaller copy first.');
     if (audioExtensions.has(extension)) generated = await audio(file, options);
     else if (videoExtensions.has(extension)) generated = await video(file, options);
     else fail('Choose JPEG, PNG, WebP, GIF, a supported audio file, or a supported video file. SVG, APNG, AVIF and TIFF need a supported local export.');

@@ -39,20 +39,11 @@ export async function stageFiles(store: SiteEditorStore, files: File[], onStatus
     const label = files.length > 1 ? ` ${index + 1} of ${files.length}` : '';
     const kind = await previewInputKind(file, signal);
     const noun = kind === 'video' ? 'video' : kind === 'audio' ? 'audio' : 'picture';
-    const onProgress = (value: number | undefined) => onStatus(`Preparing ${noun}${label}${value !== undefined ? ` ${Math.round(value * 100)}%` : ''}…`);
+    const action = (kind === 'video' || kind === 'audio') && file.size > 128 * 1024 * 1024 ? 'Compressing' : 'Preparing';
+    const onProgress = (value: number | undefined) => onStatus(`${action} ${noun}${label}${value !== undefined ? ` ${Math.round(value * 100)}%` : ''}…`);
     onProgress(undefined);
     const name = publicName(file);
-    let prepared;
-    if (kind === 'video' || kind === 'audio' || kind === 'animation') {
-      try {
-        prepared = await preparePreview(file, { creator, name, fullLength: true, signal, onProgress });
-      } catch (error) {
-        if (signal?.aborted) throw error;
-        // Long recordings can exceed the 32 MiB limit in full; keep the first minute instead.
-        prepared = await preparePreview(file, { creator, name, start: 0, duration: 60, signal, onProgress });
-        onStatus(`That ${noun} was too long to publish in full, so the first minute was kept.`);
-      }
-    } else prepared = await preparePreview(file, { creator, name, signal, onProgress });
+    const prepared = await preparePreview(file, { creator, name, ...(kind === 'image' ? {} : { fullLength: true }), signal, onProgress });
     // A video's still goes in first: the video's registry entry names it.
     if (prepared.poster) await store.addMedia(prepared.poster);
     const url = await store.addMedia(prepared);
