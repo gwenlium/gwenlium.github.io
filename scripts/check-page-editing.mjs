@@ -14,6 +14,7 @@ assert.deepEqual(pages.map(page => page.name).sort(), expected.sort());
 const originals = new Map();
 const fixtureSlug = `cms-photo-check-${process.pid}`;
 const fixturePost = `src/content/posts/${fixtureSlug}.md`;
+const captionSlug = `cms-captions-${process.pid}`;
 const entryFixtures = entrySectionIds.map(section => ({ section, slug: `cms-entry-${section}-${process.pid}`, date: '2020-01-01', draft: false, publishAt: '' }));
 entryFixtures.push({ section: 'music', slug: `cms-music-newer-${process.pid}`, date: '2020-02-01', draft: false, publishAt: '' });
 const excludedFixtures = [
@@ -25,6 +26,15 @@ const createdEntries = [];
 const registry = JSON.parse(fs.readFileSync('src/content/media-previews.json', 'utf8'));
 const photo = Object.entries(registry.files).find(([, entry]) => entry.kind === 'image')?.[0];
 const audio = Object.entries(registry.files).find(([, entry]) => entry.kind === 'audio')?.[0];
+const video = Object.entries(registry.files).find(([, entry]) => entry.kind === 'video' && !entry.loop)?.[0];
+const captionMedia = photo ? [
+  { type: 'image', src: photo, alt: 'Image description <em>as text</em>', caption: '' },
+  { type: 'image', src: photo, alt: 'Accessible image description', caption: 'Written caption\nSecond line' },
+  { type: 'image', src: photo, alt: '', caption: '' },
+  ...(video ? [{ type: 'video', src: video, alt: 'Video description', caption: '   ' }] : []),
+  ...(audio ? [{ type: 'audio', src: audio, alt: 'Audio description', caption: '' }] : []),
+] : [];
+const inlineCaptions = ['Inline image description', 'Written inline caption', 'Linked image description', 'Authored figure caption', ...(video ? ['Inline video description'] : []), ...(audio ? ['Inline audio description'] : [])];
 try {
   const windowsFile = 'src/content/windows.json';
   const windowsRaw = fs.readFileSync(windowsFile, 'utf8');
@@ -62,6 +72,18 @@ try {
   if (photo) {
     assert(!fs.existsSync(fixturePost));
     fs.writeFileSync(fixturePost, `---\ntitle: CMS photo test\npermalink: ${fixtureSlug}\nsection: devlog\ndraft: false\ndate: 2020-01-01\nphotos:\n  - ${photo}\n  - ${photo}\n---\nGallery test.\n`);
+    const filename = `src/content/posts/${captionSlug}.md`;
+    assert(!fs.existsSync(filename));
+    const body = [
+      `![Inline image description](${photo})`,
+      `![Accessible inline image description](${photo} "Written inline caption")`,
+      `[![Linked image description](${photo})](https://example.com/art)`,
+      `<figure><img src="${photo}" alt="Accessible authored image" /><figcaption>Authored figure caption</figcaption></figure>`,
+      ...(video ? [`![Inline video description](${video})`] : []),
+      ...(audio ? [`![Inline audio description](${audio})`] : []),
+    ].join('\n\n');
+    fs.writeFileSync(filename, `---\ntitle: Caption rendering check\npermalink: ${captionSlug}\nsection: devlog\ndraft: false\ndate: 2020-01-01\ncover: ${photo}\ncoverAlt: Cover description\nmedia: ${JSON.stringify(captionMedia)}\n---\n${body}\n`);
+    createdEntries.push(filename);
   }
   for (const fixture of [...entryFixtures, ...excludedFixtures]) {
     const filename = `src/content/posts/${fixture.slug}.md`;
@@ -78,6 +100,18 @@ try {
     assert.equal(post('#post-media img').length, 2);
     assert.equal(post('#post-entry img').length, 0, 'Entry gallery pictures belong in the companion window, not the text window');
     assert(fs.readFileSync('dist/rss.xml', 'utf8').includes(photo));
+    const captions = load(fs.readFileSync(`dist/devlog/${captionSlug}/index.html`, 'utf8'));
+    assert.deepEqual(captions('#post-media figcaption').toArray().map(element => captions(element).text()), [
+      'Cover description', 'Image description <em>as text</em>', 'Written caption\nSecond line',
+      ...(video ? ['Video description'] : []), ...(audio ? ['Audio description'] : []),
+    ]);
+    assert.equal(captions('#post-media figcaption em').length, 0, 'Descriptions must be text, not injected markup');
+    assert.deepEqual(captions('.entry-body figcaption').toArray().map(element => captions(element).text()), inlineCaptions);
+    assert.equal(captions('.entry-body a[href="https://example.com/art"] img').attr('alt'), 'Linked image description');
+    const listing = load(fs.readFileSync('dist/devlog/index.html', 'utf8'));
+    const thumbnail = listing(`.post-card:has(a[href="/devlog/${captionSlug}/"]) .post-cover`);
+    assert.equal(thumbnail.find('img').attr('alt'), 'Cover description');
+    assert.equal(thumbnail.find('figcaption').length, 0, 'Thumbnails should not duplicate full-size media descriptions');
   }
   for (const page of pages) {
     const target = page.name === 'site' ? 'index.html' : page.name === 'not-found' ? '404.html' : `${page.name}/index.html`;

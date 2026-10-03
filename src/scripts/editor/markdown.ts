@@ -1,6 +1,6 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { mediaKindOf, videoEmbed } from '../../lib/embed.mjs';
+import { mediaCaption, mediaKindOf, videoEmbed } from '../../lib/embed.mjs';
 
 // Raw Markdown may link to ordinary web URLs, but only the trusted draft resolver
 // may introduce blob URLs. Neither path accepts data URLs or executable schemes.
@@ -14,6 +14,12 @@ function safeURL(value: string, media: boolean, localBlob = false): boolean {
   } catch {
     return false;
   }
+}
+
+function containsOnlyMedia(parent: Element, media: Element): boolean {
+  return [...parent.childNodes].every(child => child === media
+    || (child.nodeType === Node.TEXT_NODE && !child.textContent?.trim())
+    || (parent instanceof HTMLPictureElement && child instanceof HTMLSourceElement));
 }
 
 /** `mediaInfo` says which prepared videos are animations (looping, muted, no controls) and their stills. */
@@ -42,14 +48,40 @@ export function renderMarkdownPreview(markdown: string, resolveMedia?: (url: str
     const player = document.createElement(kind);
     player.setAttribute('src', image.getAttribute('src') ?? '');
     if (image.alt) player.setAttribute('aria-label', image.alt);
+    if (image.hasAttribute('title')) player.setAttribute('title', image.title);
     const info = kind === 'video' ? mediaInfo?.(image.getAttribute('src') ?? '') : undefined;
     if (info?.loop) player.dataset.animation = '';
     if (info?.poster) player.setAttribute('poster', info.poster);
     image.replaceWith(player);
   }
+  // Keep the caption beside the media, so entry media windows move both together.
+  // Only standalone media can replace a paragraph; mixed prose and authored links stay intact.
+  for (const media of fragment.querySelectorAll<HTMLImageElement | HTMLMediaElement>('img, video, audio')) {
+    if (media.closest('figcaption')) continue;
+    const caption = mediaCaption(media.title, media instanceof HTMLImageElement ? media.alt : media.getAttribute('aria-label') ?? '');
+    if (!caption) continue;
+    let figure = media.closest('figure');
+    if (!figure) {
+      let content: Element = media;
+      if (content.parentElement instanceof HTMLPictureElement && containsOnlyMedia(content.parentElement, content)) content = content.parentElement;
+      if (content.parentElement instanceof HTMLAnchorElement && containsOnlyMedia(content.parentElement, content)) content = content.parentElement;
+      const paragraph = content.parentElement;
+      if (paragraph?.tagName !== 'P' || !containsOnlyMedia(paragraph, content)) continue;
+      figure = document.createElement('figure');
+      figure.className = `media media--${media instanceof HTMLImageElement ? 'image' : media.tagName.toLowerCase()}`;
+      figure.append(...paragraph.childNodes);
+      paragraph.replaceWith(figure);
+    }
+    // Authored captions, including intentionally empty ones, are never replaced.
+    if (figure.querySelector(':scope > figcaption')) continue;
+    const description = document.createElement('figcaption');
+    description.textContent = caption;
+    figure.append(description);
+  }
   for (const paragraph of fragment.querySelectorAll('p')) {
     const parts = [...paragraph.childNodes].filter(child => !(child.nodeType === Node.TEXT_NODE && !child.textContent?.trim()));
     const link = parts.length === 1 && parts[0] instanceof HTMLAnchorElement ? parts[0] : undefined;
+    if (link?.querySelector('img, picture, video, audio')) continue;
     const embed = link && videoEmbed(link.getAttribute('href') ?? '');
     if (!embed) continue;
     const frame = document.createElement('iframe');

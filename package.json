@@ -41,6 +41,7 @@
     "marked": "18.0.14",
     "mediabunny": "1.61.1",
     "minisearch": "7.2.0",
+    "rehype-raw": "7.0.0",
     "sharp": "0.35.4"
   },
   "devDependencies": {

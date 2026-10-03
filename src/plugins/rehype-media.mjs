@@ -1,9 +1,43 @@
 import fs from 'node:fs';
-import { mediaKindOf, videoEmbed } from '../lib/embed.mjs';
+import rehypeRaw from 'rehype-raw';
+import { mediaCaption, mediaKindOf, videoEmbed } from '../lib/embed.mjs';
 
 const manifestFile = new URL('../generated/media.json', import.meta.url);
 const registryFile = new URL('../content/media-previews.json', import.meta.url);
 const sizes = '(min-width: 1200px) 960px, (min-width: 800px) calc(100vw - 280px), calc(100vw - 48px)';
+
+const contentChildren = (node) => (node.children ?? []).filter((child) => !(child.type === 'text' && !child.value.trim()));
+const hasRaw = (node) => node.type === 'raw' || node.children?.some(hasRaw);
+
+function captionOf(node) {
+  const properties = node.properties ?? {};
+  const description = typeof properties.alt === 'string' ? properties.alt : properties.ariaLabel;
+  return mediaCaption(typeof properties.title === 'string' ? properties.title : '', typeof description === 'string' ? description : '');
+}
+
+function standaloneMedia(node) {
+  if (node?.type !== 'element') return undefined;
+  if (['img', 'video', 'audio'].includes(node.tagName)) return node;
+  if (node.tagName === 'picture') {
+    const children = contentChildren(node).filter((child) => child.type !== 'element' || child.tagName !== 'source');
+    return children.length === 1 && children[0].tagName === 'img' ? children[0] : undefined;
+  }
+  if (node.tagName === 'a') {
+    const children = contentChildren(node);
+    return children.length === 1 ? standaloneMedia(children[0]) : undefined;
+  }
+  return undefined;
+}
+
+function firstMedia(nodes, withCaption = false) {
+  for (const node of nodes) {
+    if (node.type !== 'element' || node.tagName === 'figure' || node.tagName === 'figcaption') continue;
+    if (['img', 'video', 'audio'].includes(node.tagName) && (!withCaption || captionOf(node))) return node;
+    const media = firstMedia(node.children ?? [], withCaption);
+    if (media) return media;
+  }
+  return undefined;
+}
 
 /** Add responsive sources without rendering Markdown or changing author-owned links/captions. */
 export default function rehypeMedia() {
@@ -19,15 +53,17 @@ export default function rehypeMedia() {
   let registry = {};
   try { registry = JSON.parse(fs.readFileSync(registryFile, 'utf8')).files ?? {}; }
   catch (error) { if (error.code !== 'ENOENT') throw new Error(`Cannot read the media registry: ${error.message}`, { cause: error }); }
+  const parseRaw = rehypeRaw();
 
-  return (tree) => {
+  return (tree, file) => {
+    // Astro parses raw HTML after custom plugins; normalize it now so authored media shares the same rules.
+    if (hasRaw(tree)) tree = parseRaw(tree, file);
     const visit = (parent) => {
       for (let index = 0; index < (parent.children?.length ?? 0); index++) {
         const node = parent.children[index];
-        // A YouTube or Vimeo link alone in a paragraph becomes the embedded player.
-        const only = node.type === 'element' && node.tagName === 'p'
-          ? node.children.filter((child) => !(child.type === 'text' && !child.value.trim())) : [];
-        if (only.length === 1 && only[0].type === 'element' && only[0].tagName === 'a') {
+        // A text link alone in a paragraph becomes an embedded player; linked media stays linked.
+        const only = node.type === 'element' && node.tagName === 'p' ? contentChildren(node) : [];
+        if (only.length === 1 && only[0].type === 'element' && only[0].tagName === 'a' && !firstMedia(only[0].children)) {
           const href = typeof only[0].properties?.href === 'string' ? only[0].properties.href : '';
           const embed = videoEmbed(href);
           if (embed) {
@@ -54,15 +90,19 @@ export default function rehypeMedia() {
           const label = typeof properties.alt === 'string' ? properties.alt : '';
           const entry = registry[original];
           parent.children[index] = {
-            type: 'element', tagName: kind, properties: entry?.loop ? {
-              // An animation: plays like a GIF (src/scripts/media.ts pauses it for reduced motion).
-              src: original, dataAnimation: '', autoPlay: true, muted: true, loop: true, playsInline: true, preload: 'metadata',
-              disablePictureInPicture: true, ...(entry.poster ? { poster: entry.poster } : {}), ...(entry.width ? { width: entry.width, height: entry.height } : {}),
-              ...(label ? { ariaLabel: label } : {}),
-            } : {
-              src: original, controls: true, preload: kind === 'video' && !entry?.poster ? 'metadata' : 'none',
-              ...(kind === 'video' ? { playsInline: true, controlslist: 'nodownload', ...(entry?.poster ? { poster: entry.poster } : {}), ...(entry?.width ? { width: entry.width, height: entry.height } : {}) } : {}),
-              ...(label ? { ariaLabel: label } : {}),
+            type: 'element', tagName: kind, properties: {
+              ...(entry?.loop ? {
+                // An animation: plays like a GIF (src/scripts/media.ts pauses it for reduced motion).
+                src: original, dataAnimation: '', autoPlay: true, muted: true, loop: true, playsInline: true, preload: 'metadata',
+                disablePictureInPicture: true, ...(entry.poster ? { poster: entry.poster } : {}), ...(entry.width ? { width: entry.width, height: entry.height } : {}),
+                ...(label ? { ariaLabel: label } : {}),
+              } : {
+                src: original, controls: true, preload: kind === 'video' && !entry?.poster ? 'metadata' : 'none',
+                ...(kind === 'video' ? { playsInline: true, controlslist: 'nodownload', ...(entry?.poster ? { poster: entry.poster } : {}), ...(entry?.width ? { width: entry.width, height: entry.height } : {}) } : {}),
+                ...(label ? { ariaLabel: label } : {}),
+              }),
+              ...(typeof properties.title === 'string' ? { title: properties.title } : {}),
+              dataZoomCaption: captionOf(node),
             }, children: [],
           };
           continue;
@@ -71,7 +111,7 @@ export default function rehypeMedia() {
         properties.decoding ??= 'async';
         properties.dataZoom = '';
         properties.dataZoomSrc = original;
-        if (properties.title && !properties.dataZoomCaption) properties.dataZoomCaption = properties.title;
+        properties.dataZoomCaption = mediaCaption(typeof properties.dataZoomCaption === 'string' ? properties.dataZoomCaption : '', captionOf(node));
 
         // Relative image URLs retain their page-relative meaning; remote images are never rewritten.
         if (!original.startsWith('/') || original.startsWith('//')) continue;
@@ -113,5 +153,33 @@ export default function rehypeMedia() {
       }
     };
     visit(tree);
+
+    const addCaptions = (node, insideFigure = false) => {
+      if (node.type === 'element' && node.tagName === 'figcaption') return;
+      const figure = node.type === 'element' && node.tagName === 'figure';
+      for (const child of node.children ?? []) addCaptions(child, insideFigure || figure);
+
+      let media;
+      if (figure) {
+        // Authored captions, even deliberately empty ones, always remain authoritative.
+        if (node.children.some((child) => child.type === 'element' && child.tagName === 'figcaption')) return;
+        media = firstMedia(node.children, true);
+      } else if (!insideFigure && node.type === 'element' && node.tagName === 'p') {
+        const children = contentChildren(node);
+        media = children.length === 1 ? standaloneMedia(children[0]) : undefined;
+      }
+      if (!media) return;
+      const caption = captionOf(media);
+      if (!caption) return;
+      if (!figure) {
+        node.tagName = 'figure';
+        const properties = node.properties ?? (node.properties = {});
+        const classes = Array.isArray(properties.className) ? properties.className : typeof properties.className === 'string' ? properties.className.split(/\s+/) : [];
+        properties.className = [...classes, 'media', `media--${media.tagName === 'img' ? 'image' : media.tagName}`];
+      }
+      node.children.push({ type: 'element', tagName: 'figcaption', properties: {}, children: [{ type: 'text', value: caption }] });
+    };
+    addCaptions(tree);
+    return tree;
   };
 }

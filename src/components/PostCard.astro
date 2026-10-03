@@ -16,7 +16,7 @@ const edit = picture && !picture.derived ? { editFile: sourceFile, editField: '/
 ---
 
 <article class:list={['post-card', { 'has-cover': picture, 'post-card--compact': compact }]}>
-  {picture && <div class="post-cover">{compact ? <a href={postUrl(post)} aria-label={`Read ${title}`}><Media src={picture.src} alt={picture.alt} sizes="80px" still {...edit} /></a> : <Media src={picture.src} alt={picture.alt} still {...edit} />}</div>}
+  {picture && <div class="post-cover">{compact ? <a href={postUrl(post)} aria-label={`Read ${title}`}><Media src={picture.src} alt={picture.alt} sizes="80px" still showCaption={false} {...edit} /></a> : <Media src={picture.src} alt={picture.alt} still showCaption={false} {...edit} />}</div>}
   <div class="post-details">
     <a class="tag" href={section.indexUrl}>{section.label}</a>
     {section.dated && <time datetime={date.toISOString().slice(0, 10)}>{formatDate(date)}</time>}

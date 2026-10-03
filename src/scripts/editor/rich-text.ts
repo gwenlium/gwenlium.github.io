@@ -117,7 +117,8 @@ export function createRichText(host: HTMLElement, options: RichTextOptions): Ric
     renderMarkdown: (node: { attrs?: Record<string, unknown> }) => {
       const alt = String(node.attrs?.alt ?? '').replace(/[\r\n]+/g, ' ').replace(/([\\[\]])/g, '\\$1');
       const src = String(node.attrs?.src ?? '');
-      return `![${alt}](${/[\s()<>]/.test(src) ? `<${src.replace(/[<>]/g, encodeURIComponent)}>` : src})`;
+      const title = String(node.attrs?.title ?? '').replace(/[\r\n]+/g, ' ').replace(/([\\"])/g, '\\$1');
+      return `![${alt}](${/[\s()<>]/.test(src) ? `<${src.replace(/[<>]/g, encodeURIComponent)}>` : src}${title ? ` "${title}"` : ''})`;
     },
     addNodeView() {
       return ({ node: initial, getPos, editor }) => {

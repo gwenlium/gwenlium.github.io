@@ -3,6 +3,7 @@ import type { APIContext } from 'astro';
 import { load } from 'cheerio';
 import { getPosts, postPreview, postUrl, type Post } from '../lib/content';
 import { entrySectionInfo } from '../lib/entry-sections.mjs';
+import { mediaCaption } from '../lib/embed.mjs';
 import { site } from '../lib/settings';
 
 const htmlEscapes: Record<string, string> = {
@@ -16,14 +17,16 @@ function escapeHtml(value: string): string {
 function articleContent(post: Post, base: URL): string {
   if (post.rendered?.html === undefined) throw new Error(`Missing rendered RSS content for ${post.id}`);
   const { cover, coverAlt, excerpt, media, photos } = post.data;
+  const coverCaption = mediaCaption('', coverAlt);
   const parts = [
-    cover ? `<p><img src="${escapeHtml(cover)}" alt="${escapeHtml(coverAlt)}" /></p>` : '',
+    cover ? `<figure><img src="${escapeHtml(cover)}" alt="${escapeHtml(coverAlt)}" />${coverCaption ? `<figcaption>${escapeHtml(coverCaption)}</figcaption>` : ''}</figure>` : '',
     excerpt ? `<p>${escapeHtml(excerpt)}</p>` : '',
     post.rendered.html,
     ...photos.map(src => `<figure><img src="${escapeHtml(src)}" alt="" /></figure>`),
     ...media.map((item) => {
       const src = escapeHtml(item.src);
-      const caption = item.caption ? `<figcaption>${escapeHtml(item.caption)}</figcaption>` : '';
+      const description = mediaCaption(item.caption, item.alt);
+      const caption = description ? `<figcaption>${escapeHtml(description)}</figcaption>` : '';
       const content = item.type === 'image'
         ? `<img src="${src}" alt="${escapeHtml(item.alt)}" />`
         : `<${item.type} controls src="${src}"${item.type === 'video' && item.poster ? ` poster="${escapeHtml(item.poster)}"` : ''}></${item.type}><p><a href="${src}">${escapeHtml(item.alt || `Open ${item.type}`)}</a></p>`;

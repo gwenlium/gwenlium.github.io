@@ -1,4 +1,5 @@
 import { entrySectionInfo, resolveEntrySection, type EntrySection } from '../../lib/entry-sections.mjs';
+import { mediaCaption } from '../../lib/embed.mjs';
 import { renderMarkdownPreview } from './markdown';
 import { ownerStore, writerUrl } from './session';
 
@@ -47,6 +48,7 @@ function resolve(url: string): string {
 
 /** Mirrors Media.astro, so the media window and zoom treat it like a published item. */
 function mediaFigure(item: PreviewMedia, eager: boolean): HTMLElement {
+  const caption = mediaCaption(item.caption, item.alt);
   const figure = node('figure');
   figure.className = `media media--${item.type}`;
   if (item.type === 'image') {
@@ -57,7 +59,7 @@ function mediaFigure(item: PreviewMedia, eager: boolean): HTMLElement {
     image.decoding = 'async';
     image.draggable = false;
     image.dataset.zoom = '';
-    image.dataset.zoomCaption = item.caption;
+    image.dataset.zoomCaption = caption;
     image.dataset.previewSrc = item.src;
     picture.append(image);
     figure.append(picture);
@@ -77,7 +79,7 @@ function mediaFigure(item: PreviewMedia, eager: boolean): HTMLElement {
     const expand = node('button', 'Expand video');
     expand.type = 'button';
     expand.className = 'media-expand button-secondary';
-    expand.dataset.zoomCaption = item.caption;
+    expand.dataset.zoomCaption = caption;
     expand.dataset.zoomAlt = item.alt;
     expand.dataset.previewZoomVideo = item.src;
     expand.setAttribute('aria-haspopup', 'dialog');
@@ -92,7 +94,7 @@ function mediaFigure(item: PreviewMedia, eager: boolean): HTMLElement {
     audio.dataset.previewSrc = item.src;
     figure.append(audio);
   }
-  if (item.caption) figure.append(node('figcaption', item.caption));
+  if (caption) figure.append(node('figcaption', caption));
   return figure;
 }
 

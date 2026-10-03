@@ -1,3 +1,4 @@
+import { mediaCaption } from '../lib/embed.mjs';
 import { playInterfaceSound } from './interface-audio';
 
 const interactionStyles = `
@@ -116,6 +117,12 @@ function openLightbox(trigger: HTMLElement, source: string, kind: 'image' | 'vid
   dialog.querySelector('button')!.focus();
 }
 
+function zoomCaption(media: HTMLElement, description: string, trigger: HTMLElement = media): string {
+  const caption = trigger.closest('figure')?.querySelector(':scope > figcaption')?.textContent ?? '';
+  const explicit = mediaCaption(trigger.dataset.zoomCaption, mediaCaption(trigger.title, media.title));
+  return mediaCaption(caption, mediaCaption(explicit, description));
+}
+
 function initializeMedia() {
   pageController?.abort();
   videoObserver?.disconnect();
@@ -157,13 +164,15 @@ function initializeMedia() {
     if (imageButton) {
       const image = imageButton.querySelector<HTMLImageElement>('img');
       if (!image) return;
-      const caption = image.dataset.zoomCaption || image.closest('figure')?.querySelector('figcaption')?.textContent || '';
+      const caption = zoomCaption(image, image.alt);
       openLightbox(imageButton, image.dataset.zoomSrc || image.dataset.fullSrc || image.currentSrc || image.src, 'image', image.alt, caption);
       return;
     }
     const videoButton = event.target.closest<HTMLButtonElement>('[data-zoom-video]');
     if (videoButton?.dataset.zoomVideo) {
-      openLightbox(videoButton, videoButton.dataset.zoomVideo, 'video', videoButton.dataset.zoomAlt || '', videoButton.dataset.zoomCaption || '', videoButton.dataset.zoomPoster || '');
+      const video = videoButton.closest('figure')?.querySelector('video');
+      const alt = mediaCaption(videoButton.dataset.zoomAlt, video?.getAttribute('aria-label') ?? '');
+      openLightbox(videoButton, videoButton.dataset.zoomVideo, 'video', alt, zoomCaption(video ?? videoButton, alt, videoButton), videoButton.dataset.zoomPoster || '');
     }
   }, { signal });
 

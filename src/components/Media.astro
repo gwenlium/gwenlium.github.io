@@ -1,11 +1,13 @@
 ---
 import manifest from '../generated/media.json';
 import registry from '../content/media-previews.json';
+import { mediaCaption } from '../lib/embed.mjs';
 
 interface Props {
   src: string;
   alt?: string;
   caption?: string;
+  showCaption?: boolean;
   type?: 'image' | 'video' | 'audio';
   poster?: string;
   eager?: boolean;
@@ -31,8 +33,10 @@ interface ImageRecord {
   still?: boolean;
 }
 
-const { src, alt = '', caption = '', type = 'image', poster = '', eager = false, loop = false, muted = false, still = false } = Astro.props;
+const { src, alt = '', caption = '', showCaption = true, type = 'image', poster = '', eager = false, loop = false, muted = false, still = false } = Astro.props;
 const { editFile, editField, editAltField, editCaptionField, editLabel = 'Image' } = Astro.props;
+const visibleCaption = mediaCaption(caption, alt);
+const captionField = caption.trim() ? editCaptionField : editAltField;
 let sourceKey = src;
 try { sourceKey = decodeURIComponent(new URL(src, Astro.site || 'https://gwenlium.dev').pathname); }
 catch { /* Keep malformed escape sequences as authored. */ }
@@ -72,7 +76,7 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
           draggable="false"
           data-zoom
           data-full-src={image?.src || src}
-          data-zoom-caption={caption}
+          data-zoom-caption={visibleCaption}
         />
       </picture>
     ) : animated ? (
@@ -101,7 +105,7 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
           type="button"
           class="media-expand button-secondary"
           data-zoom-video={src}
-          data-zoom-caption={caption}
+          data-zoom-caption={visibleCaption}
           data-zoom-alt={alt}
           data-zoom-poster={videoPoster}
           aria-haspopup="dialog"
@@ -113,7 +117,7 @@ const sizes = Astro.props.sizes || '(max-width: 720px) 100vw, (max-width: 1400px
         Your browser does not support audio. <a href={src}>Download the audio</a>.
       </audio>
     )}
-    {caption && <figcaption data-site-edit-file={editFile} data-site-edit-field={editCaptionField} data-site-edit-format={editFile && editCaptionField ? 'text' : undefined} data-site-edit-label={editFile && editCaptionField ? 'Media description' : undefined}>{caption}</figcaption>}
+    {showCaption && visibleCaption && <figcaption data-site-edit-file={editFile} data-site-edit-field={captionField} data-site-edit-format={editFile && captionField ? 'text' : undefined} data-site-edit-label={editFile && captionField ? 'Media description' : undefined}>{visibleCaption}</figcaption>}
   </figure>
 )}
 

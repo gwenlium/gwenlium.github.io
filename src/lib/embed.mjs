@@ -27,3 +27,8 @@ export function videoEmbed(value, base = 'https://gwenlium.dev') {
 export function mediaKindOf(src) {
   return /\.mp4(?:[?#]|$)/i.test(src) ? 'video' : /\.mp3(?:[?#]|$)/i.test(src) ? 'audio' : 'image';
 }
+
+/** A written caption takes precedence; otherwise show the saved media description. */
+export function mediaCaption(caption = '', description = '') {
+  return caption.trim() || description.trim();
+}
