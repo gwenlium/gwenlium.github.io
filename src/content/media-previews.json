@@ -164,6 +164,34 @@
       "width": 1600,
       "height": 1173
     },
+    "/media/pxl-20260927-001049065-1-preview-31228a8365df0a0bf0b7eb2195528689.mp4": {
+      "sha256": "31228a8365df0a0bf0b7eb2195528689412265cca54d9aff74ced0e4141c6bc2",
+      "kind": "video",
+      "width": 1280,
+      "height": 2274,
+      "duration": 21.966667,
+      "poster": "/media/pxl-20260927-001049065-1-still-preview-1cd2734fd9bf9adc77c29063da6d4ced.webp"
+    },
+    "/media/pxl-20260927-001049065-1-still-preview-1cd2734fd9bf9adc77c29063da6d4ced.webp": {
+      "sha256": "1cd2734fd9bf9adc77c29063da6d4cede2440c1fad762671b9123965942c6abb",
+      "kind": "image",
+      "width": 1280,
+      "height": 2274
+    },
+    "/media/riff2-1-preview-9633c3cab905532bd0044bcb767f8de5.mp4": {
+      "sha256": "9633c3cab905532bd0044bcb767f8de5a10dadd597fba5015f08458437be7d62",
+      "kind": "video",
+      "width": 1280,
+      "height": 2274,
+      "duration": 43.797,
+      "poster": "/media/riff2-1-still-preview-822e571c4f326bb7c7750a6ac83334ba.webp"
+    },
+    "/media/riff2-1-still-preview-822e571c4f326bb7c7750a6ac83334ba.webp": {
+      "sha256": "822e571c4f326bb7c7750a6ac83334bae10850002d2c6194b7c571146a4966e9",
+      "kind": "image",
+      "width": 1280,
+      "height": 2274
+    },
     "/media/ui-close-preview-118db8c6fb2f8447298b044e352b6186.mp3": {
       "sha256": "aa1a959af9188513d6904404ae3f9bb95a5d62fdea2746957bf8c714434b3765",
       "kind": "audio",
@@ -188,6 +216,20 @@
       "sha256": "85b19ee6c086c84aeb1025d132d675461f47b6d5640b4834f404e820b6c03bfc",
       "kind": "audio",
       "duration": 0.053311
+    },
+    "/media/vid-20260920-232403-102-1-preview-c65bb669590b1f7502b15faa965b1b95.mp4": {
+      "sha256": "c65bb669590b1f7502b15faa965b1b9563458dad55b408442d9deb4843a17c99",
+      "kind": "video",
+      "width": 720,
+      "height": 1280,
+      "duration": 14.792041,
+      "poster": "/media/vid-20260920-232403-102-1-still-preview-5e70c509a2e67966245020ddba4c0563.webp"
+    },
+    "/media/vid-20260920-232403-102-1-still-preview-5e70c509a2e67966245020ddba4c0563.webp": {
+      "sha256": "5e70c509a2e67966245020ddba4c0563ac11347225ec44b1646aadb7b9a7eb01",
+      "kind": "image",
+      "width": 720,
+      "height": 1280
     },
     "/media/weapon1-preview-b9412a994186d81d3419793f76d7cba5.webp": {
       "sha256": "b9412a994186d81d3419793f76d7cba5e90d30d65d535080811c80b438b2a028",
