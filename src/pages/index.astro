@@ -6,7 +6,7 @@ import Icon from '../components/Icon.astro';
 import Media from '../components/Media.astro';
 import PostCard from '../components/PostCard.astro';
 import EntryArchive from '../components/EntryArchive.astro';
-import { site, gallery, tracks } from '../lib/settings';
+import { site, tracks } from '../lib/settings';
 import { getPosts, postUrl, postSourceFile, formatDate } from '../lib/content';
 import { getWindowDefinition, hasWindowOverride } from '../lib/windows';
 import { entrySectionInfo, resolveEntrySection } from '../lib/entry-sections.mjs';
@@ -17,7 +17,7 @@ const featuredPost = posts.find((post) => post.data.permalink === site.featuredP
   ?? posts.find((post) => post.data.featured)
   ?? posts[0];
 const recentPosts = posts.filter((post) => post.id !== featuredPost?.id).slice(0, 3);
-const galleryPreview = gallery.filter((item) => item.src).slice(0, 3);
+const galleryPreview = posts.filter((post) => resolveEntrySection(post.data.section) === 'gallery').slice(0, 3);
 const musicPreview = tracks.filter((track) => track.src).slice(0, 3);
 const game = site.game;
 const hasGame = Boolean(game.title || game.description || game.cover || game.trailerUrl || game.status || game.links.length);
@@ -91,12 +91,7 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
       <Window windowId="home-gallery" class="home-gallery">
         <div class="section-heading"><h2><Icon name="image" size={20} />Gallery</h2><a href="/gallery/">Browse gallery <Icon name="arrow" size={14} /></a></div>
         <div class="gallery-preview">
-          {galleryPreview.map((item) => (
-            <div class="gallery-preview__item">
-              {item.title && <h3><a href={`/gallery/#work-${item.id}`} data-site-edit-file="src/content/gallery.json" data-site-edit-field={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/title`} data-site-edit-format="text" data-site-edit-label="Gallery title">{item.title}</a></h3>}
-              <Media src={item.src} type={item.type} alt={item.alt} caption={item.caption} poster={item.poster} sizes="(min-width: 1000px) 480px, (max-width: 640px) 90vw, 600px" editFile="src/content/gallery.json" editField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/src`} editAltField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/alt`} editCaptionField={`/items/@${item.id.replaceAll('~', '~0').replaceAll('/', '~1')}/caption`} />
-            </div>
-          ))}
+          {galleryPreview.map((post) => <PostCard post={post} compact />)}
         </div>
       </Window>
       </div>
@@ -166,10 +161,6 @@ const hasGame = Boolean(game.title || game.description || game.cover || game.tra
   .section-heading h2 { display: flex; align-items: center; gap: .65rem; font-size: 1.25rem; margin: 0; }
   .section-heading > a { display: inline-flex; align-items: center; gap: .5rem; font-size: .65rem; }
   .gallery-preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1rem; }
-  .gallery-preview__item { min-width: 0; }
-  .gallery-preview__item :global(figure) { margin: 0; }
-  .gallery-preview__item :global(img), .gallery-preview__item :global(video) { width: 100%; height: auto; max-height: 320px; object-fit: contain; background: var(--page-bg); }
-  .gallery-preview__item h3 { margin: 0 0 .65rem; font-size: .8rem; line-height: 1.55; }
   .music-preview { list-style: none; padding: 0; margin: 0; }
   .music-preview li + li { border-top: 1px solid color-mix(in srgb, var(--line) 35%, transparent); }
   .music-preview button { display: flex; align-items: center; gap: .9rem; width: 100%; min-width: 0; padding: .65rem .4rem; border: 0; background: transparent; text-align: left; }

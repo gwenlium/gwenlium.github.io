@@ -1,13 +1,3 @@
 {
-  "items": [
-    {
-      "type": "image",
-      "caption": "A drawing made from my closest friend\nhttps://www.instagram.com/viruscat_/",
-      "poster": "",
-      "id": "1",
-      "title": "Portrait of me",
-      "src": "/media/gwendolyn-drawing-preview-34802e58d25184674929d847caa7e270.webp",
-      "alt": "A drawing made from my closest friend"
-    }
-  ]
+  "items": []
 }
