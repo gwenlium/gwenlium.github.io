@@ -27,6 +27,6 @@ media:
     alt: ""
     caption: ""
 ---
-I herewith share some musical experiments. I tend to do that wen I want to find something that fits into the language of Proto:ReCompute. Here I experimented while freestyling, which I have been doing for the past 10 years or so (with a total of 15 years of experience).
+I herewith share some musical experiments. I tend to do that when I want to find something that fits into the language of Proto:ReCompute. Here I experimented while freestyling, which I have been doing for the past 10 years or so (with a total of 15 years of experience).
 
 When I sit at the piano and just 'shut off', my emotions drive my hands onto the keys and just...play. I love when I lose myself when playing this beautiful instrument. Do you remember the time when the internet was new and mysterious? Another world entirely? This is exactly what I feel when making music. It's a dreamy space that you can safely doze off to.
