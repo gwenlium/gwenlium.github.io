@@ -307,6 +307,20 @@
       "width": 720,
       "height": 1280
     },
+    "/media/vid-20261022-125811-464-preview-2840cb7ab4dc7998983955a329c32215.mp4": {
+      "sha256": "2840cb7ab4dc7998983955a329c322153c9bf482b8e932d6f0856d965f00827e",
+      "kind": "video",
+      "width": 642,
+      "height": 1144,
+      "duration": 60.061,
+      "poster": "/media/vid-20261022-125811-464-still-preview-8bdd68e5eaecee3e1ad53e6925bfb4ac.webp"
+    },
+    "/media/vid-20261022-125811-464-still-preview-8bdd68e5eaecee3e1ad53e6925bfb4ac.webp": {
+      "sha256": "8bdd68e5eaecee3e1ad53e6925bfb4ac0761bbc89b88b48bb3a37c16525b1a5d",
+      "kind": "image",
+      "width": 642,
+      "height": 1144
+    },
     "/media/weapon1-preview-b9412a994186d81d3419793f76d7cba5.webp": {
       "sha256": "b9412a994186d81d3419793f76d7cba5e90d30d65d535080811c80b438b2a028",
       "kind": "image",
