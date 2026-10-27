@@ -12,7 +12,16 @@ export function brevoFormUrl(value) {
     const url = new URL(value);
     if (url.protocol !== 'https:' || url.username || url.password || url.port ||
         !/^(?:[a-z0-9-]+\.)?sibforms\.com$/.test(url.hostname) ||
-        !/^\/serve\/[A-Za-z0-9_-]+$/.test(url.pathname) || url.search || url.hash) throw new Error();
+        !/^\/(?:v2\/)?serve\/[A-Za-z0-9_-]+={0,2}$/.test(url.pathname) || url.search || url.hash) throw new Error();
     return url.href;
   } catch { throw new Error(newsletterUrlError); }
+}
+
+/** Brevo supplies a distinct embeddable version of its public signup page. @param {unknown} value */
+export function brevoEmbedUrl(value) {
+  const form = brevoFormUrl(value);
+  if (!form) return '';
+  const url = new URL(form);
+  url.pathname = url.pathname.replace(/^\/(?:v2\/)?serve\//, '/v2/serve/');
+  return url.href;
 }

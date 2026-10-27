@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { load } from 'cheerio';
 import { inlineScripts } from './apply-csp.mjs';
 import { entryUrl, resolveEntrySection } from '../src/lib/entry-sections.mjs';
-import { brevoFormUrl } from '../src/lib/newsletter.mjs';
+import { brevoEmbedUrl } from '../src/lib/newsletter.mjs';
 import {
   containedFile, isPublishedPost, mediaFilePattern, previewReferenceIssue, publicBranding, readMediaPreviews,
   readPosts, resolvePublicUrl, siteOrigin, srcsetUrls, validatePreviewFiles, walkFiles,
@@ -67,7 +67,7 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
   const files = walkFiles(directory);
   const previews = readMediaPreviews(root, report);
   let newsletterUrl = '';
-  try { newsletterUrl = brevoFormUrl(JSON.parse(fs.readFileSync(path.join(root, 'src/content/site.json'), 'utf8')).newsletterUrl); }
+  try { newsletterUrl = brevoEmbedUrl(JSON.parse(fs.readFileSync(path.join(root, 'src/content/site.json'), 'utf8')).newsletterUrl); }
   catch { report('src/content/site.json', 'newsletterUrl', 'Configure a valid public Brevo form URL.'); }
   validatePreviewFiles(root, directory, previews, report);
   const derivatives = readDerivativePaths(root, previews, report);

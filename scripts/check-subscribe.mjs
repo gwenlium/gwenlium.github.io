@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { load } from 'cheerio';
-import { brevoFormUrl } from '../src/lib/newsletter.mjs';
+import { brevoFormUrl, brevoEmbedUrl } from '../src/lib/newsletter.mjs';
 import { policy } from './apply-csp.mjs';
 
 const exampleForm = 'https://newsletter-check.sibforms.com/serve/MUIF-test-form';
 assert.equal(brevoFormUrl(exampleForm), exampleForm);
+assert.equal(brevoFormUrl(`${exampleForm}==`), `${exampleForm}==`);
+assert.equal(brevoEmbedUrl(`${exampleForm}==`), exampleForm.replace('/serve/', '/v2/serve/') + '==');
+assert.equal(brevoEmbedUrl(brevoEmbedUrl(exampleForm)), brevoEmbedUrl(exampleForm));
 assert.equal(brevoFormUrl(''), '');
 assert.equal(brevoFormUrl(undefined), '');
 for (const value of [
@@ -35,7 +38,7 @@ if (url) {
   if (emailWindow?.enabled && emailWindow.content === 'default') assert(frames.length > 0);
   for (const element of frames.toArray()) {
     const frame = $(element);
-    assert.equal(frame.attr('src'), url);
+    assert.equal(frame.attr('src'), brevoEmbedUrl(url));
     assert(frame.attr('title'));
     assert.equal(frame.attr('loading'), 'lazy');
     assert.equal(frame.attr('referrerpolicy'), 'no-referrer');
