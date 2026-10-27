@@ -78,6 +78,7 @@ const videoExtensions = new Set(['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi', 'ogv
 const imageMetadata = new WeakMap<File, Raster>();
 
 class PreviewError extends Error {}
+class CanvasEncodingError extends PreviewError {}
 
 function fail(message: string): never {
   throw new PreviewError(message);
@@ -333,10 +334,37 @@ function encodeCanvas(element: HTMLCanvasElement, type: string, signal?: AbortSi
   checkAbort(signal);
   const { promise, resolve, reject } = Promise.withResolvers<Blob>();
   element.toBlob((blob) => {
-    if (!blob || blob.type !== type) reject(new PreviewError(`This browser cannot encode ${type === 'image/webp' ? 'WebP' : 'PNG'} previews.`));
+    if (!blob || blob.type !== type) reject(new CanvasEncodingError(`This browser cannot encode ${type === 'image/webp' ? 'WebP' : 'PNG'} previews.`));
     else resolve(blob);
   }, type, type === 'image/webp' ? 0.78 : undefined);
   return abortable(promise, signal);
+}
+
+/** Safari can display WebP but canvas falls back to PNG when asked to encode it. */
+async function encodeWebp(element: HTMLCanvasElement, options: Settings, transcoder?: FFmpeg): Promise<Blob> {
+  let encoded: Uint8Array<ArrayBuffer>;
+  try {
+    encoded = new Uint8Array(await bytes(await encodeCanvas(element, 'image/webp', options.signal), options.signal));
+  } catch (error) {
+    checkAbort(options.signal);
+    if (!(error instanceof CanvasEncodingError)) throw error;
+    // Export only the resized, watermarked canvas. The original never enters the converter.
+    const png = new Uint8Array(await bytes(await encodeCanvas(element, 'image/png', options.signal), options.signal));
+    const convert = async (ffmpeg: FFmpeg) => {
+      try {
+        await ffmpeg.writeFile('canvas.png', png);
+        await execute(ffmpeg, [...input('canvas.png', 'png_pipe'), '-frames:v', '1', '-an', '-sn', '-dn',
+          ...stripMetadata, '-c:v', 'libwebp', '-quality', '78', '-compression_level', '4', '-f', 'webp', 'canvas.webp']);
+        return await binary(ffmpeg, 'canvas.webp');
+      } finally {
+        await Promise.allSettled(['canvas.png', 'canvas.webp'].map(name => ffmpeg.deleteFile(name)));
+      }
+    };
+    // Video/animation posters reuse their current worker rather than loading another WASM heap.
+    encoded = transcoder ? await convert(transcoder) : await withTranscoder(options, convert);
+  }
+  checkAbort(options.signal);
+  return new Blob([stripWebpMetadata(encoded)], { type: 'image/webp' });
 }
 
 function stripWebpMetadata(data: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
@@ -469,8 +497,7 @@ async function still(blob: Blob, options: Settings, source: Dimensions): Promise
     surface.context.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, size.width, size.height);
     mark = await watermark(options.creator, size);
     surface.context.drawImage(mark, size.width - mark.width, size.height - mark.height);
-    const encoded = await encodeCanvas(surface.element, 'image/webp', options.signal);
-    const output = new Blob([stripWebpMetadata(new Uint8Array(await bytes(encoded, options.signal)))], { type: 'image/webp' });
+    const output = await encodeWebp(surface.element, options);
     const verified = await decodeBitmap(output, options.signal);
     try {
       if (verified.width !== size.width || verified.height !== size.height) fail('The generated image has unexpected dimensions. Nothing was prepared.');
@@ -813,7 +840,7 @@ async function videoStill(ffmpeg: FFmpeg, duration: number, size: Dimensions, op
       if (!frame.length) continue;
       const bitmap = await decodeBitmap(new Blob([frame], { type: 'image/png' }), options.signal);
       try { surface.context.drawImage(bitmap, 0, 0, surface.element.width, surface.element.height); } finally { bitmap.close(); }
-      const still = new Blob([stripWebpMetadata(new Uint8Array(await bytes(await encodeCanvas(surface.element, 'image/webp', options.signal), options.signal)))], { type: 'image/webp' });
+      const still = await encodeWebp(surface.element, options, ffmpeg);
       first ??= still;
       if (!nearlyBlank(surface.element)) return still;
     }
@@ -883,7 +910,7 @@ async function animation(data: ArrayBuffer, raster: Raster, options: Settings): 
           // The still that lists and link previews show: the first frame with something on it
           // (clips often open on a blank or faded frame), else the very first one.
           if (!poster) {
-            const still = async () => new Blob([stripWebpMetadata(new Uint8Array(await bytes(await encodeCanvas(surface.element, 'image/webp', options.signal), options.signal)))], { type: 'image/webp' });
+            const still = () => encodeWebp(surface.element, options, ffmpeg);
             if (position === 0) firstStill = await still();
             if (!nearlyBlank(surface.element)) poster = position === 0 ? firstStill : await still();
           }
