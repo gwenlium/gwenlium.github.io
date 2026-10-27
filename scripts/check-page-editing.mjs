@@ -41,7 +41,7 @@ try {
   originals.set(windowsFile, windowsRaw);
   const windows = JSON.parse(windowsRaw);
   for (const window of windows.windows) {
-    if (['home-intro', 'about-bio', 'post-entry', 'post-media', 'subscribe-rss', 'not-found'].includes(window.id)
+    if (['home-intro', 'about-bio', 'post-entry', 'post-media', 'subscribe-rss', 'subscribe-email', 'not-found'].includes(window.id)
       || entrySectionIds.some(section => window.id === `${section}-entries` || window.id === `${section}-search`)) {
       window.enabled = true;
       window.content = 'default';
@@ -52,7 +52,10 @@ try {
     const raw = fs.readFileSync(page.file, 'utf8');
     originals.set(page.file, raw);
     const data = JSON.parse(raw);
-    if (page.name === 'site') data.intro = 'CMS home introduction';
+    if (page.name === 'site') {
+      data.intro = 'CMS home introduction';
+      data.newsletterUrl = 'https://newsletter-check.sibforms.com/serve/MUIF-test-form';
+    }
     else {
       data.title = `CMS ${page.name} heading`;
       data.eyebrow = `CMS ${page.name} eyebrow`;
@@ -95,6 +98,7 @@ try {
   // Node cannot execute Windows' npm.cmd directly; reuse the invoking npm CLI.
   const npmCli = process.env.npm_execpath;
   execFileSync(npmCli ? process.execPath : 'npm', npmCli ? [npmCli, 'run', 'build'] : ['run', 'build'], { stdio: 'pipe' });
+  execFileSync(process.execPath, ['scripts/check-subscribe.mjs'], { stdio: 'pipe' });
   if (photo) {
     const post = load(fs.readFileSync(`dist/devlog/${fixtureSlug}/index.html`, 'utf8'));
     assert.equal(post('#post-media img').length, 2);

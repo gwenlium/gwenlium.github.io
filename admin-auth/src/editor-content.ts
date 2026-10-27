@@ -5,6 +5,7 @@ import { builtinWindowPages, systemWindowIds, windowContents, windowPages, windo
 import { isEntrySection, resolveEntrySection, type EntrySection } from '../../src/lib/entry-sections.mjs';
 import type { EditorMediaEntry, EditorPublishRequest } from '../../src/lib/editor-types';
 import { normalizeWatermarkCredit, watermarkCreditError } from '../../src/lib/watermark.mjs';
+import { brevoFormUrl, newsletterUrlError } from '../../src/lib/newsletter.mjs';
 
 export const registryPath = 'src/content/media-previews.json';
 export const maxTextBytes = 1024 * 1024;
@@ -148,7 +149,7 @@ export function validateContent(files: Map<string, string>, previews: Record<str
     const trailers = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtube-nocookie.com', 'youtube-nocookie.com', 'vimeo.com', 'www.vimeo.com', 'player.vimeo.com'];
     if (trailer && parsed.protocol === 'https:' && trailers.includes(parsed.hostname)) return;
     requireValue(parsed.origin === siteOrigin && !parsed.search && !parsed.hash && !/%/.test(parsed.pathname), 'Use a registered local media preview.');
-    const branding = ['/avatar.webp', '/favicon.png', '/social-card.png', '/followit-logo.svg'];
+    const branding = ['/avatar.webp', '/favicon.png', '/social-card.png'];
     if (branding.includes(parsed.pathname)) {
       requireValue((!kind || kind === 'image' || kind === 'media') && exists(`public${parsed.pathname}`), 'Missing public branding image.'); return;
     }
@@ -231,12 +232,9 @@ export function validateContent(files: Map<string, string>, previews: Record<str
         try { normalizeWatermarkCredit(value.watermarkText) || normalizeWatermarkCredit(`© ${(value.name as string).trim()}`); }
         catch { throw new EditorError(watermarkCreditError); }
         requireValue(value.maintenanceEnabled === undefined || typeof value.maintenanceEnabled === 'boolean', 'Maintenance enabled must be a boolean.');
-        url(value.githubUrl); url(value.newsletterUrl);
-        if (text(value.newsletterUrl)) {
-          const newsletter = new URL(value.newsletterUrl);
-          requireValue(newsletter.protocol === 'https:' && !newsletter.username && !newsletter.password && !/(^|\.)(example\.(com|net|org)|example|localhost|invalid|test)$/.test(newsletter.hostname), 'Use a real absolute HTTPS newsletter subscription URL.');
-        }
-        if (text(value.newsletterFormAction)) { const action = new URL(value.newsletterFormAction); requireValue(action.protocol === 'https:' && action.hostname === 'api.follow.it' && action.pathname.startsWith('/subscription-form/') && !action.username && !action.password, 'Unsupported newsletter form endpoint.'); text(value.newsletterButtonLabel, true); }
+        url(value.githubUrl);
+        try { brevoFormUrl(value.newsletterUrl); }
+        catch { throw new EditorError(newsletterUrlError); }
         if (text(value.featuredPost)) requireValue(posts.get(value.featuredPost)?.published, 'Featured post must be published.');
         if (value.game !== undefined) { const game = object(value.game); keys(game, ['title', 'description', 'status', 'cover', 'coverAlt', 'trailerUrl', 'links']); for (const key of ['title', 'description', 'status']) text(game[key]); image(game.cover, game.coverAlt); url(game.trailerUrl, 'video', false, true); links(game.links); }
       } else if (path.startsWith('src/content/pages/')) {

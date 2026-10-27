@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { brevoFormUrl } from '../src/lib/newsletter.mjs';
 
 /**
  * One Content-Security-Policy for every built page. GitHub Pages cannot send headers, so it is a
@@ -32,7 +33,9 @@ export function inlineScripts(html) {
   return scripts;
 }
 
-export function policy(hashes) {
+export function policy(hashes, newsletterUrl = '') {
+  const formUrl = brevoFormUrl(newsletterUrl);
+  const formOrigin = formUrl ? ` ${new URL(formUrl).origin}` : '';
   return [
     "default-src 'self'",
     // ffmpeg.wasm prepares video and audio in the editor; 'wasm-unsafe-eval' allows WebAssembly only, not JS eval.
@@ -44,12 +47,11 @@ export function policy(hashes) {
     "font-src 'self'",
     // api.github.com: the owner's browser uploads prepared media there directly when publishing.
     "connect-src 'self' https://gwenlium-cms-auth.gwenlium.workers.dev https://api.github.com https://cloudflareinsights.com",
-    'frame-src https://www.youtube-nocookie.com https://player.vimeo.com',
+    `frame-src https://www.youtube-nocookie.com https://player.vimeo.com${formOrigin}`,
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
-    // follow.it receives the provider's POST redirects, including confirmation and validation errors.
-    "form-action 'self' https://api.follow.it https://follow.it",
+    "form-action 'self'",
   ].join('; ');
 }
 
@@ -60,7 +62,8 @@ export async function applyCsp(directory) {
   for (const { html } of pages) {
     for (const script of inlineScripts(html)) hashes.add(`sha256-${createHash('sha256').update(script, 'utf8').digest('base64')}`);
   }
-  const meta = `<meta http-equiv="Content-Security-Policy" content="${policy(hashes).replace(/"/g, '&quot;')}">`;
+  const site = JSON.parse(await fs.readFile(path.join(root, 'src/content/site.json'), 'utf8'));
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${policy(hashes, site.newsletterUrl).replace(/"/g, '&quot;')}">`;
   for (const page of pages) {
     if (page.html.includes('http-equiv="Content-Security-Policy"')) throw new Error(`${path.relative(directory, page.file)} already has a Content-Security-Policy.`);
     // Right after the charset (or the doctype on Astro's bare redirect pages): before the first script it governs.

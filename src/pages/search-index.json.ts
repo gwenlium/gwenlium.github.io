@@ -147,7 +147,7 @@ export async function GET(): Promise<Response> {
     return route ? `${route}#${encodeURIComponent(definition.id)}` : undefined;
   }
 
-  const subscribeText = site.newsletterFormAction ? text(site.newsletterHeading, site.newsletterButtonLabel) : '';
+  const subscribeText = site.newsletterUrl ? text(site.newsletterHeading, 'Email updates from across the website. Subscribe by email.') : '';
   function defaultWindowText(id: string): string {
     const section = archiveSection(id);
     if (section && id === `${section}-entries`) return text(...(postsBySection[section] ?? []).map(postCardText));

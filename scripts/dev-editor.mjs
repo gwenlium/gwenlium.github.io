@@ -158,7 +158,7 @@ export default function devEditor() {
               const uploads = new Set(payload.media.map(upload => upload.path));
               const exists = async candidate => uploads.has(candidate) || (!deletions.has(candidate) && await fs.access(path.join(root, candidate)).then(() => true, () => false));
               const known = new Set();
-              for (const candidate of [...Object.keys(previews).map(url => `public${url}`), 'public/avatar.webp', 'public/favicon.png', 'public/social-card.png', 'public/followit-logo.svg']) {
+              for (const candidate of [...Object.keys(previews).map(url => `public${url}`), 'public/avatar.webp', 'public/favicon.png', 'public/social-card.png']) {
                 if (await exists(candidate)) known.add(candidate);
               }
               content.validateContent(files, previews, candidate => known.has(candidate), siteOrigin);

@@ -362,6 +362,9 @@ test('editor preflights disallowed paths, duplicates, broken content and malform
     { changes: [{ ...source, content: '{"name":"After","newsletterUrl":"/subscribe"}' }] },
     { changes: [{ ...source, content: '{"name":"After","newsletterUrl":"http://follow.it/website"}' }] },
     { changes: [{ ...source, content: '{"name":"After","newsletterUrl":"https://example.com/subscribe"}' }] },
+    { changes: [{ ...source, content: '{"name":"After","newsletterUrl":"https://newsletter.sibforms.com.attacker.test/serve/MUIF-form"}' }] },
+    { changes: [{ ...source, content: '{"name":"After","newsletterUrl":"https://newsletter.sibforms.com/forms/end-form/build/main.js"}' }] },
+    { changes: [{ ...source, content: '{"name":"After","newsletterUrl":"https://name:password@newsletter.sibforms.com/serve/MUIF-form"}' }] },
     { changes: [{ path: 'src/content/posts/new.md', content: '---\ntitle: Bad\ndraft: false\npermalink: invalid\ndate: 2026-02-30\n---\nText' }] },
     { changes: [{ path: 'src/content/posts/new.md', content: '---\ntitle: Bad section\nsection: [devlog]\n---\nText' }] },
     { changes: [{ path: 'src/content/gallery.json', content: JSON.stringify({ items: [{ id: 'bad-type', title: 'Bad type', type: ['image'], alt: 'Image', src: previousPreviewPath }] }) }] },
@@ -378,6 +381,18 @@ test('editor preflights disallowed paths, duplicates, broken content and malform
     assert.equal(response.status, 400, JSON.stringify(body));
   }
   assert.deepEqual(fixture.writes, []); assert.equal(fixture.head, editorHead);
+});
+
+test('editor publishes a Brevo form URL and allows email signup to be disabled', async t => {
+  for (const newsletterUrl of ['https://newsletter-check.sibforms.com/serve/MUIF-test-form', '']) {
+    const fixture = editorFixture(); const worker = runtime(fixture.handler); t.after(() => worker.dispose());
+    const response = await worker.dispatchFetch('https://auth.test/editor/publish', {
+      method: 'POST', headers: publishHeaders,
+      body: publishBody({ changes: [{ path: 'src/content/site.json', content: JSON.stringify({ name: 'After', newsletterUrl }) }] }),
+    });
+    assert.equal(response.status, 200, await response.clone().text());
+    assert(fixture.writes.some(write => write.path.endsWith('/git/commits')));
+  }
 });
 
 test('editor publishes rich entries in every destination and keeps omitted sections in Devlog selections', async t => {

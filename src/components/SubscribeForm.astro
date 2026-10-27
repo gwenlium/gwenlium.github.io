@@ -1,43 +1,34 @@
 ---
 import { site } from '../lib/settings';
+import { brevoFormUrl } from '../lib/newsletter.mjs';
 
 interface Props { idPrefix: string }
-const emailId = `${Astro.props.idPrefix}-email`;
-
-let action = '';
-if (site.newsletterFormAction) {
-  const endpoint = new URL(site.newsletterFormAction);
-  if (endpoint.protocol !== 'https:' || endpoint.hostname !== 'api.follow.it' || !endpoint.pathname.startsWith('/subscription-form/') || endpoint.username || endpoint.password) {
-    throw new Error('The newsletter form must use the HTTPS subscription-form endpoint supplied by follow.it.');
-  }
-  action = endpoint.href;
-}
+const helpId = `${Astro.props.idPrefix}-help`;
+const url = brevoFormUrl(site.newsletterUrl);
 ---
 
-{action ? (
-  <form class="newsletter-form" action={action} method="post" data-astro-reload data-followit-form>
-    {site.newsletterHeading && <h2>{site.newsletterHeading}</h2>}
-    <label for={emailId}>Email address</label>
-    <input id={emailId} type="email" name="email" required placeholder="Enter your email" autocomplete="email" spellcheck="false" aria-describedby={`${emailId}-help ${emailId}-status`} />
-    <button class="button" type="submit">{site.newsletterButtonLabel}</button>
-    <p id={`${emailId}-help`}>You’ll continue on follow.it to finish signup. Then confirm your subscription using the email they send.</p>
-    <p id={`${emailId}-status`} role="status" aria-live="polite" aria-atomic="true" data-followit-status></p>
-  </form>
-) : <p>Email signup is currently unavailable.</p>}
-{site.newsletterUrl && <p class="signup-alternative"><a href={site.newsletterUrl} data-astro-reload>Sign up directly on follow.it</a></p>}
-
-<script>
-  import '../scripts/subscribe';
-</script>
+<div class="newsletter" data-newsletter>
+  {site.newsletterHeading && <h2>{site.newsletterHeading}</h2>}
+  {url ? <>
+    <p id={helpId}>Email updates from across the website. Sign up below, then check your inbox to confirm your subscription. You can unsubscribe at any time.</p>
+    <iframe
+      class="newsletter-form"
+      src={url}
+      title="Subscribe to Gwenlium email updates"
+      aria-describedby={helpId}
+      loading="lazy"
+      referrerpolicy="no-referrer"
+      data-brevo-form
+    ></iframe>
+    <p class="signup-alternative">Form not loading? <a href={url} data-astro-reload>Open email signup directly</a></p>
+    <p class="provider">Email subscriptions are managed by Brevo.</p>
+  </> : <p>Email signup is currently unavailable. You can still follow every published entry using the <a href="/rss.xml" data-astro-reload>RSS feed</a>.</p>}
+</div>
 
 <style>
-  .newsletter-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(.65rem, 2.5cqi, .8rem); min-width: 0; overflow-wrap: anywhere; }
+  .newsletter { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; min-width: 0; overflow-wrap: anywhere; }
   h2 { margin: 0 0 .5rem; font-size: clamp(1.05rem, .85rem + 1.5cqi, 1.4rem); line-height: 1.5; }
-  label { font-size: .75rem; }
-  input { width: 100%; min-height: 44px; font-family: var(--font-reading); font-size: 1rem; }
-  button { width: 100%; min-width: 0; min-height: 44px; }
-  p { margin: .3rem 0 0; color: var(--muted); font-family: var(--font-reading); font-size: .8rem; line-height: 1.65; }
-  [data-followit-status]:empty { display: none; }
-  [data-followit-status] { color: var(--ink); }
-  .signup-alternative { margin-top: .8rem; }
+  .newsletter-form { display: block; width: 100%; height: 640px; border: 0; background: transparent; }
+  p { margin: 0; color: var(--muted); font-family: var(--font-reading); font-size: .8rem; line-height: 1.65; }
+  .provider { font-size: .7rem; }
 </style>

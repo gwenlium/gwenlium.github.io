@@ -145,9 +145,7 @@ export async function openSiteSettings(store: SiteEditorStore, onSaved: () => Pr
   const intro = textField('Home page introduction', text('intro'), { multiline: true, hint: 'Empty shows the site description instead.' });
   const featured = selectField('Featured on the home page', text('featuredPost'), [['', 'Automatic: an entry marked “Feature”, otherwise the newest'], ...entries.map(entry => [entry.permalink, entry.title || entry.permalink] as [string, string])]);
   const newsletterHeading = textField('Newsletter heading', text('newsletterHeading'));
-  const newsletterButton = textField('Newsletter button', text('newsletterButtonLabel'));
-  const newsletterUrl = textField('follow.it page', text('newsletterUrl'), { type: 'url', hint: 'Where people subscribe by email.' });
-  const newsletterAction = textField('follow.it form address', text('newsletterFormAction'), { type: 'url', hint: 'The form action from follow.it’s embed code (starts with https://api.follow.it/subscription-form/).' });
+  const newsletterUrl = textField('Brevo signup form', text('newsletterUrl'), { type: 'url', hint: 'The public form URL from Brevo → Marketing → Forms → Share (https://…sibforms.com/serve/…). Configure the form’s button text, confirmation email and messages in Brevo. Leave empty to disable email signup.' });
   const gameTitle = textField('Game title', gameText('title'));
   const gameStatus = textField('Development status', gameText('status'));
   const gameDescription = textField('Description', gameText('description'), { multiline: true });
@@ -162,7 +160,7 @@ export async function openSiteSettings(store: SiteEditorStore, onSaved: () => Pr
     node('p', draftHint, 'owner-hint'),
     section('General', name.element, description.element, statusLine.element, github.element, watermark.element),
     section('Home page', intro.element, featured.element),
-    section('Newsletter', newsletterHeading.element, newsletterButton.element, newsletterUrl.element, newsletterAction.element),
+    section('Newsletter', newsletterHeading.element, newsletterUrl.element),
     section('Game in the Devlog', gameTitle.element, gameStatus.element, gameDescription.element, gameCover.element, gameTrailer.element, gameLinks.element),
     section('Maintenance', maintenance.element, maintenanceHeading.element, maintenanceMessage.element),
   );
@@ -172,11 +170,14 @@ export async function openSiteSettings(store: SiteEditorStore, onSaved: () => Pr
     if (cover.src && !cover.alt) throw new Error('Describe the game cover.');
     const links = gameLinks.get().filter(link => link.label || link.url !== 'https://');
     if (links.some(link => !link.label || !/^https?:\/\//.test(link.url))) throw new Error('Every game link needs a label and a full web address.');
+    const current = { ...site };
+    delete current.newsletterFormAction;
+    delete current.newsletterButtonLabel;
     const next = {
-      ...site,
+      ...current,
       name: name.get().trim(), description: description.get(), status: statusLine.get(), githubUrl: github.get().trim(), watermarkText: watermark.get(),
       intro: intro.get(), featuredPost: featured.get(),
-      newsletterHeading: newsletterHeading.get(), newsletterButtonLabel: newsletterButton.get(), newsletterUrl: newsletterUrl.get().trim(), newsletterFormAction: newsletterAction.get().trim(),
+      newsletterHeading: newsletterHeading.get(), newsletterUrl: newsletterUrl.get().trim(),
       maintenanceEnabled: maintenance.get(), maintenanceHeading: maintenanceHeading.get(), maintenanceMessage: maintenanceMessage.get(),
       game: { ...game, title: gameTitle.get(), status: gameStatus.get(), description: gameDescription.get(), cover: cover.src, coverAlt: cover.alt, trailerUrl: gameTrailer.get().trim(), links },
     };

@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { load } from 'cheerio';
 import { inlineScripts } from './apply-csp.mjs';
 import { entryUrl, resolveEntrySection } from '../src/lib/entry-sections.mjs';
+import { brevoFormUrl } from '../src/lib/newsletter.mjs';
 import {
   containedFile, isPublishedPost, mediaFilePattern, previewReferenceIssue, publicBranding, readMediaPreviews,
   readPosts, resolvePublicUrl, siteOrigin, srcsetUrls, validatePreviewFiles, walkFiles,
@@ -65,6 +66,9 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
   }
   const files = walkFiles(directory);
   const previews = readMediaPreviews(root, report);
+  let newsletterUrl = '';
+  try { newsletterUrl = brevoFormUrl(JSON.parse(fs.readFileSync(path.join(root, 'src/content/site.json'), 'utf8')).newsletterUrl); }
+  catch { report('src/content/site.json', 'newsletterUrl', 'Configure a valid public Brevo form URL.'); }
   validatePreviewFiles(root, directory, previews, report);
   const derivatives = readDerivativePaths(root, previews, report);
   const generatedDirectory = path.join(directory, '_generated/media');
@@ -170,6 +174,11 @@ export function validateBuilt(root = projectRoot, directory = path.join(root, 'd
         if (attribute === 'href' && element.tagName === 'base') continue;
         const value = node.attr(attribute);
         if (value === undefined) continue;
+        if (attribute === 'src' && element.tagName === 'iframe' && node.is('[data-brevo-form]')) {
+          references++;
+          if (!newsletterUrl || value !== newsletterUrl) report(file, '<iframe>[src]', 'Embed only the configured public Brevo signup form.');
+          continue;
+        }
         check(value, file, `<${element.tagName}>[${attribute}]`, base, {
           media: ['poster', 'data', 'data-full-src'].includes(attribute) || (attribute === 'src' && ['img', 'audio', 'video', 'source', 'iframe', 'embed'].includes(element.tagName)),
           kind: attribute === 'poster' || attribute === 'data-full-src' || element.tagName === 'img' ? 'image' : ['audio', 'video'].includes(element.tagName) ? element.tagName : undefined,

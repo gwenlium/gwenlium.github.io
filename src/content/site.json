@@ -2,7 +2,6 @@
   "maintenanceEnabled": false,
   "maintenanceHeading": "A little maintenance",
   "maintenanceMessage": "I am updating the website. Please check back soon!",
-  "newsletterButtonLabel": "Subscribe!!1",
   "newsletterHeading": "Stay updated! And also hydrated :p",
   "name": "Gwenlium",
   "intro": "",
@@ -18,8 +17,7 @@
     "links": []
   },
   "status": "",
-  "newsletterFormAction": "https://api.follow.it/subscription-form/cjNVdmQyQWdHVWVhSjFZcDdEazZ5UG9TNU9zdTNsaWVvK3hJSTEyV3MvMzNhSW15eDRjUVpDbzRjMWF0SEhvL05UNmJSSENSUGJiS3BhWHRkcUVRVi91a1p5d2FpdEpyZlY1cDd3cE1FdEZBa0RUZGI2NGJ4QXoxTHpSMEx3T2d8dE1YcHh2T1NBb2tHUnJMUFpNMlFkcnBNVXptUENtWDA4dVN5K0ZvL1Vyaz0=/8",
-  "newsletterUrl": "https://follow.it/gwenlium-devlog?leanpub",
+  "newsletterUrl": "",
   "description": "Welcome to my quirky website where I share things I do in life with the world!",
   "watermarkText": "© Gwendolyn Ural Erkut\ngwenlium.dev"
 }

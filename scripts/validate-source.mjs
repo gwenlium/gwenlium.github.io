@@ -9,6 +9,7 @@ import { load } from 'cheerio';
 import { builtinWindowPages, systemWindowIds, windowContents, windowPages, windowTones } from '../src/lib/window-catalogue.mjs';
 import { entrySectionIds, entryUrl, isEntrySection, resolveEntrySection } from '../src/lib/entry-sections.mjs';
 import { normalizeWatermarkCredit, watermarkCreditError } from '../src/lib/watermark.mjs';
+import { brevoFormUrl, newsletterUrlError } from '../src/lib/newsletter.mjs';
 
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 export const siteOrigin = 'https://gwenlium.dev';
@@ -17,7 +18,7 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
 const relativeName = (root, file) => path.relative(root, file).split(path.sep).join('/');
 const previewPathPattern = /^\/media\/([a-z0-9]+(?:-[a-z0-9]+)*)-preview-[a-f0-9]{32}\.(webp|gif|mp3|mp4)$/;
 const previewKinds = { webp: 'image', gif: 'image', mp3: 'audio', mp4: 'video' };
-export const publicBranding = { '/avatar.webp': true, '/favicon.png': true, '/social-card.png': true, '/followit-logo.svg': true };
+export const publicBranding = { '/avatar.webp': true, '/favicon.png': true, '/social-card.png': true };
 export const mediaFilePattern = /\.(?:avif|bmp|gif|heic|heif|ico|jpe?g|png|psd|svg|tiff?|webp|aac|aiff?|alac|flac|m4a|mp3|oga|ogg|opus|wav|wma|3gp|avi|m4v|mkv|mov|mp4|mpeg|mpg|ogv|webm|wmv)$/i;
 const trailerHosts = { 'youtube.com': true, 'www.youtube.com': true, 'm.youtube.com': true, 'youtu.be': true, 'www.youtube-nocookie.com': true, 'youtube-nocookie.com': true, 'vimeo.com': true, 'www.vimeo.com': true, 'player.vimeo.com': true };
 const importInstruction = 'Add media with the website editor (/write/) so it uploads a processed copy, or keep the original outside this repository and run npm run media:import -- "/absolute/path/to/original". Commit the generated public/media file and src/content/media-previews.json together.';
@@ -412,27 +413,12 @@ export function validateSource(root = projectRoot, now = new Date()) {
     text(value.name, file, 'name', true);
     if (value.maintenanceEnabled !== undefined && typeof value.maintenanceEnabled !== 'boolean') report(file, 'maintenanceEnabled', 'Use a boolean maintenance toggle.');
     optionalStrings(value, ['maintenanceHeading', 'maintenanceMessage'], file);
-    optionalStrings(value, ['description', 'intro', 'status', 'featuredPost', 'newsletterHeading', 'newsletterButtonLabel'], file);
+    optionalStrings(value, ['description', 'intro', 'status', 'featuredPost', 'newsletterHeading'], file);
     try { normalizeWatermarkCredit(value.watermarkText) || normalizeWatermarkCredit(`© ${typeof value.name === 'string' ? value.name.trim() : ''}`); }
     catch { report(file, 'watermarkText', watermarkCreditError); }
     url(value.githubUrl, file, 'githubUrl');
-    if (text(value.newsletterUrl, file, 'newsletterUrl')) {
-      try {
-        const newsletter = new URL(value.newsletterUrl);
-        if (newsletter.protocol !== 'https:' || newsletter.username || newsletter.password || /(^|\.)(example\.(com|net|org)|example|localhost|invalid|test)$/.test(newsletter.hostname)) throw new Error('placeholder or non-HTTPS URL');
-      } catch {
-        report(file, 'newsletterUrl', 'Use your real absolute HTTPS subscription-page URL, or leave this value empty until an account is configured.');
-      }
-    }
-    if (text(value.newsletterFormAction, file, 'newsletterFormAction')) {
-      try {
-        const endpoint = new URL(value.newsletterFormAction);
-        if (endpoint.protocol !== 'https:' || endpoint.hostname !== 'api.follow.it' || !endpoint.pathname.startsWith('/subscription-form/') || endpoint.username || endpoint.password) throw new Error('unsupported form endpoint');
-      } catch {
-        report(file, 'newsletterFormAction', 'Use the HTTPS subscription-form action supplied by follow.it, or leave it empty.');
-      }
-      text(value.newsletterButtonLabel, file, 'newsletterButtonLabel', true);
-    }
+    try { brevoFormUrl(value.newsletterUrl); }
+    catch { report(file, 'newsletterUrl', newsletterUrlError); }
     if (typeof value.featuredPost === 'string' && value.featuredPost.trim()) {
       if (!posts.some((post) => post.data.permalink === value.featuredPost && isPublishedPost(post.data, now))) report(file, 'featuredPost', 'Choose an existing published post permalink, or leave it empty. Draft and future posts cannot be featured publicly.');
     }
