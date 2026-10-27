@@ -8,7 +8,11 @@ Email signup uses Brevo's hosted form inside an iframe. Brevo handles email vali
 2. Create a list named **Gwenlium — all updates**.
 3. Create a full-page/embedded signup form for that list. Collect the email address, enable double opt-in and configure the confirmation email. Set the form's heading and button text in Brevo; the website's separate heading remains editable in Site settings. Use a responsive form and configure the provider's spam protection.
 4. Set the success message to **Check your inbox and confirm your subscription.** Keep invalid-address and delivery errors visible. Test the complete signup and unsubscribe flow using an address you control.
-5. Copy the public form URL from the Share step (the iframe `src`, `https://…sibforms.com/serve/…`). Set it in **Edit → Site settings → Brevo signup form** (`src/content/site.json` → `newsletterUrl`). Empty disables email signup and shows the RSS alternative. There is always a direct link beside the embedded form for browsers that block it.
+5. Copy the public form URL from the Share step (`https://…sibforms.com/serve/…`). Set it in **Edit → Site settings → Brevo signup form** (`src/content/site.json` → `newsletterUrl`). The site uses Brevo's `/v2/serve/…` iframe endpoint automatically; either URL is accepted. Preserve the entire token, including any trailing `=` characters. Empty disables email signup and shows the RSS alternative. There is always a direct link beside the embedded form for browsers that block it.
+
+## Sender and replies
+
+Use **Gwenlium <info@gwenlium.dev>** as the sender and reply-to for both the double opt-in email and RSS campaigns. The domain uses Dynadot DNS. Configure its free email forwarding for `info` to the owner's chosen inbox, complete destination verification, and add the domain authentication records supplied by Brevo. Keep existing website records intact. Verify forwarding and domain authentication before enabling delivery. Forwarding receives replies; Brevo sends the newsletter emails.
 
 ## Automatic updates
 
