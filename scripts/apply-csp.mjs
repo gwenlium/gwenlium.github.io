@@ -48,7 +48,8 @@ export function policy(hashes) {
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self' https://api.follow.it",
+    // follow.it receives the provider's POST redirects, including confirmation and validation errors.
+    "form-action 'self' https://api.follow.it https://follow.it",
   ].join('; ');
 }
 

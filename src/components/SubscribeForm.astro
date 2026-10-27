@@ -15,14 +15,20 @@ if (site.newsletterFormAction) {
 ---
 
 {action ? (
-  <form class="newsletter-form" action={action} method="post" data-followit-form>
+  <form class="newsletter-form" action={action} method="post" data-astro-reload data-followit-form>
     {site.newsletterHeading && <h2>{site.newsletterHeading}</h2>}
     <label for={emailId}>Email address</label>
-    <input id={emailId} type="email" name="email" required placeholder="Enter your email" autocomplete="email" spellcheck="false" />
+    <input id={emailId} type="email" name="email" required placeholder="Enter your email" autocomplete="email" spellcheck="false" aria-describedby={`${emailId}-help ${emailId}-status`} />
     <button class="button" type="submit">{site.newsletterButtonLabel}</button>
-    <p>Your email is submitted directly to follow.it. Confirm your subscription using the email they send.</p>
+    <p id={`${emailId}-help`}>You’ll continue on follow.it to finish signup. Then confirm your subscription using the email they send.</p>
+    <p id={`${emailId}-status`} role="status" aria-live="polite" aria-atomic="true" data-followit-status></p>
   </form>
 ) : <p>Email signup is currently unavailable.</p>}
+{site.newsletterUrl && <p class="signup-alternative"><a href={site.newsletterUrl} data-astro-reload>Sign up directly on follow.it</a></p>}
+
+<script>
+  import '../scripts/subscribe';
+</script>
 
 <style>
   .newsletter-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(.65rem, 2.5cqi, .8rem); min-width: 0; overflow-wrap: anywhere; }
@@ -31,4 +37,7 @@ if (site.newsletterFormAction) {
   input { width: 100%; min-height: 44px; font-family: var(--font-reading); font-size: 1rem; }
   button { width: 100%; min-width: 0; min-height: 44px; }
   p { margin: .3rem 0 0; color: var(--muted); font-family: var(--font-reading); font-size: .8rem; line-height: 1.65; }
+  [data-followit-status]:empty { display: none; }
+  [data-followit-status] { color: var(--ink); }
+  .signup-alternative { margin-top: .8rem; }
 </style>
