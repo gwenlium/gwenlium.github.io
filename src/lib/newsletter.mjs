@@ -16,12 +16,3 @@ export function brevoFormUrl(value) {
     return url.href;
   } catch { throw new Error(newsletterUrlError); }
 }
-
-/** Brevo supplies a distinct embeddable version of its public signup page. @param {unknown} value */
-export function brevoEmbedUrl(value) {
-  const form = brevoFormUrl(value);
-  if (!form) return '';
-  const url = new URL(form);
-  url.pathname = url.pathname.replace(/^\/(?:v2\/)?serve\//, '/v2/serve/');
-  return url.href;
-}

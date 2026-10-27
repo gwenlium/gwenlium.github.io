@@ -18,7 +18,7 @@
     "check": "astro check",
     "test:pages": "node scripts/check-page-editing.mjs",
     "test:media": "node scripts/check-portrait-jpeg.mjs && node scripts/check-webp-fallback.mjs",
-    "test:subscribe": "node scripts/check-subscribe.mjs",
+    "test:subscribe": "node scripts/check-subscribe.mjs && node scripts/check-subscribe-client.mjs",
     "test:preferences": "node scripts/check-dialogue-preference.mjs",
     "test:topics": "node scripts/check-topics.mjs",
     "test:archive": "node scripts/check-archive.mjs",

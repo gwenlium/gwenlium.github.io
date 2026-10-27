@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { load } from 'cheerio';
-import { brevoFormUrl, brevoEmbedUrl } from '../src/lib/newsletter.mjs';
+import { brevoFormUrl } from '../src/lib/newsletter.mjs';
 import { policy } from './apply-csp.mjs';
 
 const exampleForm = 'https://newsletter-check.sibforms.com/serve/MUIF-test-form';
 assert.equal(brevoFormUrl(exampleForm), exampleForm);
 assert.equal(brevoFormUrl(`${exampleForm}==`), `${exampleForm}==`);
-assert.equal(brevoEmbedUrl(`${exampleForm}==`), exampleForm.replace('/serve/', '/v2/serve/') + '==');
-assert.equal(brevoEmbedUrl(brevoEmbedUrl(exampleForm)), brevoEmbedUrl(exampleForm));
+assert.equal(brevoFormUrl(exampleForm.replace('/serve/', '/v2/serve/')), exampleForm.replace('/serve/', '/v2/serve/'));
 assert.equal(brevoFormUrl(''), '');
 assert.equal(brevoFormUrl(undefined), '');
 for (const value of [
@@ -22,10 +21,11 @@ for (const value of [
   `${exampleForm}?redirect=https://attacker.test`, `${exampleForm}#fragment`,
 ]) assert.throws(() => brevoFormUrl(value));
 const allowed = policy(new Set(), exampleForm);
-assert(allowed.includes('frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://newsletter-check.sibforms.com;'));
+assert(allowed.includes('frame-src https://www.youtube-nocookie.com https://player.vimeo.com;'));
 assert(!policy(new Set()).includes('sibforms.com'));
 assert(!allowed.includes('follow.it'));
-assert(allowed.includes("form-action 'self'"));
+assert(allowed.includes("form-action 'self' https://newsletter-check.sibforms.com"));
+assert(allowed.split(';').find(part => part.trim().startsWith('connect-src ')).includes('https://newsletter-check.sibforms.com'));
 
 const site = JSON.parse(fs.readFileSync('src/content/site.json', 'utf8'));
 const windows = JSON.parse(fs.readFileSync('src/content/windows.json', 'utf8')).windows;
@@ -33,27 +33,37 @@ const emailWindow = windows.find(window => window.id === 'subscribe-email');
 const $ = load(fs.readFileSync('dist/subscribe/index.html', 'utf8'));
 assert.equal($('[data-followit-form], [name="follow.it-verification-code"]').length, 0);
 const url = brevoFormUrl(site.newsletterUrl);
-const frames = $('iframe[data-brevo-form]');
+assert.equal($('iframe[data-brevo-form]').length, 0, 'Signup must use the site UI, not a provider iframe.');
+const forms = $('form[data-brevo-form]');
 if (url) {
-  if (emailWindow?.enabled && emailWindow.content === 'default') assert(frames.length > 0);
-  for (const element of frames.toArray()) {
-    const frame = $(element);
-    assert.equal(frame.attr('src'), brevoEmbedUrl(url));
-    assert(frame.attr('title'));
-    assert.equal(frame.attr('loading'), 'lazy');
-    assert.equal(frame.attr('referrerpolicy'), 'no-referrer');
-    assert.equal($(`[id="${frame.attr('aria-describedby')}"]`).length, 1);
-    assert(frame.parent().find('a[data-astro-reload]').toArray().some(link => $(link).attr('href') === url));
+  if (emailWindow?.enabled && emailWindow.content === 'default') assert(forms.length > 0);
+  for (const element of forms.toArray()) {
+    const form = $(element);
+    assert.equal(form.attr('action'), url);
+    assert.equal(form.attr('method'), 'post');
+    assert.equal($(`[id="${form.attr('aria-describedby')}"]`).length, 1);
+    const email = form.find('input[name="EMAIL"]');
+    assert.equal(email.attr('type'), 'email');
+    assert.equal(email.attr('autocomplete'), 'email');
+    assert(email.is('[required]'));
+    assert.equal(form.find(`label[for="${email.attr('id')}"]`).length, 1);
+    assert(form.find('button.button[type="submit"]').text().includes('Subscribe'));
+    assert.equal(form.find('[data-subscribe-status][role="status"][aria-live="polite"]').length, 1);
+    assert.equal(form.find('input[name="email_address_check"][tabindex="-1"]').length, 1);
+    assert.equal(form.find('input[name="locale"]').val(), 'en');
+    assert(form.parent().find('a[data-astro-reload]').toArray().some(link => $(link).attr('href') === url));
   }
   const csp = $('meta[http-equiv="Content-Security-Policy"]').attr('content');
-  const origins = csp.split(';').find(part => part.trim().startsWith('frame-src ')).trim().split(/\s+/).slice(1);
-  assert(origins.includes(new URL(url).origin));
-  assert(!origins.includes('*'));
+  for (const directive of ['form-action ', 'connect-src ']) {
+    const origins = csp.split(';').find(part => part.trim().startsWith(directive)).trim().split(/\s+/).slice(1);
+    assert(origins.includes(new URL(url).origin));
+    assert(!origins.includes('*'));
+  }
 } else {
-  assert.equal(frames.length, 0, 'Unconfigured signup must not show a broken form.');
+  assert.equal(forms.length, 0, 'Unconfigured signup must not show a broken form.');
   if (emailWindow?.enabled && emailWindow.content === 'default') {
     assert($('[data-newsletter]').text().includes('Email signup is currently unavailable'));
     assert($('[data-newsletter] a[href="/rss.xml"]').length);
   }
 }
-console.log('Brevo embed, exact-origin CSP, safe URL validation, direct signup fallback and disabled signup verified.');
+console.log('Site-styled Brevo form, accessible feedback, exact-origin CSP, safe URLs, direct fallback and disabled signup verified.');

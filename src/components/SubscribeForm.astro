@@ -1,9 +1,10 @@
 ---
 import { site } from '../lib/settings';
-import { brevoFormUrl, brevoEmbedUrl } from '../lib/newsletter.mjs';
+import { brevoFormUrl } from '../lib/newsletter.mjs';
 
 interface Props { idPrefix: string }
 const helpId = `${Astro.props.idPrefix}-help`;
+const emailId = `${Astro.props.idPrefix}-email`;
 const url = brevoFormUrl(site.newsletterUrl);
 ---
 
@@ -11,25 +12,36 @@ const url = brevoFormUrl(site.newsletterUrl);
   {site.newsletterHeading && <h2>{site.newsletterHeading}</h2>}
   {url ? <>
     <p id={helpId}>Email updates from across the website. Sign up below, then check your inbox to confirm your subscription. You can unsubscribe at any time.</p>
-    <iframe
-      class="newsletter-form"
-      src={brevoEmbedUrl(url)}
-      title="Subscribe to Gwenlium email updates"
-      aria-describedby={helpId}
-      loading="lazy"
-      referrerpolicy="no-referrer"
-      data-brevo-form
-    ></iframe>
-    <p class="signup-alternative">Form not loading? <a href={url} data-astro-reload>Open email signup directly</a></p>
+    <form class="newsletter-form" action={url} method="post" data-brevo-form aria-describedby={helpId}>
+      <label for={emailId}>Email address</label>
+      <input id={emailId} name="EMAIL" type="email" autocomplete="email" placeholder="you@example.com" required />
+      <div class="address-check" aria-hidden="true">
+        <input type="text" name="email_address_check" tabindex="-1" autocomplete="off" aria-label="Leave this field empty" />
+      </div>
+      <input type="hidden" name="locale" value="en" />
+      <button class="button" type="submit">Subscribe</button>
+      <p class="signup-status" data-subscribe-status role="status" aria-live="polite" aria-atomic="true"></p>
+    </form>
+    <p class="signup-alternative">Having trouble? <a href={url} data-astro-reload>Open email signup directly</a></p>
     <p class="provider">Email subscriptions are managed by Brevo.</p>
   </> : <p>Email signup is currently unavailable. You can still follow every published entry using the <a href="/rss.xml" data-astro-reload>RSS feed</a>.</p>}
 </div>
 
+<script>
+  import '../scripts/subscribe';
+</script>
+
 <style>
   .newsletter { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; min-width: 0; overflow-wrap: anywhere; }
   h2 { margin: 0 0 .5rem; font-size: clamp(1.05rem, .85rem + 1.5cqi, 1.4rem); line-height: 1.5; }
-  .newsletter-form { display: block; width: 100%; height: 420px; border: 0; background: transparent; }
-  @container (max-width: 400px) { .newsletter-form { height: 520px; } }
+  .newsletter-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: .65rem; min-width: 0; }
+  label { font-family: var(--font-ui); font-size: .8rem; }
+  input[type='email'] { width: 100%; min-height: 44px; }
+  button { justify-self: start; min-height: 44px; }
+  .address-check { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .signup-status:empty { display: none; }
+  .signup-status { padding: .75rem; border: 1px solid var(--line); background: color-mix(in srgb, var(--sage) 30%, var(--surface)); color: var(--ink); box-shadow: inset 1px 1px var(--bevel-dark), inset -1px -1px var(--bevel-light); }
+  .signup-status[data-state='error'] { background: color-mix(in srgb, var(--pink) 45%, var(--surface)); }
   p { margin: 0; color: var(--muted); font-family: var(--font-reading); font-size: .8rem; line-height: 1.65; }
   .provider { font-size: .7rem; }
 </style>
