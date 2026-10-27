@@ -30,6 +30,10 @@ If moving existing subscribers, export only confirmed, subscribed contacts from 
 
 ## Deployment
 
+Subscriptions are currently paused at the owner's request. All four `subscribe` page windows in `src/content/windows.json` are disabled. With all subscription-page windows disabled, `/subscribe/` redirects home and the page is excluded from navigation, keyboard shortcuts, search and the sitemap. Signup forms elsewhere also stop rendering and the Brevo origin is removed from the site's CSP. The form URL and copy remain saved for later. The Brevo RSS integration must remain **inactive** while paused.
+
+To restore the page, enable the desired subscription-page windows in the website's window editor and publish. Enable `subscribe-email` for email signup and `subscribe-rss` for the RSS panel. Review the first RSS campaign's date range and resume the Brevo integration separately when delivery is wanted.
+
 Run `npm run test:pages` (also verifies a configured Brevo form), `npm run test:auth`, `npm run check`, `npm run build`, and `npm run test:subscribe`. The existing publishing worker accepts the `newsletterUrl` field, so no worker deployment or new secrets are required. Publish the static site with the real form URL through the existing GitHub Pages workflow. Verify signup feedback in Safari and a second browser, and confirm the subscription in Brevo before claiming the migration is live.
 
 References: [Brevo forms](https://help.brevo.com/hc/en-us/articles/208771869-Create-a-sign-up-form-in-Brevo), [RSS campaigns](https://help.brevo.com/hc/en-us/articles/360013130059-RSS-Campaign-integration-Automatically-share-your-blog-posts-with-your-subscribers), [free plan](https://help.brevo.com/hc/en-us/articles/208589409-About-Brevo-s-pricing-plans).

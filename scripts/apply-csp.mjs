@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { brevoFormUrl } from '../src/lib/newsletter.mjs';
+import { brevoFormUrl, subscriptionsEnabled } from '../src/lib/newsletter.mjs';
 
 /**
  * One Content-Security-Policy for every built page. GitHub Pages cannot send headers, so it is a
@@ -63,7 +63,8 @@ export async function applyCsp(directory) {
     for (const script of inlineScripts(html)) hashes.add(`sha256-${createHash('sha256').update(script, 'utf8').digest('base64')}`);
   }
   const site = JSON.parse(await fs.readFile(path.join(root, 'src/content/site.json'), 'utf8'));
-  const meta = `<meta http-equiv="Content-Security-Policy" content="${policy(hashes, site.newsletterUrl).replace(/"/g, '&quot;')}">`;
+  const windows = JSON.parse(await fs.readFile(path.join(root, 'src/content/windows.json'), 'utf8')).windows;
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${policy(hashes, subscriptionsEnabled(windows) ? site.newsletterUrl : '').replace(/"/g, '&quot;')}">`;
   for (const page of pages) {
     if (page.html.includes('http-equiv="Content-Security-Policy"')) throw new Error(`${path.relative(directory, page.file)} already has a Content-Security-Policy.`);
     // Right after the charset (or the doctype on Astro's bare redirect pages): before the first script it governs.

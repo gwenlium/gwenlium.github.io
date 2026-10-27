@@ -72,7 +72,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
         <dt><kbd>I</kbd></dt><dd>Gallery</dd>
         <dt><kbd>M</kbd></dt><dd>Music</dd>
         <dt><kbd>A</kbd></dt><dd>About</dd>
-        <dt><kbd>S</kbd></dt><dd>Subscribe</dd>
+        {navigation.some(item => item.href === '/subscribe/') && <><dt><kbd>S</kbd></dt><dd>Subscribe</dd></>}
         <dt><kbd>P</kbd></dt><dd>Play or pause music</dd>
         <dt><kbd>,</kbd></dt><dd>Preferences</dd>
         <dt><kbd>Esc</kbd></dt><dd>Close dialog or restore maximized window</dd>

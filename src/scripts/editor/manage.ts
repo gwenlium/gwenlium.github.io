@@ -145,7 +145,7 @@ export async function openSiteSettings(store: SiteEditorStore, onSaved: () => Pr
   const intro = textField('Home page introduction', text('intro'), { multiline: true, hint: 'Empty shows the site description instead.' });
   const featured = selectField('Featured on the home page', text('featuredPost'), [['', 'Automatic: an entry marked “Feature”, otherwise the newest'], ...entries.map(entry => [entry.permalink, entry.title || entry.permalink] as [string, string])]);
   const newsletterHeading = textField('Newsletter heading', text('newsletterHeading'));
-  const newsletterUrl = textField('Brevo signup form', text('newsletterUrl'), { type: 'url', hint: 'The public form URL from Brevo → Marketing → Forms → Share (https://…sibforms.com/serve/…). Configure the form’s button text, confirmation email and messages in Brevo. Leave empty to disable email signup.' });
+  const newsletterUrl = textField('Brevo signup form', text('newsletterUrl'), { type: 'url', hint: 'The public form URL from Brevo → Marketing → Forms → Share (https://…sibforms.com/serve/…). Configure the subscriber list and confirmation email in Brevo. Leave empty to disable email signup. Disable all Subscriptions page windows to hide the page and signup throughout the website.' });
   const gameTitle = textField('Game title', gameText('title'));
   const gameStatus = textField('Development status', gameText('status'));
   const gameDescription = textField('Description', gameText('description'), { multiline: true });

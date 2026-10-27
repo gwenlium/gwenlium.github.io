@@ -1,5 +1,12 @@
 export const newsletterUrlError = 'Use the public HTTPS form URL from Brevo (https://…sibforms.com/serve/…), or leave it empty to disable email signup.';
 
+/** The existing window switches also control whether the subscriptions page is public.
+ * @param {Array<{page: string, enabled: boolean}>} windows
+ */
+export function subscriptionsEnabled(windows) {
+  return windows.some(window => window.page === 'subscribe' && window.enabled);
+}
+
 /**
  * One allowlist for the renderer, build validator and generated security policy.
  * @param {unknown} value

@@ -3,13 +3,17 @@ import sitemap from '@astrojs/sitemap';
 import { unified } from '@astrojs/markdown-remark';
 import rehypeMedia from './src/plugins/rehype-media.mjs';
 import devEditor from './scripts/dev-editor.mjs';
+import { readFileSync } from 'node:fs';
+import { subscriptionsEnabled } from './src/lib/newsletter.mjs';
+
+const showSubscriptions = subscriptionsEnabled(JSON.parse(readFileSync(new URL('./src/content/windows.json', import.meta.url), 'utf8')).windows);
 
 export default defineConfig({
   site: 'https://gwenlium.dev',
   output: 'static',
   trailingSlash: 'always',
   integrations: [
-    sitemap({ filter: (page) => !/\/(?:game|404|admin)\/$|\/write\//.test(page) }),
+    sitemap({ filter: (page) => !/\/(?:game|404|admin)\/$|\/write\//.test(page) && (showSubscriptions || !page.endsWith('/subscribe/')) }),
     devEditor(),
   ],
   markdown: { processor: unified({ rehypePlugins: [rehypeMedia] }) },

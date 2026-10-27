@@ -6,7 +6,7 @@ import { entrySectionInfo, isEntrySection, type EntrySection } from '../lib/entr
 import { gallery, site, tracks, type GalleryItem, type MusicTrack } from '../lib/settings';
 import type { SearchEntry } from '../lib/search-types';
 import { builtinWindowPages, systemWindowIds } from '../lib/window-catalogue.mjs';
-import { getWindowDefinition, hasWindowOverride, windowDefinitions, type WindowDefinition, type WindowPage } from '../lib/windows';
+import { getWindowDefinition, hasWindowOverride, subscriptionsEnabled, windowDefinitions, type WindowDefinition, type WindowPage } from '../lib/windows';
 
 export const prerender = true;
 
@@ -112,6 +112,7 @@ export async function GET(): Promise<Response> {
 
   function windowUrl(definition: WindowDefinition): string | undefined {
     if (!definition.enabled || systemWindowIds.includes(definition.id)) return undefined;
+    if (!subscriptionsEnabled && (definition.page === 'subscribe' || definition.content === 'subscribe')) return undefined;
     const builtin = Object.hasOwn(builtinWindowPages, definition.id);
     const section = archiveSection(definition.id);
     if (section && !entrySectionInfo[section].dated && !postsBySection[section]?.length
@@ -147,7 +148,7 @@ export async function GET(): Promise<Response> {
     return route ? `${route}#${encodeURIComponent(definition.id)}` : undefined;
   }
 
-  const subscribeText = site.newsletterUrl ? text(site.newsletterHeading, 'Email updates from across the website. Subscribe by email.') : '';
+  const subscribeText = subscriptionsEnabled && site.newsletterUrl ? text(site.newsletterHeading, 'Email updates from across the website. Subscribe by email.') : '';
   function defaultWindowText(id: string): string {
     const section = archiveSection(id);
     if (section && id === `${section}-entries`) return text(...(postsBySection[section] ?? []).map(postCardText));
@@ -184,6 +185,7 @@ export async function GET(): Promise<Response> {
     { id: 'subscribe', title: pageSettings.subscribe.title, url: '/subscribe/', text: 'Subscriptions RSS Email updates' },
   ];
   for (const page of pages) {
+    if (page.id === 'subscribe' && !subscriptionsEnabled) continue;
     const settings = page.id === 'home' ? undefined : pageSettings[page.id as keyof typeof pageSettings];
     add({ ...page, text: text(page.text, settings?.eyebrow, settings?.intro), id: `page:${page.id}`, kind: 'page', tags: [] });
   }

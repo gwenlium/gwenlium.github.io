@@ -1,11 +1,12 @@
 ---
 import { site } from '../lib/settings';
 import { brevoFormUrl } from '../lib/newsletter.mjs';
+import { subscriptionsEnabled } from '../lib/windows';
 
 interface Props { idPrefix: string }
 const helpId = `${Astro.props.idPrefix}-help`;
 const emailId = `${Astro.props.idPrefix}-email`;
-const url = brevoFormUrl(site.newsletterUrl);
+const url = subscriptionsEnabled ? brevoFormUrl(site.newsletterUrl) : '';
 ---
 
 <div class="newsletter" data-newsletter>

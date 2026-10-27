@@ -1,5 +1,6 @@
 import data from '../content/windows.json';
 import { builtinWindowPages } from './window-catalogue.mjs';
+import { subscriptionsEnabled as pageEnabled } from './newsletter.mjs';
 import type { Link } from './settings';
 
 export type WindowPage = 'home' | 'devlog' | 'life' | 'post' | 'gallery' | 'music' | 'about' | 'subscribe' | 'not-found' | 'all';
@@ -33,6 +34,7 @@ export interface WindowDefinition {
 }
 
 export const windowDefinitions: WindowDefinition[] = data.windows as WindowDefinition[];
+export const subscriptionsEnabled = pageEnabled(windowDefinitions);
 const definitions: Record<string, WindowDefinition> = Object.fromEntries(windowDefinitions.map((window) => [window.id, window]));
 
 export function getWindowDefinition(id: string): WindowDefinition | undefined {

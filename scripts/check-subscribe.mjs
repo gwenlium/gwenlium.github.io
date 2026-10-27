@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { load } from 'cheerio';
-import { brevoFormUrl } from '../src/lib/newsletter.mjs';
+import { brevoFormUrl, subscriptionsEnabled } from '../src/lib/newsletter.mjs';
 import { policy } from './apply-csp.mjs';
 
 const exampleForm = 'https://newsletter-check.sibforms.com/serve/MUIF-test-form';
@@ -30,12 +30,15 @@ assert(allowed.split(';').find(part => part.trim().startsWith('connect-src ')).i
 const site = JSON.parse(fs.readFileSync('src/content/site.json', 'utf8'));
 const windows = JSON.parse(fs.readFileSync('src/content/windows.json', 'utf8')).windows;
 const emailWindow = windows.find(window => window.id === 'subscribe-email');
+const enabled = subscriptionsEnabled(windows);
+assert.equal(subscriptionsEnabled([{ page: 'subscribe', enabled: false }, { page: 'home', enabled: true }]), false);
+assert.equal(subscriptionsEnabled([{ page: 'subscribe', enabled: true }]), true);
 const $ = load(fs.readFileSync('dist/subscribe/index.html', 'utf8'));
 assert.equal($('[data-followit-form], [name="follow.it-verification-code"]').length, 0);
 const url = brevoFormUrl(site.newsletterUrl);
 assert.equal($('iframe[data-brevo-form]').length, 0, 'Signup must use the site UI, not a provider iframe.');
 const forms = $('form[data-brevo-form]');
-if (url) {
+if (url && enabled) {
   if (emailWindow?.enabled && emailWindow.content === 'default') assert(forms.length > 0);
   for (const element of forms.toArray()) {
     const form = $(element);
@@ -65,5 +68,18 @@ if (url) {
     assert($('[data-newsletter]').text().includes('Email signup is currently unavailable'));
     assert($('[data-newsletter] a[href="/rss.xml"]').length);
   }
+}
+if (!enabled) {
+  assert($('meta[http-equiv="refresh"]').attr('content')?.includes('url=/'), 'The disabled page must redirect home.');
+  for (const path of fs.readdirSync('dist', { recursive: true }).filter(path => path.endsWith('.html'))) {
+    const page = load(fs.readFileSync(`dist/${path}`, 'utf8'));
+    assert.equal(page('form[data-brevo-form]').length, 0, `${path} must not expose email signup`);
+    assert.equal(page('.footer-navigation a[href="/subscribe/"], .start-pages a[href="/subscribe/"]').length, 0);
+    assert(!page('meta[http-equiv="Content-Security-Policy"]').attr('content').includes('sibforms.com'));
+  }
+  const search = JSON.parse(fs.readFileSync('dist/search-index.json', 'utf8'));
+  assert(!search.entries.some(entry => entry.url === '/subscribe/' || entry.url.startsWith('/subscribe/#')));
+  const sitemaps = fs.readdirSync('dist').filter(path => /^sitemap.*\.xml$/.test(path));
+  for (const path of sitemaps) assert(!fs.readFileSync(`dist/${path}`, 'utf8').includes('https://gwenlium.dev/subscribe/'));
 }
 console.log('Site-styled Brevo form, accessible feedback, exact-origin CSP, safe URLs, direct fallback and disabled signup verified.');

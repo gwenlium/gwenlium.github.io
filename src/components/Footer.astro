@@ -2,6 +2,7 @@
 import Icon from './Icon.astro';
 import StartMenu from './StartMenu.astro';
 import { site } from '../lib/settings';
+import { subscriptionsEnabled } from '../lib/windows';
 
 const path = Astro.url.pathname;
 const navigation = [
@@ -11,7 +12,7 @@ const navigation = [
   { href: '/gallery/', label: 'Gallery', icon: 'image', phonePrimary: true },
   { href: '/music/', label: 'Music', icon: 'music', phonePrimary: false },
   { href: '/about/', label: 'About', icon: 'user', phonePrimary: false },
-  { href: '/subscribe/', label: 'Subscribe', icon: 'rss', phonePrimary: false },
+  ...(subscriptionsEnabled ? [{ href: '/subscribe/', label: 'Subscribe', icon: 'rss', phonePrimary: false }] : []),
 ];
 ---
 

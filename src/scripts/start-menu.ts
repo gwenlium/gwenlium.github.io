@@ -401,7 +401,7 @@ document.addEventListener('keydown', (event) => {
   if (openDialog) return;
 
   const destination = Object.hasOwn(navigationShortcuts, key) ? navigationShortcuts[key] : undefined;
-  if (destination) {
+  if (destination && document.querySelector(`.footer-navigation a[href="${destination}"]`)) {
     event.preventDefault();
     void navigate(destination);
     return;
