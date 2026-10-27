@@ -1,7 +1,7 @@
 export const newsletterUrlError = 'Use the public HTTPS form URL from Brevo (https://…sibforms.com/serve/…), or leave it empty to disable email signup.';
 
 /**
- * One allowlist for the renderer, build validator and owner's publishing worker.
+ * One allowlist for the renderer, build validator and generated security policy.
  * @param {unknown} value
  * @returns {string}
  */

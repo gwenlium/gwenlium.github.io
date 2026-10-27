@@ -26,6 +26,6 @@ If moving existing subscribers, export only confirmed, subscribed contacts from 
 
 ## Deployment
 
-Run `npm run test:pages` (also verifies a configured Brevo embed), `npm run test:auth`, `npm run check`, `npm run build`, and `npm run test:subscribe`. Deploy the existing publishing worker with `npx wrangler deploy --config admin-auth/wrangler.jsonc` so the editor accepts Brevo form URLs, preserving its existing secrets and variables. Publish the static site with the real form URL through the existing GitHub Pages workflow. Verify the embedded form in Safari and a second browser, and confirm the subscription in Brevo before claiming the migration is live.
+Run `npm run test:pages` (also verifies a configured Brevo embed), `npm run test:auth`, `npm run check`, `npm run build`, and `npm run test:subscribe`. The existing publishing worker accepts the `newsletterUrl` field, so no worker deployment or new secrets are required. Publish the static site with the real form URL through the existing GitHub Pages workflow. Verify the embedded form in Safari and a second browser, and confirm the subscription in Brevo before claiming the migration is live.
 
 References: [Brevo forms](https://help.brevo.com/hc/en-us/articles/208771869-Create-a-sign-up-form-in-Brevo), [RSS campaigns](https://help.brevo.com/hc/en-us/articles/360013130059-RSS-Campaign-integration-Automatically-share-your-blog-posts-with-your-subscribers), [free plan](https://help.brevo.com/hc/en-us/articles/208589409-About-Brevo-s-pricing-plans).
