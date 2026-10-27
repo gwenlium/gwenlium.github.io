@@ -134,6 +134,42 @@
       "width": 1600,
       "height": 1600
     },
+    "/media/img-20261018-wa0000-preview-e2cd72b6de81ca4f9de9dcb695b201e7.webp": {
+      "sha256": "e2cd72b6de81ca4f9de9dcb695b201e77e566927b64752de779745cb74bc2664",
+      "kind": "image",
+      "width": 1600,
+      "height": 683
+    },
+    "/media/img-20261023-wa0000-preview-6acf7e2beaf68ba8846a84d9b33bcec9.webp": {
+      "sha256": "6acf7e2beaf68ba8846a84d9b33bcec9d7bad1b53f270f4456b98ffa7effaad7",
+      "kind": "image",
+      "width": 1600,
+      "height": 746
+    },
+    "/media/img-20261023-wa0001-preview-814345e3e24f4306d6bfc34c293acdf2.webp": {
+      "sha256": "814345e3e24f4306d6bfc34c293acdf27e06a226dfffef363e3d22440da3ce43",
+      "kind": "image",
+      "width": 1600,
+      "height": 734
+    },
+    "/media/img-20261023-wa0002-preview-50dfa6e170343d373209dae77f712139.webp": {
+      "sha256": "50dfa6e170343d373209dae77f71213917d3c7449bab47ce3244bd692def5e97",
+      "kind": "image",
+      "width": 1600,
+      "height": 680
+    },
+    "/media/img-20261025-wa0006-preview-8288db7b240bbf9f15d9d872c54cf44f.webp": {
+      "sha256": "8288db7b240bbf9f15d9d872c54cf44f1c1911f06fd72d35b103b0013539d730",
+      "kind": "image",
+      "width": 1280,
+      "height": 855
+    },
+    "/media/img-20261025-wa0007-preview-f8836555dbe813f70c44126e91774558.webp": {
+      "sha256": "f8836555dbe813f70c44126e91774558cf5427fc032225d92fcb7c3fdffe35bb",
+      "kind": "image",
+      "width": 1501,
+      "height": 1561
+    },
     "/media/lyn-front-preview-6a955fa64a01e2b5356bc0b62a5212ca.webp": {
       "sha256": "1c34f5e0cdc976088d7414ac912a08a75d01495b7740768bc0be1b28d80caf79",
       "kind": "image",
@@ -326,6 +362,12 @@
       "kind": "image",
       "width": 1600,
       "height": 1600
+    },
+    "/media/whatsapp-image-2026-10-26-at-21-38-39-preview-f130bfdf1838b1033276d34118ef0187.webp": {
+      "sha256": "f130bfdf1838b1033276d34118ef01874d95ba34f13ce3c1075615c18aae295b",
+      "kind": "image",
+      "width": 1600,
+      "height": 734
     }
   }
 }
