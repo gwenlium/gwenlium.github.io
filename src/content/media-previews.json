@@ -343,6 +343,20 @@
       "width": 720,
       "height": 1280
     },
+    "/media/vid-20261004-233806-750-preview-b29c5a91c02d92743aeed4c04ef504f3.mp4": {
+      "sha256": "b29c5a91c02d92743aeed4c04ef504f3a0f17d507195f397445603a21d8a7181",
+      "kind": "video",
+      "width": 580,
+      "height": 1034,
+      "duration": 60.061,
+      "poster": "/media/vid-20261004-233806-750-still-preview-6bd3a6189a85c2852b76021e1fb90529.webp"
+    },
+    "/media/vid-20261004-233806-750-still-preview-6bd3a6189a85c2852b76021e1fb90529.webp": {
+      "sha256": "6bd3a6189a85c2852b76021e1fb90529c2754a132d24540cb574401843a67607",
+      "kind": "image",
+      "width": 580,
+      "height": 1034
+    },
     "/media/vid-20261022-125811-464-preview-2840cb7ab4dc7998983955a329c32215.mp4": {
       "sha256": "2840cb7ab4dc7998983955a329c322153c9bf482b8e932d6f0856d965f00827e",
       "kind": "video",
