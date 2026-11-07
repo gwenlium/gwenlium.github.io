@@ -382,6 +382,24 @@
       "kind": "image",
       "width": 1600,
       "height": 734
+    },
+    "/media/whatsapp-image-2026-11-07-at-16-24-36-1-preview-7996804363bc73c2ac7c83e81ad71a07.webp": {
+      "sha256": "7996804363bc73c2ac7c83e81ad71a07c7b7af5bd35b597b6cc54889c6e5dc0c",
+      "kind": "image",
+      "width": 1600,
+      "height": 875
+    },
+    "/media/whatsapp-image-2026-11-07-at-16-24-36-preview-1ac6fc228c14c6d5c097361de1b84a1b.webp": {
+      "sha256": "1ac6fc228c14c6d5c097361de1b84a1b8046313d71d2eb9eac605c4786e8cf9d",
+      "kind": "image",
+      "width": 1600,
+      "height": 866
+    },
+    "/media/whatsapp-image-2026-11-07-at-16-24-50-preview-0420e056c5b0ba82175e032e4140ef68.webp": {
+      "sha256": "0420e056c5b0ba82175e032e4140ef689c2056f6618d180fb12f5b10954403b5",
+      "kind": "image",
+      "width": 1600,
+      "height": 872
     }
   }
 }
