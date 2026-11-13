@@ -60,6 +60,36 @@
       "width": 800,
       "height": 450
     },
+    "/media/2026-11-13-004754627-preview-8fca8e771fe7d24d615d720d1d2a1119.webp": {
+      "sha256": "8fca8e771fe7d24d615d720d1d2a1119c9592856c44fdba969da54485811470d",
+      "kind": "image",
+      "width": 1600,
+      "height": 900
+    },
+    "/media/2026-11-13-004758545-preview-f472c6b5b5f7adc3e58c5a9295e92031.webp": {
+      "sha256": "f472c6b5b5f7adc3e58c5a9295e92031c3ad5ce5fe0baedc07b5a2c60ded0cc8",
+      "kind": "image",
+      "width": 1600,
+      "height": 900
+    },
+    "/media/2026-11-13-004848746-preview-b1c1b477f7f40559acd4a9ab0061e3ce.webp": {
+      "sha256": "b1c1b477f7f40559acd4a9ab0061e3ce49502999a646394e0e8cf1c44a0eca63",
+      "kind": "image",
+      "width": 1600,
+      "height": 900
+    },
+    "/media/2026-11-13-005004695-preview-2eca6ceb652dc0c02ec57f6f6b168e3c.webp": {
+      "sha256": "2eca6ceb652dc0c02ec57f6f6b168e3cb0b27d3d7d7eb399196000972a15c6e1",
+      "kind": "image",
+      "width": 1600,
+      "height": 900
+    },
+    "/media/2026-11-13-005241880-preview-efe07b771b5801e19a6ac089119ddde0.webp": {
+      "sha256": "efe07b771b5801e19a6ac089119ddde058da66ba12f8f2d7d8d433188432d69a",
+      "kind": "image",
+      "width": 1600,
+      "height": 900
+    },
     "/media/c-2026-09-22-22-55-15-7-preview-bd79c321eaee25ccdc65e1e9574a6e4a.mp4": {
       "sha256": "bd79c321eaee25ccdc65e1e9574a6e4a7f56a15993754e18a15cd92e0d5a1908",
       "kind": "video",
@@ -169,6 +199,12 @@
       "kind": "image",
       "width": 1501,
       "height": 1561
+    },
+    "/media/img-20261113-012918-490-preview-f40f044f5006293477e5c20eccc7209e.webp": {
+      "sha256": "f40f044f5006293477e5c20eccc7209e8a9a496c3d4417a55fcf386b2f303373",
+      "kind": "image",
+      "width": 900,
+      "height": 1600
     },
     "/media/lyn-front-preview-6a955fa64a01e2b5356bc0b62a5212ca.webp": {
       "sha256": "1c34f5e0cdc976088d7414ac912a08a75d01495b7740768bc0be1b28d80caf79",
@@ -400,6 +436,18 @@
       "kind": "image",
       "width": 1600,
       "height": 872
+    },
+    "/media/whatsapp-image-2026-11-13-at-00-41-17-preview-52fadfed3294d058ec35853fe7cf7eae.webp": {
+      "sha256": "52fadfed3294d058ec35853fe7cf7eae4f167ac102d5ae8a265816728fb48cbe",
+      "kind": "image",
+      "width": 1600,
+      "height": 898
+    },
+    "/media/whatsapp-image-2026-11-13-at-00-42-23-preview-8175281b600b28ba21729571f828dcc2.webp": {
+      "sha256": "8175281b600b28ba21729571f828dcc2784fa09f5dfc1b10ef078194ee2e8d29",
+      "kind": "image",
+      "width": 1600,
+      "height": 899
     }
   }
 }
