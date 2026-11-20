@@ -90,6 +90,20 @@
       "width": 1600,
       "height": 900
     },
+    "/media/2026-11-20-14-56-08-2-preview-2958ef1c5da1c1748de3c17d9ad41d88.mp4": {
+      "sha256": "2958ef1c5da1c1748de3c17d9ad41d88601dfb855bcd314bb4b3df2582c9a607",
+      "kind": "video",
+      "width": 1280,
+      "height": 720,
+      "duration": 12.766667,
+      "poster": "/media/2026-11-20-14-56-08-2-still-preview-72da972a68e760dfb7170075a97a3140.webp"
+    },
+    "/media/2026-11-20-14-56-08-2-still-preview-72da972a68e760dfb7170075a97a3140.webp": {
+      "sha256": "72da972a68e760dfb7170075a97a314075f2127bf14887c274eb3a21f37135ed",
+      "kind": "image",
+      "width": 1280,
+      "height": 720
+    },
     "/media/c-2026-09-22-22-55-15-7-preview-bd79c321eaee25ccdc65e1e9574a6e4a.mp4": {
       "sha256": "bd79c321eaee25ccdc65e1e9574a6e4a7f56a15993754e18a15cd92e0d5a1908",
       "kind": "video",
